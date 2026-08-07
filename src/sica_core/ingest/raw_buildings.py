@@ -1,8 +1,20 @@
 """Ingest data/buildings.csv verbatim into raw_buildings.
 
-value_land/value_bldg are kept as TEXT — the source mixes plain numbers with
-"$35,407,000.00"-style strings (100% of West End rows use the latter format);
-parsing happens at merge time (see ingest/merge.py::_parse_money), not here.
+value_land/value_bldg are kept as TEXT — historically the source mixed plain
+numbers with "$35,407,000.00"-style strings (100% of pre-2026-08-07 West End
+rows used the latter, an artifact of that subset having gone through a
+separate hand path; 0% elsewhere). Since the vhd pipeline's 2026-08-07
+refresh replaced that two-tier assembly with one uniform city-wide Open Data
+pull, the whole column now arrives plain numeric — `_stringify_money()`
+normalizes either shape to a clean string for storage; actual parsing to a
+number happens at merge time (see ingest/merge.py::_parse_money).
+
+`secondary_addresses`, `folio`, `zoning_district`, `zoning_classification`,
+`bsns_subtype` arrived with that same refresh (see docs/DATA_SOURCES.md).
+`n_pids`, `is_primary_address`, `bldg_land_ratio`, `value_per_unit` dropped
+out of it — left in RAW_BUILDINGS_COLUMNS anyway (they just fill as NULL
+going forward) since nothing downstream reads them and removing them buys
+nothing.
 """
 
 from __future__ import annotations
@@ -39,21 +51,26 @@ IGNORED_COLUMNS = {
 RAW_BUILDINGS_COLUMNS = [
     "local_area",
     "address",
+    "secondary_addresses",
     "primary_address",
     "is_primary_address",
     "n_pids",
     "pid",
+    "folio",
     "units",
     "year_built",
     "bsns_group",
     "bsns_name",
     "bsns_trade_name",
     "bsns_type",
+    "bsns_subtype",
     "value_land",
     "value_bldg",
     "bldg_land_ratio",
     "value_per_unit",
     "zoning",
+    "zoning_district",
+    "zoning_classification",
     "name",
     "management",
     "n_issues",
@@ -61,6 +78,21 @@ RAW_BUILDINGS_COLUMNS = [
     "notes",
     "prospect",
 ]
+
+
+def _stringify_money(v: object) -> object:
+    """Normalize a value_land/value_bldg cell to a clean TEXT-storage string.
+
+    Accepts either historical shape (a "$35,407,000.00"-style string, or a
+    plain number that pandas has already parsed to int/float) and returns a
+    clean string with no currency formatting and no trailing ".0" on whole
+    numbers. None/NaN passes through as None.
+    """
+    if v is None or (isinstance(v, float) and pd.isna(v)):
+        return None
+    if isinstance(v, (int, float)):
+        return str(int(v)) if float(v).is_integer() else str(v)
+    return str(v).strip()
 
 
 def load_raw_buildings_frame(path: str) -> pd.DataFrame:
@@ -75,16 +107,9 @@ def load_raw_buildings_frame(path: str) -> pd.DataFrame:
             "Add them to RAW_BUILDINGS_COLUMNS/schema.sql or IGNORED_COLUMNS, don't drop silently."
         )
 
-    # See CLAUDE.md / schema design notes: the source mixes plain numbers and
-    # currency-formatted strings in these two columns. If a fresh export ever
-    # arrives fully numeric, that's a meaningful change worth knowing about
-    # explicitly rather than silently accepting either shape.
     for col in ("value_land", "value_bldg"):
-        if col in df.columns and df[col].dtype != object:
-            raise RuntimeError(
-                f"buildings.csv '{col}' column is no longer string-typed "
-                f"(dtype={df[col].dtype}) — verify it's still safe to store verbatim as TEXT."
-            )
+        if col in df.columns:
+            df[col] = df[col].apply(_stringify_money)
 
     for col in RAW_BUILDINGS_COLUMNS:
         if col not in df.columns:

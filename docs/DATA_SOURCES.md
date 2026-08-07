@@ -52,11 +52,11 @@ format, cadence, quirks). It stops there.
 
 | Source | Category | Last fetched | Refresh cadence | Consumed by |
 |---|---|---|---|---|
-| [`buildings.csv`](#buildingscsv) | Open Data + hand-added fields ⚠️ | TODO | Ad hoc | `sica_mapping`, `sica_core` |
-| [`property_addresses.csv`](#property_addressescsv) | Open Data portal | TODO | Ad hoc | `sica_mapping`, `sica_core` |
+| [`buildings.csv`](#buildingscsv) | Open Data + FOI, via `vhd` pipeline | 2026-08-07 | Ad hoc, tied to `vhd` | `sica_mapping`, `sica_core` |
+| [`property_addresses.csv`](#property_addressescsv) | Open Data portal, via `vhd` pipeline | 2026-08-07 | Ad hoc, tied to `vhd` | `sica_mapping`, `sica_core` |
 | [`block-outlines.csv`](#block-outlinescsv) | Open Data portal | TODO | Ad hoc | `sica_mapping`, `sica_core` |
 | [`block-numbers.csv`](#block-numberscsv) | Open Data portal | TODO | Ad hoc | `sica_mapping`, `sica_core` |
-| [`local-area-boundary.csv`](#local-area-boundarycsv) | Open Data portal | TODO | Rare (stable boundaries) | `sica_mapping` |
+| [`local-area-boundary.csv`](#local-area-boundarycsv) | Open Data portal, via `vhd` pipeline | 2026-08-07 | Rare (stable boundaries) | `sica_mapping` |
 | [`sra_housing_combined.csv`](#sra_housing_combinedcsv) | FOI? — unverified ⚠️ | 2026-07-30 (file date) | TODO | `sica_mapping` |
 | [`rezoning_applications.csv`](#rezoning_applicationscsv) | FOI? — unverified ⚠️ | 2026-07-30 (file date) | TODO | `sica_mapping` |
 | [`coops_vancouver.csv`](#coops_vancouvercsv) | Third-party online | 2026-08-04 | Periodic (re-run script) | `sica_mapping` |
@@ -81,60 +81,113 @@ the raw CSVs.
   year built, assessed land/building value, zoning, plus City rental
   business-licence fields (`bsns_group`, `bsns_name`, `bsns_trade_name`,
   `bsns_type`).
-- **⚠️ Not a pure Open Data pull.** Several columns in this file —
-  `management`, `n_issues`, `issues_details`, `notes`, `prospect` — read as
-  hand-added/curated, not sourced from the portal
-  (`src/sica_core/ingest/raw_buildings.py` keeps them verbatim but they have
-  no Open Data equivalent). `raw_buildings.py` already strips four other
-  columns — `vtu_members`, `westend_inbox`, `vtu_main_inbox`, `vtu_building`
-  — as "a one-off artifact from manually merging buildings.csv with a small
-  organizing-status tracking sheet." The five kept columns above look like
-  the same kind of thing, just not yet flagged. Worth deciding: are these
-  hand-added columns actually part of this "Open Data" source at all, or do
-  they belong in their own tracked manual layer (arguably close to the
-  future `ownership_claims`/organizer-view model in `CLAUDE.md`)? TODO:
-  your call.
-- **Origin:** TODO — exact dataset URL/export. Likely the portal's rental
-  business licence dataset, joined with something producing land/building
-  values (BC Assessment data via the portal, or a separate export) —
-  unconfirmed.
+- **Origin (confirmed 2026-08-07):** produced by a separate, un-versioned
+  pipeline repo ("vhd" — Vancouver Housing Data,
+  `~/Projects/VTU/vancouver-housing-data`), not pulled from Open Data
+  directly by this repo. `vhd`'s `scripts/build_buildings.py` joins the
+  City's Open Data Explore API v2.1 pull (property-addresses,
+  property-tax-report, business-licences, etc.) with a 2023/2024 FOI
+  rental-inventory release and a hand-maintained `landlord_mapping.toml`,
+  writing `processed/buildings.csv`. Pulled into this repo's `data/` via
+  `scripts/sync_from_vhd.py` (see "Syncing from vhd" below) — most recently
+  2026-08-07.
+- **`management`, `n_issues`, `issues_details` are part of this source**,
+  not a hand-added local artifact — confirmed by their presence in `vhd`'s
+  own `processed/buildings.csv` output (sourced from `landlord_mapping.toml`
+  there). `notes`/`prospect` are *not* in `vhd`'s output at all — genuinely
+  local/hand-added columns of unclear origin; kept verbatim by
+  `raw_buildings.py` but worth eventually tracing or retiring.
+  `vtu_members`/`westend_inbox`/`vtu_main_inbox`/`vtu_building` remain
+  correctly identified as a one-off local artifact (see
+  [[project_organizer_view_deferred]]) — `raw_buildings.py` strips them.
 - **License/attribution:** TODO — Vancouver Open Data's default license
-  (Open Government Licence – Vancouver) likely applies; confirm and note any
-  attribution requirement once the exact dataset is identified.
-- **Geographic scope:** appears pre-filtered to West End already in this
-  file (or filtered downstream — TODO confirm which).
-- **Access method:** manual download from the portal (steps TODO).
-- **Format/known quirks:** `value_land`/`value_bldg` are `TEXT`, not
-  numeric — 100% of West End rows use `"$35,407,000.00"`-style formatting.
-  A prior version of the pipeline's bare `pd.to_numeric(errors="coerce")`
-  silently nulled every West End row on this; fixed in
-  `sica_core/ingest/merge.py::_parse_money()`. If a fresh export ever
-  arrives fully numeric, `raw_buildings.py` raises rather than silently
-  accepting the new shape.
+  (Open Government Licence – Vancouver) likely applies to the underlying
+  Open Data portions; confirm once `vhd`'s exact dataset list per pull is
+  documented there.
+- **Geographic scope:** citywide (no West-End restriction — see CLAUDE.md
+  Section 2, Q3).
+- **Access method:** re-run `vhd`'s pipeline scripts against its own config,
+  then `scripts/sync_from_vhd.py` to pull the result into this repo.
+- **Format/known quirks:**
+  - `value_land`/`value_bldg`: **as of the 2026-08-07 `vhd` refresh, plain
+    numeric city-wide.** Historically (pre-refresh) 100% of West End rows
+    arrived as `"$35,407,000.00"`-style strings while the rest of the city
+    was plain numeric — an artifact of West End having gone through a
+    separate hand path in the old pipeline. `vhd`'s rebuild replaced that
+    two-tier assembly with one uniform Open Data pull, so the formatting
+    split is gone. `raw_buildings.py::_stringify_money()` normalizes either
+    shape to a clean string for TEXT storage; `ingest/merge.py::_parse_money()`
+    still does the actual numeric parse at merge time and still handles
+    both shapes, in case a future pull reintroduces currency formatting for
+    some subset.
+  - `pid`/`folio`: semicolon-joined lists when a building spans multiple
+    parcels (1,045/5,146 rows in the 2026-08-07 pull). ~7% of
+    `property_addresses.csv` rows carry a plan number (e.g. `EPS5265`)
+    instead of a numeric PID (bare-land-strata/common-property parcels) —
+    `folio`/`value_land`/`value_bldg` are null on those.
+  - `secondary_addresses` (new 2026-08-07): semicolon-joined list of other
+    civic addresses VanMaps resolves to the same building as `address`
+    (e.g. multiple street-facing entrances on one podium building). Used by
+    `src/sica_mapping/data/overlays.py::_load_secondary_address_index()` as
+    a fallback when matching co-op/SRO records that were geocoded to a
+    secondary address rather than the building's primary one — lifted
+    SRO/SRA match rate from 41/171 (24%) to 53/171 (31%) on the 2026-08-07
+    data. Not used for rezoning matching (keys off project name, not a
+    civic address).
+  - `folio`, `zoning_district`, `zoning_classification`, `bsns_subtype`:
+    also new in the 2026-08-07 pull; stored verbatim, not yet consumed
+    downstream beyond raw browsability.
+  - `n_pids`, `is_primary_address` (`address is primary?`), `bldg_land_ratio`,
+    `value_per_unit`: present in older pulls, **absent** from `vhd`'s
+    2026-08-07 output. Nothing downstream reads them (bldg_land_ratio is
+    recomputed from value_bldg/value_land at merge time if missing) — left
+    in `raw_buildings.py`'s column list as always-null rather than removed.
 - **Output location:** `data/buildings.csv`.
 - **Consumed by:** `sica_mapping` (`config.toml` → `buildings`), `sica_core`
   (`ingest/raw_buildings.py`).
-- **Refresh cadence:** ad hoc / not tracked historically. TODO: decide one.
+- **Refresh cadence:** ad hoc, tied to `vhd`'s own refresh cadence (also ad
+  hoc today). Last synced 2026-08-07.
 
 ### `property_addresses.csv`
 
 - **What it is:** civic addresses with lat/lon and local-area tagging —
   used to geocode buildings and recover missing coordinates.
-- **Origin:** TODO — exact dataset URL (columns `civic_number`,
-  `geo_local_area`, `geom`, `p_parcel_id`, `pcoord`, `site_id`,
-  `std_street`, `geo_point_2d` strongly suggest the portal's "Property
-  Addresses" dataset; URL unconfirmed).
-- **License/attribution:** TODO.
+- **Origin (confirmed 2026-08-07):** also `vhd` — its `raw/property-addresses.csv`
+  is a direct, unmodified City Open Data Explore API v2.1 pull (dataset
+  "Property Addresses"; columns `civic_number`, `geo_local_area`, `geom`,
+  `p_parcel_id`, `pcoord`, `site_id`, `std_street`, `geo_point_2d` match
+  exactly). Pulled into this repo via `scripts/sync_from_vhd.py`, same as
+  `buildings.csv`.
+- **License/attribution:** Open Government Licence – Vancouver (Open Data
+  portal default) — TODO: confirm no additional attribution needed.
 - **Geographic scope:** citywide (filtered to West End downstream by the
   pipelines, not in the file itself).
-- **Access method:** manual download (steps TODO).
+- **Access method:** `vhd`'s `scripts/download_data.py`, then
+  `scripts/sync_from_vhd.py` into this repo.
 - **Format/known quirks:** `geo_point_2d` holds `"lat,lon"` as a single
   string, parsed downstream. `sica_core/ingest/raw_addresses.py` raises on
   any column not in its allow-list rather than silently dropping it.
+  Header casing has varied between pulls (`Geo Local Area` vs
+  `geo_local_area`) — harmless, `normalize_cols()` lowercases before the
+  allow-list check either way.
 - **Output location:** `data/property_addresses.csv`.
 - **Consumed by:** `sica_mapping` (`config.toml` → `addresses`), `sica_core`
   (`ingest/raw_addresses.py`).
-- **Refresh cadence:** ad hoc / not tracked historically. TODO: decide one.
+- **Refresh cadence:** ad hoc, tied to `vhd`'s own refresh cadence. Last
+  synced 2026-08-07.
+
+### Syncing from vhd
+
+`buildings.csv`, `property_addresses.csv`, and `local-area-boundary.csv`
+originate from `vhd` (`~/Projects/VTU/vancouver-housing-data`, output
+directory `~/Projects/VTU/vancouver-housing-data-dir` — both machine-local
+paths, not committed anywhere). That output directory is **not** version
+controlled and can be mid-regeneration at any moment, so this repo never
+reads it directly — `scripts/sync_from_vhd.py` copies the relevant files
+into this repo's git-tracked `data/`, giving every ingested vintage real
+history (`git diff`/`git log` on the CSV), the same way `ownership_claims.csv`
+already works. Run it, review `git diff data/`, then re-ingest
+(`uv run python scripts/rebuild_map.py`).
 
 ### `block-outlines.csv`
 
@@ -179,11 +232,17 @@ the raw CSVs.
   used to assign a `local_area` to overlay records (co-ops, SRO/SRA,
   rezoning applications) that don't already carry one that matches the
   sidebar's neighbourhood checkboxes.
-- **Origin:** TODO — exact dataset URL/name (likely the portal's "Local
-  Area Boundary" dataset).
-- **License/attribution:** TODO.
+- **Origin (confirmed 2026-08-07):** `vhd`'s `raw/local-area-boundary.csv`,
+  a City Open Data pull (portal's "Local Area Boundary" dataset). Same
+  provenance as `buildings.csv`/`property_addresses.csv` — see "Syncing
+  from vhd" above.
+- **License/attribution:** Open Government Licence – Vancouver (Open Data
+  portal default) — TODO: confirm no additional attribution needed.
 - **Geographic scope:** citywide, all 22 local areas.
-- **Access method:** manual download (steps TODO).
+- **Access method:** `scripts/sync_from_vhd.py` (see "Syncing from vhd"
+  above). The 2026-08-07 re-pull came back byte-different (re-simplified
+  polygon coordinates) but row-count-identical — boundaries themselves
+  didn't change, just their geometry encoding.
 - **Format/known quirks:** GeoJSON-style `FeatureCollection`, `properties.name`
   used as the area label. `src/sica_mapping/data/overlays.py` deliberately
   does *not* trust each overlay source's own free-text area field (e.g. the
@@ -192,7 +251,8 @@ the raw CSVs.
 - **Output location:** `data/local-area-boundary.csv`.
 - **Consumed by:** `sica_mapping` only (`overlays.py`) — not yet ingested
   into `sica_core`.
-- **Refresh cadence:** rare — official boundaries change infrequently.
+- **Refresh cadence:** rare — official boundaries change infrequently. Last
+  synced 2026-08-07 (via `vhd`, content unchanged).
 
 ---
 

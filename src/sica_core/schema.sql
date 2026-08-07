@@ -16,21 +16,26 @@ CREATE TABLE raw_buildings (
     raw_building_id INTEGER PRIMARY KEY,
     local_area TEXT,
     address TEXT,
+    secondary_addresses TEXT,  -- semicolon-joined list of other civic addresses VanMaps resolves to this same building
     primary_address TEXT,
     is_primary_address INTEGER,
     n_pids INTEGER,
-    pid TEXT,
+    pid TEXT,                  -- semicolon-joined list when a building spans multiple PIDs
+    folio TEXT,                -- semicolon-joined list, same reason
     units INTEGER,
     year_built INTEGER,
     bsns_group TEXT,
     bsns_name TEXT,
     bsns_trade_name TEXT,
     bsns_type TEXT,
+    bsns_subtype TEXT,
     value_land TEXT,        -- verbatim: source mixes plain numbers and "$..." strings; parse at merge time
     value_bldg TEXT,        -- verbatim, same reason
     bldg_land_ratio REAL,
     value_per_unit TEXT,
     zoning TEXT,
+    zoning_district TEXT,
+    zoning_classification TEXT,
     name TEXT,
     management TEXT,
     n_issues INTEGER,
