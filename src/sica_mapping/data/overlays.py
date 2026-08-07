@@ -23,8 +23,18 @@ source needs different preprocessing before it produces a clean key:
   multi-lot assemblies) don't correspond to any row in buildings.csv at all,
   regardless of parsing quality.
 
-Measured match rates against buildings.csv (5,112 rows, citywide): co-ops
-42/117 (36%), SRO/SRA 41/171 (24%), rezoning ~43/377 (11%).
+Co-ops and SRO/SRA additionally get a secondary-address fallback: since the
+vhd pipeline's 2026-08-07 refresh, `buildings.csv` carries a
+`secondary_addresses` column (other civic addresses VanMaps resolves to the
+same building — e.g. a podium building with several street-facing unit
+entrances). A source record whose address doesn't key-match any building's
+own `address` may still key-match one of those secondary addresses; see
+`_load_secondary_address_index`. Not applied to rezoning, which doesn't key
+off a civic address in the first place.
+
+Measured match rates against buildings.csv (5,112 rows, citywide, pre-
+secondary-address fallback): co-ops 42/117 (36%), SRO/SRA 41/171 (24%),
+rezoning ~43/377 (11%).
 """
 
 from __future__ import annotations
@@ -67,6 +77,53 @@ def _load_optional_csv(path: str | None, label: str) -> pd.DataFrame | None:
         logger.warning("%s CSV not found, skipping overlay: %s", label, path)
         return None
     return normalize_cols(read_any_csv(path))
+
+
+def _load_secondary_address_index(buildings_path: str | None) -> dict[str, str]:
+    """secondary-address addr_key -> owning building's own addr_key.
+
+    Built directly from buildings.csv rather than from `pts_df`, so this
+    works regardless of which pipeline produced `pts_df` (the legacy CSV
+    path or sica_core's exported cache) without either needing to carry
+    `secondary_addresses` through their own merge/dedup logic. Returns {} on
+    any older buildings.csv vintage that lacks the column — pure fallback,
+    never required.
+    """
+    if not buildings_path or not Path(buildings_path).exists():
+        return {}
+    df = normalize_cols(read_any_csv(buildings_path))
+    if "secondary_addresses" not in df.columns or "address" not in df.columns:
+        return {}
+
+    index: dict[str, str] = {}
+    for _, row in df.iterrows():
+        secs = row.get("secondary_addresses")
+        if secs is None or (isinstance(secs, float) and pd.isna(secs)):
+            continue
+        secs = str(secs).strip()
+        if not secs:
+            continue
+        primary_key = addr_key_from_freeform(row.get("address"))
+        for sec_addr in secs.split(";"):
+            sec_addr = sec_addr.strip()
+            if not sec_addr:
+                continue
+            sec_key = addr_key_from_freeform(sec_addr)
+            # First building to claim a given secondary address wins; a
+            # genuine collision (two buildings listing the same secondary
+            # address) would be a data question for vhd, not something to
+            # silently pick a "better" side of here.
+            index.setdefault(sec_key, primary_key)
+    return index
+
+
+def _resolve_via_secondary(addr_keys: pd.Series, known_keys: set[str], secondary_index: dict[str, str]) -> pd.Series:
+    """Remap keys that miss `known_keys` directly but hit the secondary-address index."""
+    if not secondary_index:
+        return addr_keys
+    return addr_keys.apply(
+        lambda k: k if k in known_keys else secondary_index.get(k, k)
+    )
 
 
 def _build_boundary_polys(local_area_boundary_fc: dict) -> list[tuple[str, object]]:
@@ -126,10 +183,18 @@ def match_overlays(
     sro_path: str | None,
     rezoning_path: str | None,
     local_area_boundary_fc: dict,
+    buildings_path: str | None = None,
 ) -> OverlayResult:
     df = pts_df.copy()
     addr_keys = set(df["addr_key"])
     boundary_polys = _build_boundary_polys(local_area_boundary_fc)
+    secondary_index = _load_secondary_address_index(buildings_path)
+    if secondary_index:
+        logger.info(
+            "Secondary-address fallback: %d addresses across buildings.csv "
+            "available for co-op/SRO matching",
+            len(secondary_index),
+        )
     unmatched_records: list[dict] = []
 
     # Defaults for every new column, so downstream code (add_buildings_layers,
@@ -156,6 +221,7 @@ def match_overlays(
     if coops is not None:
         coops = coops.copy()
         coops["addr_key"] = coops["address"].apply(_coop_addr_key)
+        coops["addr_key"] = _resolve_via_secondary(coops["addr_key"], addr_keys, secondary_index)
         matched_mask = coops["addr_key"].isin(addr_keys)
         matched = coops[matched_mask].drop_duplicates("addr_key")
         unmatched = coops[~matched_mask]
@@ -205,6 +271,7 @@ def match_overlays(
     if sro is not None:
         sro = sro.copy()
         sro["addr_key"] = sro["address"].apply(_sro_addr_key)
+        sro["addr_key"] = _resolve_via_secondary(sro["addr_key"], addr_keys, secondary_index)
         matched_mask = sro["addr_key"].isin(addr_keys)
         matched = sro[matched_mask].drop_duplicates("addr_key")
         unmatched = sro[~matched_mask]

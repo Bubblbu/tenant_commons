@@ -186,6 +186,7 @@ def build_map(args) -> None:
         sro_path=getattr(args, "sro_housing", None),
         rezoning_path=getattr(args, "rezoning_applications", None),
         local_area_boundary_fc=neighbourhoods_fc,
+        buildings_path=getattr(args, "buildings", None),
     )
     pts_df = overlay_result.pts_df
 
