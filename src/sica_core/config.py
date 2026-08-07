@@ -35,6 +35,14 @@ class IngestConfig:
     # ingest/ownership_claims.py). Not in _REQUIRED_PATHS — unlike the other
     # sources, there may genuinely be no claims yet to import.
     ownership_claims: str | None = None
+    # Optional: SRO/SRA, co-op, and rezoning-application overlays (see
+    # ingest/raw_sro.py, raw_coops.py, raw_rezoning.py). Same config.toml
+    # keys sica_mapping already uses for these (sro_housing/coops/
+    # rezoning_applications) — not required, since a fresh setup may not
+    # have these sources configured yet.
+    sro_housing: str | None = None
+    coops: str | None = None
+    rezoning_applications: str | None = None
 
 
 def _load_raw(path: str) -> dict[str, object]:
@@ -78,5 +86,10 @@ def load_ingest_config(path: str) -> IngestConfig:
         bbox=bbox,
         ownership_claims=(
             str(flat["ownership_claims"]) if flat.get("ownership_claims") else None
+        ),
+        sro_housing=str(flat["sro_housing"]) if flat.get("sro_housing") else None,
+        coops=str(flat["coops"]) if flat.get("coops") else None,
+        rezoning_applications=(
+            str(flat["rezoning_applications"]) if flat.get("rezoning_applications") else None
         ),
     )

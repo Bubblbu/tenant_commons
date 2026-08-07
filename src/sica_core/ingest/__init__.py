@@ -6,6 +6,12 @@ point-in-polygon assignment), then membership (needs buildings.addr_key to
 resolve building_id), then ownership_claims last (independent of everything
 else, but kept at the end since it's the one optional/persistent source).
 
+raw_sro/raw_coops/raw_rezoning are raw storage only (see raw_sro.py's
+docstring) — no FK relationship to buildings, so their position among the
+raw tables is arbitrary; grouped with the other raw ingests for readability.
+All three are optional, same as ownership_claims, since a fresh setup may
+not have them configured.
+
 Each stage's inserts are already scoped in their own transaction. If a stage
 fails partway, nothing is silently left half-correct: every REBUILDABLE table
 gets dropped and recreated by `init_db()` at the start of the next run, so
@@ -39,6 +45,9 @@ from .merge import run_merge
 from .ownership_claims import ingest_ownership_claims
 from .raw_addresses import ingest_raw_addresses
 from .raw_buildings import ingest_raw_buildings
+from .raw_coops import ingest_raw_coops
+from .raw_rezoning import ingest_raw_rezoning
+from .raw_sro import ingest_raw_sro
 from .tracking import new_run_id, record_run
 
 logger = logging.getLogger("sica_core.ingest")
@@ -84,6 +93,21 @@ def run_ingest(conn: sqlite3.Connection, config: IngestConfig) -> dict[str, int]
     counts["raw_block_numbers"] = run_source(
         conn, run_id, "raw_block_numbers", ingest_raw_block_numbers, conn, config.block_numbers
     )
+    # SRO/co-op/rezoning: independent of everything else (no FK, not merged
+    # into buildings — see raw_sro.py's docstring), optional since a fresh
+    # setup may not have these sources configured yet.
+    if config.sro_housing:
+        counts["raw_sro"] = run_source(
+            conn, run_id, "raw_sro", ingest_raw_sro, conn, config.sro_housing
+        )
+    if config.coops:
+        counts["raw_coops"] = run_source(
+            conn, run_id, "raw_coops", ingest_raw_coops, conn, config.coops
+        )
+    if config.rezoning_applications:
+        counts["raw_rezoning"] = run_source(
+            conn, run_id, "raw_rezoning", ingest_raw_rezoning, conn, config.rezoning_applications
+        )
     counts["buildings"] = run_source(conn, run_id, "buildings", run_merge, conn)
     counts["vtu_membership"] = run_source(
         conn, run_id, "vtu_membership", ingest_membership, conn, config.vtu

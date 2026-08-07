@@ -10,6 +10,9 @@ DROP TABLE IF EXISTS blocks;
 DROP TABLE IF EXISTS raw_addresses;
 DROP TABLE IF EXISTS raw_buildings;
 DROP TABLE IF EXISTS raw_block_numbers;
+DROP TABLE IF EXISTS raw_sro;
+DROP TABLE IF EXISTS raw_coops;
+DROP TABLE IF EXISTS raw_rezoning;
 DROP VIEW IF EXISTS block_stats;
 
 CREATE TABLE raw_buildings (
@@ -72,6 +75,70 @@ CREATE TABLE raw_block_numbers (
     geo_local_area TEXT,
     geom TEXT,
     geo_point_2d TEXT,      -- "lat, lon" verbatim
+    ingested_at TEXT NOT NULL
+);
+
+-- SRO/SRA, co-op, and rezoning-application sources: raw storage only, for
+-- browsability (CLAUDE.md Q8b) — no address/name-key matching against
+-- buildings happens at ingest time. That logic stays in
+-- src/sica_mapping/data/overlays.py::match_overlays(), which runs at
+-- map-render time directly against the source CSVs. See docs/DATA_SOURCES.md
+-- for each source's (partially unverified) origin.
+CREATE TABLE raw_sro (
+    raw_sro_id INTEGER PRIMARY KEY,
+    source_id TEXT,            -- the source's own "ID" column
+    address TEXT,
+    building_name TEXT,
+    secondary_address TEXT,
+    area TEXT,
+    latitude REAL,
+    longitude REAL,
+    owner TEXT,
+    operator TEXT,
+    operator_group TEXT,
+    ownership_group TEXT,
+    registered_rooms INTEGER,
+    occupancy_status TEXT,
+    match_method TEXT,        -- upstream address-matching flag from whoever combined the source lists; unrelated to our own matching
+    ingested_at TEXT NOT NULL
+);
+CREATE INDEX idx_raw_sro_address ON raw_sro(address);
+
+CREATE TABLE raw_coops (
+    raw_coop_id INTEGER PRIMARY KEY,
+    source_id TEXT,            -- the source's own "id" column
+    title TEXT,
+    city TEXT,
+    region TEXT,
+    neighbourhood TEXT,
+    school_district TEXT,
+    address TEXT,
+    lat REAL,
+    lon REAL,
+    status TEXT,
+    ownership_model TEXT,
+    bedrooms_min REAL,
+    bedrooms_max REAL,
+    home_types TEXT,
+    features TEXT,
+    summary TEXT,
+    featured_image TEXT,
+    website TEXT,
+    read_more_url TEXT,
+    ingested_at TEXT NOT NULL
+);
+CREATE INDEX idx_raw_coops_address ON raw_coops(address);
+
+CREATE TABLE raw_rezoning (
+    raw_rezoning_id INTEGER PRIMARY KEY,
+    source_id TEXT,            -- the source's own "ID" column (e.g. "RZ285"); NOT reliably unique per row
+    name TEXT,
+    status TEXT,
+    category TEXT,
+    status_detail TEXT,
+    latitude REAL,
+    longitude REAL,
+    link TEXT,
     ingested_at TEXT NOT NULL
 );
 
