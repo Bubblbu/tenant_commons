@@ -148,8 +148,16 @@ GROUP BY bl.block_id;
 -- never issue a DROP against anything in this section.
 -- ============================================================
 
+-- claim_key: a stable idempotency key, independent of claim_id (which doesn't
+-- exist yet when a row is being drafted). Bulk-CSV imports (see
+-- ingest/ownership_claims.py) require a human-authored one so re-running
+-- against an edited research spreadsheet updates existing rows instead of
+-- duplicating them; record_claim() auto-generates one (a UUID) for callers
+-- that don't supply one (e.g. a future single-record entry form). Always
+-- present either way — never a sometimes-null column.
 CREATE TABLE IF NOT EXISTS ownership_claims (
     claim_id INTEGER PRIMARY KEY,
+    claim_key TEXT NOT NULL UNIQUE,
     entity_a TEXT NOT NULL,
     entity_b TEXT NOT NULL,
     relationship TEXT NOT NULL,
@@ -167,3 +175,21 @@ CREATE TABLE IF NOT EXISTS ownership_claims (
 CREATE INDEX IF NOT EXISTS idx_claims_entity_a ON ownership_claims(entity_a);
 CREATE INDEX IF NOT EXISTS idx_claims_entity_b ON ownership_claims(entity_b);
 CREATE INDEX IF NOT EXISTS idx_claims_status ON ownership_claims(status);
+
+-- Pipeline run history — tracks every source ingested on every run_ingest()
+-- invocation, not just claims. Flat: one row per (run_id, source_name).
+-- Never dropped, same persistence invariant as ownership_claims, for the
+-- same reason — losing run history on every rebuild would defeat the point
+-- of keeping it. See ingest/tracking.py.
+CREATE TABLE IF NOT EXISTS ingest_runs (
+    run_entry_id INTEGER PRIMARY KEY,
+    run_id TEXT NOT NULL,
+    source_name TEXT NOT NULL,
+    started_at TEXT NOT NULL,
+    finished_at TEXT NOT NULL,
+    status TEXT NOT NULL CHECK (status IN ('success','failure')),
+    row_count INTEGER,
+    error_message TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_ingest_runs_run_id ON ingest_runs(run_id);
+CREATE INDEX IF NOT EXISTS idx_ingest_runs_source ON ingest_runs(source_name);

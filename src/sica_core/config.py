@@ -31,6 +31,10 @@ class IngestConfig:
     vtu: str
     db_path: str = DEFAULT_DB_PATH
     bbox: tuple[float, float, float, float] = (-123.18, 49.265, -123.10, 49.295)
+    # Optional: manually-curated ownership research CSV (see
+    # ingest/ownership_claims.py). Not in _REQUIRED_PATHS — unlike the other
+    # sources, there may genuinely be no claims yet to import.
+    ownership_claims: str | None = None
 
 
 def _load_raw(path: str) -> dict[str, object]:
@@ -72,4 +76,7 @@ def load_ingest_config(path: str) -> IngestConfig:
         vtu=str(flat["vtu"]),
         db_path=str(flat.get("sica_core_db", DEFAULT_DB_PATH)),
         bbox=bbox,
+        ownership_claims=(
+            str(flat["ownership_claims"]) if flat.get("ownership_claims") else None
+        ),
     )

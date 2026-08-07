@@ -1,0 +1,3 @@
+claim_key,entity_a,entity_b,relationship,source_type,source_note,reported_by,date_reported,confidence,status
+numbered-co-733603-kim,0733603 BC Ltd,Phil Kim,same_entity,tenant_report,"Tenant at 320 Abbott St said the property manager referred to the owner as ""Phil Kim""; matches the numbered company listed on title.",jsmith,2026-08-04,unconfirmed,active
+wall-portfolio-hastings-carrall,1030163 BC Ltd,1058063 BC Ltd,common_owner,manual_research,Both registered to the same mailing address in a BC Registry search; believed to be Chris Wall's holding companies.,jsmith,2026-08-05,confirmed,active
