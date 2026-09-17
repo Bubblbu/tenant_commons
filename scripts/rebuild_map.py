@@ -46,7 +46,7 @@ def main() -> int:
     print(f"Ingest complete: {counts}")
 
     print(f"Exporting to {DATA_DIR} ...")
-    export_to_cache(conn, DATA_DIR)
+    export_to_cache(conn, DATA_DIR, pid_address_map_path=config.pid_address_map)
 
     print("Rendering map via build_sica_map.py --stage frontend ...")
     subprocess.run(

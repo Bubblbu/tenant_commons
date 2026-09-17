@@ -8,8 +8,14 @@ claim_key logic and the write-time entity normalization, not two.
 
 Entity resolution: this project deliberately has no canonical-entities/alias
 table. Trivial spelling/formatting noise (case, stray whitespace, list-like
-string artifacts) is collapsed automatically here via clean_owner_label().
-Everything else — a numbered company turning out to be a named person, two
+string artifacts, punctuation like a trailing period on a legal suffix) is
+collapsed automatically here — clean_owner_label() handles display cleanup,
+and record_claim() additionally collapses onto an existing entity's exact
+stored spelling whenever only that kind of noise differs (via
+find_similar_entity()'s sanitize_owner()-based key), so "GLR PROPERTIES LTD"
+and "GLR PROPERTIES LTD." always accumulate under one stored entity_a/
+entity_b string instead of silently splitting a portfolio in two. Everything
+else — a numbered company turning out to be a named person, two
 differently-spelled names turning out to be the same legal entity, two
 legally-distinct entities sharing a beneficial owner — is recorded as a
 claim, not merged at the schema level. Relationship-value convention:
@@ -40,6 +46,18 @@ _CLAIM_FIELDS = (
 )
 
 
+def _resolve_entity_label(conn: sqlite3.Connection, entity: str) -> str:
+    """clean_owner_label() plus an automatic collapse onto an existing
+    entity's exact stored spelling when only trivial formatting noise
+    (case/whitespace/punctuation) differs, via find_similar_entity()'s
+    sanitize_owner()-based key. Genuine entity resolution — a numbered
+    company turning out to be a named person — is deliberately NOT handled
+    here; see module docstring.
+    """
+    cleaned = clean_owner_label(entity)
+    return find_similar_entity(conn, cleaned) or cleaned
+
+
 def record_claim(
     conn: sqlite3.Connection,
     entity_a: str,
@@ -63,9 +81,11 @@ def record_claim(
     (auto-generating a UUID if the caller didn't supply one). Returns the
     row's claim_id either way.
 
-    entity_a/entity_b are passed through clean_owner_label() before
-    storage — collapses case/whitespace/list-artifact noise so trivial
-    spelling variants never even reach the table; see module docstring for
+    entity_a/entity_b are passed through clean_owner_label() before storage,
+    then collapsed onto an existing entity's exact stored spelling if one
+    with the same sanitize_owner() key already exists — collapses case/
+    whitespace/punctuation/list-artifact noise so trivial spelling variants
+    never accumulate as separate stored entities; see module docstring for
     why genuine entity resolution deliberately isn't handled here.
     """
     for field_name, value in (
@@ -77,8 +97,8 @@ def record_claim(
         if value is None or not str(value).strip():
             raise ValueError(f"record_claim: {field_name} is required and cannot be empty")
 
-    entity_a = clean_owner_label(entity_a)
-    entity_b = clean_owner_label(entity_b)
+    entity_a = _resolve_entity_label(conn, entity_a)
+    entity_b = _resolve_entity_label(conn, entity_b)
     claim_key = claim_key or uuid.uuid4().hex
     now = datetime.now(timezone.utc).isoformat()
 

@@ -35,9 +35,12 @@ from shapely.strtree import STRtree
 from .building_metrics import BUILDING_METRICS, _summarize_metric, build_building_metrics
 from .geometry import parse_geom
 from .membership_metrics import compute_building_member_metrics, membership_filter_config
+from .portfolios import build_landlord_portfolios
 
 
-def reconstruct_points(conn: sqlite3.Connection, now: pd.Timestamp) -> pd.DataFrame:
+def reconstruct_points(
+    conn: sqlite3.Connection, now: pd.Timestamp, pid_address_map_path: str | None = None
+) -> pd.DataFrame:
     buildings = pd.read_sql_query("SELECT * FROM buildings", conn)
     landlords = pd.read_sql_query(
         "SELECT landlord_id, display_name, owner_key FROM landlords", conn
@@ -69,13 +72,43 @@ def reconstruct_points(conn: sqlite3.Connection, now: pd.Timestamp) -> pd.DataFr
         0.0,
     )
 
+    # Claims-derived landlord portfolios (CLAUDE.md Phase 1: "wire in claims-
+    # derived landlord clustering"), joined onto buildings via PID rather than
+    # the vhd-derived owner_group label — see portfolios.py's module docstring
+    # for why. Only buildings reached by a confirmed common_owner cluster get
+    # a non-null portfolio_name; where present it becomes the displayed/
+    # grouped owner_group/owner_key outright (for now — see portfolios.py),
+    # so search, the Landlords tab, and hover-highlight all pick it up with
+    # no separate code path. portfolio_building_count/portfolio_entities are
+    # kept alongside for the popup's "N buildings, M linked entities" detail.
+    portfolios = (
+        build_landlord_portfolios(conn, pid_address_map_path)
+        if pid_address_map_path
+        else {}
+    )
+    merged["portfolio_name"] = merged["addr_key"].map(
+        lambda k: portfolios[k].portfolio_name if k in portfolios else None
+    )
+    merged["portfolio_building_count"] = merged["addr_key"].map(
+        lambda k: len(portfolios[k].addr_keys) if k in portfolios else None
+    )
+    merged["portfolio_entities"] = merged["addr_key"].map(
+        lambda k: portfolios[k].entities if k in portfolios else None
+    )
+    portfolio_key = merged["addr_key"].map(
+        lambda k: portfolios[k].portfolio_key if k in portfolios else None
+    )
+    merged["owner_group"] = merged["portfolio_name"].fillna(merged["owner_group"])
+    merged["owner_key"] = portfolio_key.fillna(merged["owner_key"])
+
     return merged[
         [
             "addr_key", "address", "lat", "lon", "units", "year_built", "n_issues",
             "member_count", "has_vtu_member", "member_share_building", "owner_group",
             "owner_key", "member_count_all", "members_payload", "value_land",
             "value_bldg", "bldg_land_ratio", "local_area", "b_id", "block_id",
-            "latest_membership_year",
+            "latest_membership_year", "portfolio_name", "portfolio_building_count",
+            "portfolio_entities",
         ]
     ]
 
@@ -279,14 +312,17 @@ def reconstruct_filter_config(
 
 
 def export_to_cache(
-    conn: sqlite3.Connection, data_dir: str | Path, now: pd.Timestamp | None = None
+    conn: sqlite3.Connection,
+    data_dir: str | Path,
+    now: pd.Timestamp | None = None,
+    pid_address_map_path: str | None = None,
 ) -> None:
     if now is None:
         now = pd.Timestamp.now(tz="UTC")
     data_dir = Path(data_dir)
     data_dir.mkdir(parents=True, exist_ok=True)
 
-    points_df = reconstruct_points(conn, now)
+    points_df = reconstruct_points(conn, now, pid_address_map_path)
     blocks_df = reconstruct_blocks(conn, points_df)
     filter_cfg = reconstruct_filter_config(conn, points_df, blocks_df, now)
 

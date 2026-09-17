@@ -79,18 +79,21 @@ def ingest_ownership_claims(conn: sqlite3.Connection, path: str) -> int:
         entity_a = _cell(row, "entity_a")
         entity_b = _cell(row, "entity_b")
 
-        # Soft nudge only — doesn't block the import, doesn't merge anything.
-        # See claims.py's module docstring: genuine entity resolution is a
-        # claim (same_entity/common_owner), this just flags a possible typo.
+        # Informational only — record_claim() itself now auto-collapses this
+        # exact case (same sanitize_owner() key, different spelling) onto the
+        # existing stored label, so this is a paper trail for that automatic
+        # collapse, not a prompt for a human decision. Genuine entity
+        # resolution (different sanitize_owner() keys, same real owner) still
+        # requires a same_entity/common_owner claim — see claims.py's module
+        # docstring.
         for entity in (entity_a, entity_b):
             if entity is None:
                 continue
             similar = find_similar_entity(conn, entity)
             if similar is not None:
-                logger.warning(
-                    "ownership_claims: %r looks similar to existing entity %r "
-                    "(claim_key=%s) — same entity typed differently, or a "
-                    "genuine same_entity/common_owner claim worth recording?",
+                logger.info(
+                    "ownership_claims: %r auto-collapsed onto existing entity %r "
+                    "(claim_key=%s) — same entity, formatting difference only.",
                     entity, similar, claim_key,
                 )
 

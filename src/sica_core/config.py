@@ -53,6 +53,11 @@ class IngestConfig:
     # imported standalone via scripts/import_lotr_claims.py, decoupled from
     # the main rebuild cadence.
     lotr_ownership: str | None = None
+    # Optional: PID -> addr_key bridge (scripts/export_pid_address_map.py).
+    # Used by portfolios.py to join claims-derived landlord clusters onto
+    # buildings for the map export; absent it, export_to_cache() just skips
+    # portfolio attachment.
+    pid_address_map: str | None = None
 
 
 def _load_raw(path: str) -> dict[str, object]:
@@ -104,5 +109,8 @@ def load_ingest_config(path: str) -> IngestConfig:
         ),
         lotr_ownership=(
             str(flat["lotr_ownership"]) if flat.get("lotr_ownership") else None
+        ),
+        pid_address_map=(
+            str(flat["pid_address_map"]) if flat.get("pid_address_map") else None
         ),
     )

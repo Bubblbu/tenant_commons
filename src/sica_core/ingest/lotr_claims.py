@@ -47,26 +47,26 @@ class _Group(NamedTuple):
     dates: list[str]
 
 
-def _norm(value: str | None) -> str:
-    return (value or "").strip().casefold()
-
-
 def _clean(value: str | None) -> str | None:
     text = (value or "").strip()
     return text or None
 
 
 def _build_groups(rows: list[tuple]) -> dict[tuple[str, str], _Group]:
+    # Grouping key is sanitize_owner() (case/punctuation/whitespace-insensitive),
+    # not a plain casefold+strip -- otherwise "GLR PROPERTIES LTD" and "GLR
+    # PROPERTIES LTD." (trailing period) become two separate groups here, one
+    # of the ways a real landlord's portfolio can silently get split in two.
     groups: dict[tuple[str, str], _Group] = {}
     for pid, reporting_body_name, holder_name, type_of_interest, order_created_date in rows:
         entity_a = _clean(reporting_body_name)
         entity_b = _clean(holder_name)
         if entity_a is None or entity_b is None:
             continue
-        if _norm(entity_a) == _norm(entity_b):
+        if sanitize_owner(entity_a) == sanitize_owner(entity_b):
             continue
 
-        key = (_norm(entity_a), _norm(entity_b))
+        key = (sanitize_owner(entity_a), sanitize_owner(entity_b))
         group = groups.get(key)
         if group is None:
             group = _Group(entity_a=entity_a, entity_b=entity_b, pids=set(), interests=set(), dates=[])

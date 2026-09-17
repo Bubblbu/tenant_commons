@@ -253,6 +253,15 @@ def build_map(args) -> None:
         buildings_path=getattr(args, "buildings", None),
     )
     pts_df = overlay_result.pts_df
+    # Claims-derived portfolio data only exists via sica_core's SQLite export
+    # (see sica_core/export.py, sica_core/portfolios.py), which already folds
+    # a portfolio name into owner_group/owner_key directly when one exists —
+    # the legacy CSV-only pipeline never populates these columns at all, so
+    # this just gives layout.py's popup code a column to read.
+    if "portfolio_name" not in pts_df.columns:
+        pts_df["portfolio_name"] = None
+        pts_df["portfolio_building_count"] = None
+        pts_df["portfolio_entities"] = None
 
     fc = blocks_feature_collection(blocks_merged)
     blocks_geo = add_blocks_layer(m, fc)

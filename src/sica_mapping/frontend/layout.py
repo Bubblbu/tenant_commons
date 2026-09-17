@@ -207,6 +207,27 @@ def add_buildings_layers(m: folium.Map, pts_df):
             f"Year built: {'' if pd.isna(r['year_built']) else int(r['year_built'])}"
         )
 
+        # Claims-derived portfolio (see sica_core/portfolios.py) — for now,
+        # the Owner line above already shows the portfolio name directly
+        # (export.py folds it into owner_group when one exists), so this
+        # only adds the size detail, not the name again.
+        portfolio_name = r.get("portfolio_name")
+        # pd.isna() first, not `if portfolio_name and ...` -- the cached-data
+        # path runs convert_dtypes(), which turns a missing value into
+        # pandas' nullable pd.NA, and bool(pd.NA) raises before pd.isna()
+        # ever runs.
+        if not pd.isna(portfolio_name):
+            building_count = r.get("portfolio_building_count")
+            building_count_val = None if pd.isna(building_count) else int(building_count)
+            buildings_label = "building" if building_count_val == 1 else "buildings"
+            entities_raw = r.get("portfolio_entities")
+            entity_count = len(entities_raw) if isinstance(entities_raw, list) else 0
+            popup_html += (
+                f"<br><b>Portfolio:</b> "
+                f"{'' if building_count_val is None else building_count_val} "
+                f"{buildings_label}, {entity_count} linked entities"
+            )
+
         # Housing type (SRO/co-op) — ring color, not mutually exclusive: a
         # building matching both gets the first type as its own stroke and an
         # extra outer ring in the second type's color (one known case today:

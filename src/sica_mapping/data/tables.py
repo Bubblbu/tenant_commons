@@ -68,6 +68,10 @@ def blocks_table(blocks_merged: pd.DataFrame) -> pd.DataFrame:
 
 
 def landlords_table(pts_df: pd.DataFrame) -> pd.DataFrame:
+    # owner_group/owner_key already carry the claims-derived portfolio name
+    # when one exists (see sica_core/export.py, sica_core/portfolios.py), so
+    # this groups shell companies confirmed to share a real owner into one
+    # Landlords-tab row with no separate code path.
     owners_df = pts_df.copy()
     owners_df["owner_group"] = owners_df["owner_group"].fillna("(Unknown)")
     owners_df["owner_key"] = owners_df["owner_key"].fillna("unknown")
