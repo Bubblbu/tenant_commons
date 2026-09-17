@@ -36,3 +36,4 @@ data/sica_core.db
 
 # Raw, un-anonymized personal data — must never be committed
 data/Nationbuilder/*
+data/Samwise/*

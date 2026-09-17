@@ -265,3 +265,64 @@ CREATE TABLE IF NOT EXISTS ingest_runs (
 );
 CREATE INDEX IF NOT EXISTS idx_ingest_runs_run_id ON ingest_runs(run_id);
 CREATE INDEX IF NOT EXISTS idx_ingest_runs_source ON ingest_runs(source_name);
+
+-- Verbatim dump of a Samwise (BC Land Owner Transparency Registry research
+-- tool) export: one row per (property, reporting corporation, disclosed
+-- interest holder) declaration. PERSISTENT rather than REBUILDABLE like the
+-- other raw_<source> tables — unlike raw_sro/raw_coops/raw_rezoning, this
+-- source isn't wired into run_ingest() (it's imported standalone via
+-- scripts/import_lotr_claims.py whenever Samwise produces a fresh export),
+-- so it must survive a normal pipeline rebuild's init_db() call rather than
+-- being dropped alongside buildings/addresses. ingest/raw_lotr.py does its
+-- own delete-and-reinsert on each run instead, for the same idempotent-
+-- reimport behaviour the REBUILDABLE tables get from init_db().
+CREATE TABLE IF NOT EXISTS raw_lotr_ownership (
+    raw_lotr_ownership_id INTEGER PRIMARY KEY,
+    pid TEXT,
+    reporting_body_name TEXT,
+    reporting_body_kind TEXT,
+    reporting_body_capacity TEXT,
+    reporting_body_category TEXT,
+    reporting_body_party_type TEXT,
+    type_of_interest TEXT,
+    holder_type TEXT,
+    holder_name TEXT,
+    obscure_message TEXT,
+    individual_last_name TEXT,
+    individual_given_names TEXT,
+    individual_is_full_name_omitted TEXT,
+    individual_is_canadian_citizen_or_pr TEXT,
+    individual_principal_residence_city TEXT,
+    individual_principal_residence_province TEXT,
+    individual_principal_residence_country TEXT,
+    individual_is_principal_residence_canada TEXT,
+    individual_citizenship_country_codes TEXT,
+    corporation_legal_name TEXT,
+    corporation_registered_business_name TEXT,
+    corporation_partnership_type TEXT,
+    corporation_partnership_type_other TEXT,
+    corporation_registered_address_line1 TEXT,
+    corporation_registered_address_line2 TEXT,
+    corporation_registered_address_city TEXT,
+    corporation_registered_address_province_code TEXT,
+    corporation_registered_address_province_name TEXT,
+    corporation_registered_address_country_code TEXT,
+    corporation_registered_address_country_name TEXT,
+    corporation_registered_address_postal_code TEXT,
+    corporation_is_head_office_different_from_registered TEXT,
+    corporation_has_head_office TEXT,
+    corporation_governing_laws_jurisdiction TEXT,
+    corporation_incorporation_jurisdiction TEXT,
+    corporation_continued_jurisdiction TEXT,
+    order_id TEXT,
+    order_created_date TEXT,
+    search_by TEXT,
+    search_text TEXT,
+    is_exact_match TEXT,
+    data_fetch_status TEXT,
+    item_row_identifier TEXT,
+    source_path TEXT,
+    ingested_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_raw_lotr_ownership_pid ON raw_lotr_ownership(pid);
+CREATE INDEX IF NOT EXISTS idx_raw_lotr_ownership_reporting_body ON raw_lotr_ownership(reporting_body_name);

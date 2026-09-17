@@ -48,6 +48,11 @@ class IngestConfig:
     sro_housing: str | None = None
     coops: str | None = None
     rezoning_applications: str | None = None
+    # Optional: Samwise's BC Land Owner Transparency Registry export (see
+    # ingest/raw_lotr.py, ingest/lotr_claims.py). Not wired into run_ingest —
+    # imported standalone via scripts/import_lotr_claims.py, decoupled from
+    # the main rebuild cadence.
+    lotr_ownership: str | None = None
 
 
 def _load_raw(path: str) -> dict[str, object]:
@@ -96,5 +101,8 @@ def load_ingest_config(path: str) -> IngestConfig:
         coops=str(flat["coops"]) if flat.get("coops") else None,
         rezoning_applications=(
             str(flat["rezoning_applications"]) if flat.get("rezoning_applications") else None
+        ),
+        lotr_ownership=(
+            str(flat["lotr_ownership"]) if flat.get("lotr_ownership") else None
         ),
     )

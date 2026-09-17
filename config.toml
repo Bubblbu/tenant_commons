@@ -10,10 +10,12 @@ vtu = "data/vtu_membership_public.csv"
 # sica_core's internal-tool ingest, never by the public sica_mapping build above.
 vtu_raw = "data/Nationbuilder/membership_full.csv"
 sica_core_db = "data/sica_core.db"
+pid_address_map = "data/pid_address_map.csv"
 sro_housing = "data/sra_housing_combined.csv"
 rezoning_applications = "data/rezoning_applications.csv"
 coops = "data/coops_vancouver.csv"
 ownership_claims = "data/ownership_claims.csv"
+lotr_ownership = "data/Samwise/samwise-export.csv"
 
 [options]
 out = "index.html"
