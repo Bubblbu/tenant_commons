@@ -13,6 +13,7 @@ sica_core_db = "data/sica_core.db"
 sro_housing = "data/sra_housing_combined.csv"
 rezoning_applications = "data/rezoning_applications.csv"
 coops = "data/coops_vancouver.csv"
+ownership_claims = "data/ownership_claims.csv"
 
 [options]
 out = "index.html"

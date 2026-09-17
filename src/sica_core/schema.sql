@@ -10,27 +10,35 @@ DROP TABLE IF EXISTS blocks;
 DROP TABLE IF EXISTS raw_addresses;
 DROP TABLE IF EXISTS raw_buildings;
 DROP TABLE IF EXISTS raw_block_numbers;
+DROP TABLE IF EXISTS raw_sro;
+DROP TABLE IF EXISTS raw_coops;
+DROP TABLE IF EXISTS raw_rezoning;
 DROP VIEW IF EXISTS block_stats;
 
 CREATE TABLE raw_buildings (
     raw_building_id INTEGER PRIMARY KEY,
     local_area TEXT,
     address TEXT,
+    secondary_addresses TEXT,  -- semicolon-joined list of other civic addresses VanMaps resolves to this same building
     primary_address TEXT,
     is_primary_address INTEGER,
     n_pids INTEGER,
-    pid TEXT,
+    pid TEXT,                  -- semicolon-joined list when a building spans multiple PIDs
+    folio TEXT,                -- semicolon-joined list, same reason
     units INTEGER,
     year_built INTEGER,
     bsns_group TEXT,
     bsns_name TEXT,
     bsns_trade_name TEXT,
     bsns_type TEXT,
+    bsns_subtype TEXT,
     value_land TEXT,        -- verbatim: source mixes plain numbers and "$..." strings; parse at merge time
     value_bldg TEXT,        -- verbatim, same reason
     bldg_land_ratio REAL,
     value_per_unit TEXT,
     zoning TEXT,
+    zoning_district TEXT,
+    zoning_classification TEXT,
     name TEXT,
     management TEXT,
     n_issues INTEGER,
@@ -67,6 +75,70 @@ CREATE TABLE raw_block_numbers (
     geo_local_area TEXT,
     geom TEXT,
     geo_point_2d TEXT,      -- "lat, lon" verbatim
+    ingested_at TEXT NOT NULL
+);
+
+-- SRO/SRA, co-op, and rezoning-application sources: raw storage only, for
+-- browsability (CLAUDE.md Q8b) — no address/name-key matching against
+-- buildings happens at ingest time. That logic stays in
+-- src/sica_mapping/data/overlays.py::match_overlays(), which runs at
+-- map-render time directly against the source CSVs. See docs/DATA_SOURCES.md
+-- for each source's (partially unverified) origin.
+CREATE TABLE raw_sro (
+    raw_sro_id INTEGER PRIMARY KEY,
+    source_id TEXT,            -- the source's own "ID" column
+    address TEXT,
+    building_name TEXT,
+    secondary_address TEXT,
+    area TEXT,
+    latitude REAL,
+    longitude REAL,
+    owner TEXT,
+    operator TEXT,
+    operator_group TEXT,
+    ownership_group TEXT,
+    registered_rooms INTEGER,
+    occupancy_status TEXT,
+    match_method TEXT,        -- upstream address-matching flag from whoever combined the source lists; unrelated to our own matching
+    ingested_at TEXT NOT NULL
+);
+CREATE INDEX idx_raw_sro_address ON raw_sro(address);
+
+CREATE TABLE raw_coops (
+    raw_coop_id INTEGER PRIMARY KEY,
+    source_id TEXT,            -- the source's own "id" column
+    title TEXT,
+    city TEXT,
+    region TEXT,
+    neighbourhood TEXT,
+    school_district TEXT,
+    address TEXT,
+    lat REAL,
+    lon REAL,
+    status TEXT,
+    ownership_model TEXT,
+    bedrooms_min REAL,
+    bedrooms_max REAL,
+    home_types TEXT,
+    features TEXT,
+    summary TEXT,
+    featured_image TEXT,
+    website TEXT,
+    read_more_url TEXT,
+    ingested_at TEXT NOT NULL
+);
+CREATE INDEX idx_raw_coops_address ON raw_coops(address);
+
+CREATE TABLE raw_rezoning (
+    raw_rezoning_id INTEGER PRIMARY KEY,
+    source_id TEXT,            -- the source's own "ID" column (e.g. "RZ285"); NOT reliably unique per row
+    name TEXT,
+    status TEXT,
+    category TEXT,
+    status_detail TEXT,
+    latitude REAL,
+    longitude REAL,
+    link TEXT,
     ingested_at TEXT NOT NULL
 );
 
@@ -148,8 +220,16 @@ GROUP BY bl.block_id;
 -- never issue a DROP against anything in this section.
 -- ============================================================
 
+-- claim_key: a stable idempotency key, independent of claim_id (which doesn't
+-- exist yet when a row is being drafted). Bulk-CSV imports (see
+-- ingest/ownership_claims.py) require a human-authored one so re-running
+-- against an edited research spreadsheet updates existing rows instead of
+-- duplicating them; record_claim() auto-generates one (a UUID) for callers
+-- that don't supply one (e.g. a future single-record entry form). Always
+-- present either way — never a sometimes-null column.
 CREATE TABLE IF NOT EXISTS ownership_claims (
     claim_id INTEGER PRIMARY KEY,
+    claim_key TEXT NOT NULL UNIQUE,
     entity_a TEXT NOT NULL,
     entity_b TEXT NOT NULL,
     relationship TEXT NOT NULL,
@@ -167,3 +247,21 @@ CREATE TABLE IF NOT EXISTS ownership_claims (
 CREATE INDEX IF NOT EXISTS idx_claims_entity_a ON ownership_claims(entity_a);
 CREATE INDEX IF NOT EXISTS idx_claims_entity_b ON ownership_claims(entity_b);
 CREATE INDEX IF NOT EXISTS idx_claims_status ON ownership_claims(status);
+
+-- Pipeline run history — tracks every source ingested on every run_ingest()
+-- invocation, not just claims. Flat: one row per (run_id, source_name).
+-- Never dropped, same persistence invariant as ownership_claims, for the
+-- same reason — losing run history on every rebuild would defeat the point
+-- of keeping it. See ingest/tracking.py.
+CREATE TABLE IF NOT EXISTS ingest_runs (
+    run_entry_id INTEGER PRIMARY KEY,
+    run_id TEXT NOT NULL,
+    source_name TEXT NOT NULL,
+    started_at TEXT NOT NULL,
+    finished_at TEXT NOT NULL,
+    status TEXT NOT NULL CHECK (status IN ('success','failure')),
+    row_count INTEGER,
+    error_message TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_ingest_runs_run_id ON ingest_runs(run_id);
+CREATE INDEX IF NOT EXISTS idx_ingest_runs_source ON ingest_runs(source_name);
