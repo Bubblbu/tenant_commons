@@ -17,7 +17,7 @@ try:
 except ModuleNotFoundError:  # pragma: no cover - only for <3.11
     tomllib = None
 
-DEFAULT_DB_PATH = "data/sica_core.db"
+DEFAULT_DB_PATH = "data/derived/sica_core.db"
 DEFAULT_BBOX = "-123.18,49.265,-123.10,49.295"
 # "vtu_raw", not "vtu" — config.toml's "vtu" key is sica_mapping's public,
 # address-aggregated extract (data/vtu_membership_public.csv). sica_core's

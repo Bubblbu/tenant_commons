@@ -27,7 +27,7 @@ import pandas as pd
 import requests
 
 SOURCE_URL = "https://www.chf.bc.ca/find-a-co-op/"
-DEFAULT_OUT = "data/coops_vancouver.csv"
+DEFAULT_OUT = "data/raw/chf_bc/coops_vancouver.csv"
 
 # CHF's page blocks bare-looking scripted requests; a normal browser UA gets
 # a plain 200.

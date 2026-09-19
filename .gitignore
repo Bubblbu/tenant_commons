@@ -32,8 +32,11 @@ coverage.xml
 www/
 .preprocessed/
 .uv-cache/
-data/sica_core.db
 
-# Raw, un-anonymized personal data — must never be committed
-data/Nationbuilder/*
-data/Samwise/*
+# Everything under data/ is ignored; only the README and per-source manifests
+# are tracked. Membership exports are personal data — must never be committed.
+data/**
+!data/README.md
+!data/**/
+!data/**/MANIFEST.md
+docs/disambiguation/*
