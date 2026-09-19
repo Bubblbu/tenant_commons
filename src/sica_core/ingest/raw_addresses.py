@@ -17,6 +17,7 @@ RAW_ADDRESSES_COLUMNS = [
     "pcoord",
     "site_id",
     "std_street",
+    "note",
     "geo_point_2d",
 ]
 

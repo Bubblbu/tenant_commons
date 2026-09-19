@@ -59,6 +59,7 @@ CREATE TABLE raw_addresses (
     pcoord TEXT,
     site_id TEXT,
     std_street TEXT,
+    note TEXT,
     geo_point_2d TEXT,      -- "lat, lon" verbatim
     ingested_at TEXT NOT NULL
 );
