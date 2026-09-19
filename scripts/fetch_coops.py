@@ -8,7 +8,7 @@ co-op dataset (287 records as of 2026-08-04) as inline JSON in the page:
 No API call is needed — one page fetch gets everything. This script pulls
 that page, extracts the JSON, filters to `location.city == "Vancouver"`
 (city-wide, not just West End — CHF's own "city" field, not our block/bbox
-geometry), and writes a flat CSV to data/coops_vancouver.csv.
+geometry), and writes a flat CSV to data/raw/chf_bc/coops_vancouver.csv.
 
 This is a manual/occasional pull (like the other CSVs in data/), not a
 build-time dependency — re-run this script by hand when you want a refresh,

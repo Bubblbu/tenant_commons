@@ -1,5 +1,5 @@
 """Ingest an explicit allow-list of columns from the raw NationBuilder export
-(config's `vtu_raw` path, e.g. data/Nationbuilder/membership_full.csv).
+(config's `vtu_raw` path, e.g. data/raw/nationbuilder/membership_full.csv).
 
 `membership_full.csv` is a raw, un-anonymized 154-column NationBuilder export
 (emails, phone, ethnicity, religion, donation history, marital status, ...).

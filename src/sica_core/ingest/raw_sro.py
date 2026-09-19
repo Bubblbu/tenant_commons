@@ -1,4 +1,4 @@
-"""Ingest data/sra_housing_combined.csv verbatim into raw_sro.
+"""Ingest data/raw/cov_foi/sra_housing_combined.csv verbatim into raw_sro.
 
 Raw storage only — no address-key matching against buildings happens here.
 That logic (and its own reasons for existing independently — see its

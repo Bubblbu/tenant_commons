@@ -2,7 +2,7 @@
 
 *Living document. Update this as decisions change — it's meant to be edited, not archived.*
 
-Last updated: 2026-08-06
+Last updated: 2026-09-18
 
 ---
 
@@ -35,6 +35,8 @@ The manually-curated ownership knowledge — built from tenant testimony and res
 - **VTU NationBuilder exports** — membership data, manually anonymized by removing sensitive fields before use. Controlled internally, updated on VTU's own cadence.
 - **Manual research / tenant reports** — common ownership across shell companies, identified through tenant testimony. Grows piecemeal, no external source — this is the project's core IP.
 - **Third-party online sources** — e.g. CHF BC's co-op housing list. Scraped/pulled from another organization's own site, not the City or VTU.
+
+The on-disk layout (`raw/` → `curated/` → `derived/`) and rebuild order are described in [`data/README.md`](data/README.md); everything under `data/` except the README and per-source manifests is gitignored.
 
 See [`docs/DATA_SOURCES.md`](docs/DATA_SOURCES.md) for the full per-source catalog: origin, license/attribution, fetch method (scripted vs. manual), format quirks, and refresh cadence for every source above except manual research (which lives entirely in the `ownership_claims` model below).
 

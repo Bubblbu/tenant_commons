@@ -20,7 +20,7 @@ except ModuleNotFoundError:  # pragma: no cover - only for <3.11
 DEFAULT_DB_PATH = "data/derived/sica_core.db"
 DEFAULT_BBOX = "-123.18,49.265,-123.10,49.295"
 # "vtu_raw", not "vtu" — config.toml's "vtu" key is sica_mapping's public,
-# address-aggregated extract (data/vtu_membership_public.csv). sica_core's
+# address-aggregated extract (data/derived/vtu_membership_public.csv). sica_core's
 # ingest needs the raw, un-anonymized NationBuilder export instead (allow-
 # listed down to a few columns by ingest/membership.py); giving it its own
 # key avoids the two builds silently fighting over one config value.

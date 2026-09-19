@@ -2,10 +2,10 @@
 """Builds the committed, address-aggregated VTU membership extract.
 
 Reads the raw, un-anonymized local NationBuilder export (config's `vtu_raw`
-path, e.g. data/Nationbuilder/membership_full.csv — gitignored, never
+path, e.g. data/raw/nationbuilder/membership_full.csv — gitignored, never
 committed; see feedback_never_commit_raw_membership_csvs in the assistant's
 memory for why) and writes the address-level aggregate to config's `vtu`
-path (data/vtu_membership_public.csv): one row per address with
+path (data/derived/vtu_membership_public.csv): one row per address with
 member_count_active, member_count_all, and latest_membership_year only.
 
 No per-member rows, tags, or timestamps ever reach the output — that would

@@ -2,7 +2,7 @@
 
 *Reference catalog. Update whenever a source is added, re-fetched, or its details change — see [Adding a new source](#adding-a-new-source) at the bottom.*
 
-Last updated: 2026-09-17
+Last updated: 2026-09-18
 
 ---
 
@@ -12,7 +12,7 @@ This document catalogs **acquisition** — how each external dataset gets from i
 origin into a file under `data/`, and what's known about that origin (license,
 format, cadence, quirks). It stops there.
 
-- What happens *after* acquisition — parsing a `data/*.csv` into `sica_core`'s
+- What happens *after* acquisition — parsing a `data/raw/**` file into `sica_core`'s
   SQLite tables — is covered by the code itself: one `ingest/raw_<source>.py`
   module per source under `src/sica_core/ingest/`, each with an explicit
   column allow-list. That pattern is the target for new sources going
@@ -25,11 +25,10 @@ format, cadence, quirks). It stops there.
 
 ## Conventions
 
-- **Retain originals.** Where a source arrives as a document (FOI PDF/
-  spreadsheet, a scraped page) rather than a clean CSV, the as-received file
-  is kept under `data/sources/<source_name>/`, separate from the processed
-  CSV the pipelines actually read (which keeps its existing path in `data/`
-  unchanged — this is additive, not a reorg).
+- **Retain originals.** Where a source arrives as a document (FOI PDF, a
+  scraped page), the as-received file is kept in its `data/raw/<source>/`
+  folder beside the extracted CSV. Nothing under `data/` is tracked by git;
+  the record of what was fetched, when and how is that folder's `MANIFEST.md`.
 - **Script vs. manual.** A source gets a `scripts/fetch_<source>.py` (see
   `fetch_coops.py` for the pattern: documented, replayable offline via a
   `--html-file`-style flag) if it's expected to be re-pulled periodically.
@@ -52,11 +51,11 @@ format, cadence, quirks). It stops there.
 
 | Source | Category | Last fetched | Refresh cadence | Consumed by |
 |---|---|---|---|---|
-| [`buildings.csv`](#buildingscsv) | Open Data + FOI, via `vhd` pipeline | 2026-08-07 | Ad hoc, tied to `vhd` | `sica_mapping`, `sica_core` |
-| [`property_addresses.csv`](#property_addressescsv) | Open Data portal, via `vhd` pipeline | 2026-08-07 | Ad hoc, tied to `vhd` | `sica_mapping`, `sica_core` |
-| [`block-outlines.csv`](#block-outlinescsv) | Open Data portal | TODO | Ad hoc | `sica_mapping`, `sica_core` |
-| [`block-numbers.csv`](#block-numberscsv) | Open Data portal | TODO | Ad hoc | `sica_mapping`, `sica_core` |
-| [`local-area-boundary.csv`](#local-area-boundarycsv) | Open Data portal, via `vhd` pipeline | 2026-08-07 | Rare (stable boundaries) | `sica_mapping` |
+| [`buildings.csv`](#buildingscsv) | Derived: built by `prepare_data.py` from Open Data + FOI | 2026-09-18 | Rebuilt after a fetch | `sica_mapping`, `sica_core` |
+| [`property_addresses.csv`](#property_addressescsv) | Open Data portal | 2026-09-18 | On demand (`fetch_cov_open_data.py`) | `sica_mapping`, `sica_core` |
+| [`block-outlines.csv`](#block-outlinescsv) | Open Data portal | 2026-09-18 | On demand (`fetch_cov_open_data.py`) | `sica_mapping`, `sica_core` |
+| [`block-numbers.csv`](#block-numberscsv) | Open Data portal | 2026-09-18 | On demand (`fetch_cov_open_data.py`) | `sica_mapping`, `sica_core` |
+| [`local-area-boundary.csv`](#local-area-boundarycsv) | Open Data portal | 2026-09-18 | On demand (`fetch_cov_open_data.py`) | `sica_mapping` |
 | [`sra_housing_combined.csv`](#sra_housing_combinedcsv) | FOI? — unverified ⚠️ | 2026-07-30 (file date) | TODO | `sica_mapping`, `sica_core` |
 | [`rezoning_applications.csv`](#rezoning_applicationscsv) | FOI? — unverified ⚠️ | 2026-07-30 (file date) | TODO | `sica_mapping`, `sica_core` |
 | [`coops_vancouver.csv`](#coops_vancouvercsv) | Third-party online | 2026-08-04 | Periodic (re-run script) | `sica_mapping`, `sica_core` |
@@ -71,8 +70,8 @@ format, cadence, quirks). It stops there.
 ## Open Data portal
 
 Sources pulled from the City of Vancouver's Open Data platform
-(opendata.vancouver.ca). Currently all manual downloads — no fetch script
-exists yet for any of them. Column names like `geo_point_2d`, `geom`,
+(opendata.vancouver.ca). All fetched by
+`scripts/fetch_cov_open_data.py`. Column names like `geo_point_2d`, `geom`,
 `geo_local_area` are the portal's own naming convention, visible directly in
 the raw CSVs.
 
@@ -82,16 +81,7 @@ the raw CSVs.
   year built, assessed land/building value, zoning, plus City rental
   business-licence fields (`bsns_group`, `bsns_name`, `bsns_trade_name`,
   `bsns_type`).
-- **Origin (confirmed 2026-08-07):** produced by a separate, un-versioned
-  pipeline repo ("vhd" — Vancouver Housing Data,
-  `~/Projects/VTU/vancouver-housing-data`), not pulled from Open Data
-  directly by this repo. `vhd`'s `scripts/build_buildings.py` joins the
-  City's Open Data Explore API v2.1 pull (property-addresses,
-  property-tax-report, business-licences, etc.) with a 2023/2024 FOI
-  rental-inventory release and a hand-maintained `landlord_mapping.toml`,
-  writing `processed/buildings.csv`. Pulled into this repo's `data/` via
-  `scripts/sync_from_vhd.py` (see "Syncing from vhd" below) — most recently
-  2026-08-07.
+- **Origin and access method:** Fetched directly from Open Data by `scripts/fetch_cov_open_data.py` (buildings.csv is built from several of those files plus the FOI extracts by `scripts/prepare_data.py`). Until 2026-09 this came from a separate pipeline repo, `vhd`, since retired; its logic now lives in `src/sica_core/prepare/`.
 - **`management`, `n_issues`, `issues_details` are part of this source**,
   not a hand-added local artifact — confirmed by their presence in `vhd`'s
   own `processed/buildings.csv` output (sourced from `landlord_mapping.toml`
@@ -107,8 +97,6 @@ the raw CSVs.
   documented there.
 - **Geographic scope:** citywide (no West-End restriction — see CLAUDE.md
   Section 2, Q3).
-- **Access method:** re-run `vhd`'s pipeline scripts against its own config,
-  then `scripts/sync_from_vhd.py` to pull the result into this repo.
 - **Format/known quirks:**
   - `value_land`/`value_bldg`: **as of the 2026-08-07 `vhd` refresh, plain
     numeric city-wide.** Historically (pre-refresh) 100% of West End rows
@@ -143,52 +131,43 @@ the raw CSVs.
     2026-08-07 output. Nothing downstream reads them (bldg_land_ratio is
     recomputed from value_bldg/value_land at merge time if missing) — left
     in `raw_buildings.py`'s column list as always-null rather than removed.
-- **Output location:** `data/buildings.csv`.
+  - `clean_address` (ported unchanged) rewrites any word starting with ` str` (e.g. `strathcona` becomes `stathcona`). Both sides of each join use the same function, so matching works; do not change it without rebuilding everything.
+- **Output location:** `data/derived/buildings.csv`.
 - **Consumed by:** `sica_mapping` (`config.toml` → `buildings`), `sica_core`
   (`ingest/raw_buildings.py`).
-- **Refresh cadence:** ad hoc, tied to `vhd`'s own refresh cadence (also ad
-  hoc today). Last synced 2026-08-07.
+- **Refresh cadence:** rebuilt by `prepare_data.py` after each fetch. Last
+  fetched 2026-09-18.
 
 ### `property_addresses.csv`
 
 - **What it is:** civic addresses with lat/lon and local-area tagging —
   used to geocode buildings and recover missing coordinates.
-- **Origin (confirmed 2026-08-07):** also `vhd` — its `raw/property-addresses.csv`
-  is a direct, unmodified City Open Data Explore API v2.1 pull (dataset
-  "Property Addresses"; columns `civic_number`, `geo_local_area`, `geom`,
-  `p_parcel_id`, `pcoord`, `site_id`, `std_street`, `geo_point_2d` match
-  exactly). Pulled into this repo via `scripts/sync_from_vhd.py`, same as
-  `buildings.csv`.
+- **Origin and access method:** Fetched directly from Open Data by `scripts/fetch_cov_open_data.py` (buildings.csv is built from several of those files plus the FOI extracts by `scripts/prepare_data.py`). Until 2026-09 this came from a separate pipeline repo, `vhd`, since retired; its logic now lives in `src/sica_core/prepare/`.
 - **License/attribution:** Open Government Licence – Vancouver (Open Data
   portal default) — TODO: confirm no additional attribution needed.
 - **Geographic scope:** citywide (filtered to West End downstream by the
   pipelines, not in the file itself).
-- **Access method:** `vhd`'s `scripts/download_data.py`, then
-  `scripts/sync_from_vhd.py` into this repo.
 - **Format/known quirks:** `geo_point_2d` holds `"lat,lon"` as a single
   string, parsed downstream. `sica_core/ingest/raw_addresses.py` raises on
   any column not in its allow-list rather than silently dropping it.
   Header casing has varied between pulls (`Geo Local Area` vs
   `geo_local_area`) — harmless, `normalize_cols()` lowercases before the
   allow-list check either way.
-- **Output location:** `data/property_addresses.csv`.
+  The Open Data export gained a `note` column in 2026-09 (populated on
+  ~1,247 of ~99.7k rows with the text "Translated name until colonial
+  systems support multi-lingual characters."); it is stored in
+  `raw_addresses.note`.
+- **Output location:** `data/raw/cov_open_data/property-addresses.csv`.
 - **Consumed by:** `sica_mapping` (`config.toml` → `addresses`), `sica_core`
   (`ingest/raw_addresses.py`).
-- **Refresh cadence:** ad hoc, tied to `vhd`'s own refresh cadence. Last
-  synced 2026-08-07.
+- **Refresh cadence:** on demand. Last fetched 2026-09-18.
 
-### Syncing from vhd
+### Fetching Open Data
 
-`buildings.csv`, `property_addresses.csv`, and `local-area-boundary.csv`
-originate from `vhd` (`~/Projects/VTU/vancouver-housing-data`, output
-directory `~/Projects/VTU/vancouver-housing-data-dir` — both machine-local
-paths, not committed anywhere). That output directory is **not** version
-controlled and can be mid-regeneration at any moment, so this repo never
-reads it directly — `scripts/sync_from_vhd.py` copies the relevant files
-into this repo's git-tracked `data/`, giving every ingested vintage real
-history (`git diff`/`git log` on the CSV), the same way `ownership_claims.csv`
-already works. Run it, review `git diff data/`, then re-ingest
-(`uv run python scripts/rebuild_map.py`).
+`scripts/fetch_cov_open_data.py` downloads the 8 Open Data datasets into
+`data/raw/cov_open_data/` (CSV for the ingest, GeoJSON for the prepare steps).
+Then `scripts/prepare_data.py` rebuilds `data/derived/`. See `data/README.md`
+for the full rebuild order.
 
 ### `block-outlines.csv`
 
@@ -202,7 +181,7 @@ already works. Run it, review `git diff data/`, then re-ingest
 - **Access method:** manual download (steps TODO).
 - **Format/known quirks:** polygon geometry lives in a `geom` column,
   parsed via `sica_core/geometry.py::parse_geom`.
-- **Output location:** `data/block-outlines.csv`.
+- **Output location:** `data/raw/cov_open_data/block-outlines.csv`.
 - **Consumed by:** `sica_mapping` (`config.toml` → `blocks`), `sica_core`
   (`ingest/blocks.py`).
 - **Refresh cadence:** ad hoc / not tracked historically. TODO: decide one.
@@ -221,7 +200,7 @@ already works. Run it, review `git diff data/`, then re-ingest
 - **Format/known quirks:** none noted beyond standard portal column naming
   (`geom`, `geo_point_2d`). `sica_core/ingest/block_numbers.py` raises on
   unexpected columns.
-- **Output location:** `data/block-numbers.csv`.
+- **Output location:** `data/raw/cov_open_data/block-numbers.csv`.
 - **Consumed by:** `sica_mapping` (`spatial.py::resolve_local_area_from_block_numbers`),
   `sica_core` (`ingest/block_numbers.py`).
 - **Refresh cadence:** rare — local area/block boundaries change
@@ -233,27 +212,20 @@ already works. Run it, review `git diff data/`, then re-ingest
   used to assign a `local_area` to overlay records (co-ops, SRO/SRA,
   rezoning applications) that don't already carry one that matches the
   sidebar's neighbourhood checkboxes.
-- **Origin (confirmed 2026-08-07):** `vhd`'s `raw/local-area-boundary.csv`,
-  a City Open Data pull (portal's "Local Area Boundary" dataset). Same
-  provenance as `buildings.csv`/`property_addresses.csv` — see "Syncing
-  from vhd" above.
+- **Origin and access method:** Fetched directly from Open Data by `scripts/fetch_cov_open_data.py` (buildings.csv is built from several of those files plus the FOI extracts by `scripts/prepare_data.py`). Until 2026-09 this came from a separate pipeline repo, `vhd`, since retired; its logic now lives in `src/sica_core/prepare/`.
 - **License/attribution:** Open Government Licence – Vancouver (Open Data
   portal default) — TODO: confirm no additional attribution needed.
 - **Geographic scope:** citywide, all 22 local areas.
-- **Access method:** `scripts/sync_from_vhd.py` (see "Syncing from vhd"
-  above). The 2026-08-07 re-pull came back byte-different (re-simplified
-  polygon coordinates) but row-count-identical — boundaries themselves
-  didn't change, just their geometry encoding.
 - **Format/known quirks:** GeoJSON-style `FeatureCollection`, `properties.name`
   used as the area label. `src/sica_mapping/data/overlays.py` deliberately
   does *not* trust each overlay source's own free-text area field (e.g. the
   SRO CSV's "Area" is a DTES-style composite label) — always resolves via
   point-in-polygon against this file instead.
-- **Output location:** `data/local-area-boundary.csv`.
+- **Output location:** `data/raw/cov_open_data/local-area-boundary.csv`.
 - **Consumed by:** `sica_mapping` only (`overlays.py`) — not yet ingested
   into `sica_core`.
 - **Refresh cadence:** rare — official boundaries change infrequently. Last
-  synced 2026-08-07 (via `vhd`, content unchanged).
+  fetched 2026-09-18.
 
 ---
 
@@ -297,9 +269,9 @@ Sections kept here for now since that's the best guess available.
 - **Provenance/original retained:** **not yet** — no original document is
   currently kept. Per the retain-originals convention above, the source
   document(s) this was combined from should be saved under
-  `data/sources/sra_housing/` going forward, with a note on how the merge
+  `data/raw/cov_foi/` going forward, with a note on how the merge
   was done. TODO once the origin is confirmed.
-- **Output location:** `data/sra_housing_combined.csv`.
+- **Output location:** `data/raw/cov_foi/sra_housing_combined.csv`.
 - **Consumed by:** `sica_mapping` (`overlays.py`) — 53/171 rows (31%, since
   the 2026-08-07 `secondary_addresses` fallback) match an existing building
   by address; the rest surface as standalone unmatched markers. Also
@@ -332,7 +304,7 @@ Sections kept here for now since that's the best guess available.
   assemblies) don't correspond to any row in `buildings.csv` at all,
   regardless of parsing quality — ~43/377 (11%) match.
 - **Provenance/original retained:** **not yet** — TODO, same as above.
-- **Output location:** `data/rezoning_applications.csv`.
+- **Output location:** `data/raw/cov_foi/rezoning_applications.csv`.
 - **Consumed by:** `sica_mapping` (`overlays.py`), split into open/closed
   status groups. Also `sica_core` (`ingest/raw_rezoning.py`, since
   2026-08-07) — raw storage only, for browsability.
@@ -372,10 +344,10 @@ not the City's Open Data portal, not FOI, not VTU's own systems.
 - **Provenance/original retained:** not currently — the fetched HTML is not
   saved, only the derived CSV. Per the retain-originals convention, future
   re-runs could optionally save the fetched HTML under
-  `data/sources/coops_chf_bc/<date>.html` for exact replay/audit later;
+  `data/raw/chf_bc/<date>.html` for exact replay/audit later;
   not done yet (TODO, low priority given the script re-fetches live data
   cleanly).
-- **Output location:** `data/coops_vancouver.csv`.
+- **Output location:** `data/raw/chf_bc/coops_vancouver.csv`.
 - **Consumed by:** `sica_mapping` (`overlays.py`) — 42/117 rows (36%) match
   an existing building by address; the rest surface as standalone unmatched
   markers. Also `sica_core` (`ingest/raw_coops.py`, since 2026-08-07) — raw
@@ -403,14 +375,14 @@ not the City's Open Data portal, not FOI, not VTU's own systems.
   export contains real individuals' names, citizenship, and city/province of
   residence. Per CLAUDE.md's sensitivity model and the standing rule against
   committing raw personal-data exports (same reasoning as
-  `data/Nationbuilder/`), `data/Samwise/*` is gitignored — kept local-only,
-  never committed. `raw_lotr_ownership` in `data/sica_core.db` (also
+  `data/raw/nationbuilder/`), `data/raw/samwise/*` is gitignored — kept local-only,
+  never committed. `raw_lotr_ownership` in `data/derived/sica_core.db` (also
   gitignored) is the only persisted copy.
 - **Geographic scope:** whatever PIDs `samwise` has been pointed at so
   far — not systematically all of West End yet, opportunistic per
   `CLAUDE.md` Section 7's "secondary, opportunistic scope."
 - **Access method:** manual — export generated by the separate `samwise`
-  tool, dropped into `data/Samwise/samwise-export.csv` by hand. Not
+  tool, dropped into `data/raw/samwise/samwise-export.csv` by hand. Not
   scripted from this repo's side.
 - **Format/known quirks:** 44 columns. Many rows are self-referential (a
   corporation disclosing itself as its own direct interest holder — no new
@@ -422,7 +394,7 @@ not the City's Open Data portal, not FOI, not VTU's own systems.
   `raw_lotr_ownership` stores the export verbatim in SQLite for
   browsability (see `ingest/raw_lotr.py`), but that database is itself
   gitignored, same as the source CSV.
-- **Output location:** `data/Samwise/samwise-export.csv` (gitignored,
+- **Output location:** `data/raw/samwise/samwise-export.csv` (gitignored,
   local-only — see Sensitivity above).
 - **Consumed by:** `sica_core` only — `ingest/raw_lotr.py` (raw storage)
   and `ingest/lotr_claims.py` (derives `common_owner` `ownership_claims`
@@ -463,7 +435,7 @@ rather than this doc for how field-level access is handled.
   broader field-level flagging approach this feeds into.
 - **Access method:** manual export from NationBuilder by VTU; not
   scriptable from this project's side.
-- **Output location:** `data/membership_full.csv`.
+- **Output location:** `data/raw/nationbuilder/membership_full.csv`.
 - **Consumed by:** `sica_mapping` (`data/vtu.py`), `sica_core`
   (`ingest/membership.py`).
 - **Refresh cadence:** VTU's own cadence — TODO: confirm how often VTU
@@ -478,7 +450,7 @@ rather than this doc for how field-level access is handled.
   (confirmed via repo-wide search); `config.toml`'s `vtu` path points at
   `membership_full.csv` only.
 - **Recommendation:** confirm it's genuinely unused, then either delete it
-  or move it under `data/sources/` as a dated historical snapshot rather
+  or move it out of `data/raw/nationbuilder/` as a dated historical snapshot rather
   than leaving it sitting in `data/` looking like a live input.
 
 ---
@@ -503,7 +475,7 @@ rationale.
    offline-replayable, fails loudly on unexpected shape rather than
    silently returning something wrong or empty.
 3. If it arrives as a document (PDF, spreadsheet, saved HTML) rather than a
-   clean CSV, save the original under `data/sources/<source_name>/` and
+   clean CSV, save the original under `data/raw/<source_name>/` and
    note how it was turned into the CSV the pipeline actually reads.
 4. Add a row to the [Summary](#summary) table.
 5. Add a detail section with these fields: **What it is**, **Origin**,

@@ -376,7 +376,7 @@ def resolve_local_area_from_block_numbers(
 ) -> pd.Series:
     """Blocks with zero buildings have no local_area to take a mode from, and
     default to "(Unknown)" (see aggregate_blocks). Resolve those from
-    Vancouver Open Data's "block-numbers" dataset instead (data/block-numbers.csv)
+    Vancouver Open Data's "block-numbers" dataset instead (data/raw/cov_open_data/block-numbers.csv)
     — one point per city block, carrying the City's own authoritative
     geo_local_area. Primary: point-in-polygon (a block-numbers point almost
     always lands inside exactly one of our block polygons). Fallback: nearest

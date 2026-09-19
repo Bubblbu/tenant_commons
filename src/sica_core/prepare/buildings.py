@@ -57,7 +57,7 @@ def run(paths: DataPaths) -> None:
     ).write_csv(ct_properties_f)
     print(f"ct_properties.csv: {ct_props.height} rows")
 
-    # --- Rentals (merged FOI 2023+2024, see merge_foi_releases.py) ---
+    # --- Rentals (merged FOI 2023+2024, see sica_core.prepare.foi) ---
     rentals = pl.read_csv(all_rentals_f)
     rentals = rentals.rename(
         {
@@ -70,7 +70,6 @@ def run(paths: DataPaths) -> None:
     ).with_columns(address=CLEAN("address"))
     rentals = rentals.unique(subset="address", keep="first").drop("id")
     print("rentals:", rentals.shape)
-
 
     # --- Non-market housing ---
     nm_rentals = load_polars(non_market_housing_f)
@@ -89,7 +88,6 @@ def run(paths: DataPaths) -> None:
     nm_rentals = nm_rentals.sort("occupancy_year").unique(subset="address", keep="last")
     print("nm_rentals:", nm_rentals.shape)
 
-
     rentals = rentals.join(
         nm_rentals.select("address", "name", "occupancy_year", "management", "units"),
         on="address",
@@ -106,8 +104,9 @@ def run(paths: DataPaths) -> None:
     print("rentals + non-market:", rentals.shape)
 
     # --- Join with property information ---
-    # NOTE: reconstructs the notebook's undefined `addresses` reference (see
-    # module docstring point 1) using `props` with geo_local_area -> local_area.
+    # NOTE: reconstructs the notebook's undefined `addresses` reference (history
+    # is in the archived vhd scripts, ~/Projects/VTU/_archive/2026-09-18-data-restructure/)
+    # using `props` with geo_local_area -> local_area.
     addresses_for_join = props.rename({"geo_local_area": "local_area"})
     housing = (
         rentals.drop("units_right", "occupancy_year")
@@ -177,9 +176,9 @@ def run(paths: DataPaths) -> None:
     businesses = businesses.filter(pl.col("status").is_in(["Issued", "Pending"]))
     print("businesses (housing-related, active licences):", businesses.shape)
 
-    # --- New: per-building index WITH landlord attribution (buildings.csv) ---
-    # This combination has never been written to a file before -- see module
-    # docstring point 3.
+    # --- Per-building index WITH landlord attribution (buildings.csv) ---
+    # (History of this step lives in the archived vhd scripts,
+    # ~/Projects/VTU/_archive/2026-09-18-data-restructure/.)
     bsns_by_address = businesses.group_by("address").agg(
         bsns_group=pl.col("bsns_group").unique().drop_nulls(),
         bsns_name=pl.col("bsns_name").unique().drop_nulls(),
@@ -193,8 +192,7 @@ def run(paths: DataPaths) -> None:
     )
 
     # Collapse to one row per address (the VanMaps join can bring in multiple
-    # pid/objectid records per primary_address) -- same pattern as
-    # rental_properties.csv / nm_rental_properties.csv above.
+    # pid/objectid records per primary_address).
     buildings = (
         buildings.group_by("address")
         .agg(pl.all().drop_nulls().unique())
@@ -203,9 +201,9 @@ def run(paths: DataPaths) -> None:
     )
 
     # --- Address lookup: every address (primary + secondary) VanMaps knows
-    # about, resolved to its primary address and property. Written both as a
-    # standalone lookup file (address_index.csv) and folded into buildings.csv
-    # as `secondary_addresses`, so a building's alternate civic addresses are
+    # about, resolved to its primary address and property. Folded into buildings.csv
+    # as `secondary_addresses` (the standalone address_index.csv is no longer
+    # written), so a building's alternate civic addresses are
     # visible without a separate lookup.
 
     alias_groups = (

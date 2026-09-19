@@ -1,4 +1,4 @@
-"""Ingest data/buildings.csv verbatim into raw_buildings.
+"""Ingest data/derived/buildings.csv verbatim into raw_buildings.
 
 value_land/value_bldg are kept as TEXT — historically the source mixed plain
 numbers with "$35,407,000.00"-style strings (100% of pre-2026-08-07 West End

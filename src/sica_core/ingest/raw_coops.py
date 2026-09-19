@@ -1,4 +1,4 @@
-"""Ingest data/coops_vancouver.csv (see scripts/fetch_coops.py) verbatim into raw_coops.
+"""Ingest data/raw/chf_bc/coops_vancouver.csv (see scripts/fetch_coops.py) verbatim into raw_coops.
 
 Raw storage only — no address-key matching against buildings happens here.
 That logic stays in `src/sica_mapping/data/overlays.py::match_overlays()`.

@@ -1,4 +1,4 @@
-"""Ingest data/rezoning_applications.csv verbatim into raw_rezoning.
+"""Ingest data/raw/cov_foi/rezoning_applications.csv verbatim into raw_rezoning.
 
 Raw storage only — no name-key matching against buildings happens here.
 That logic stays in `src/sica_mapping/data/overlays.py::match_overlays()`.

@@ -1,4 +1,4 @@
-"""Ingest data/property_addresses.csv verbatim into raw_addresses."""
+"""Ingest data/raw/cov_open_data/property-addresses.csv verbatim into raw_addresses."""
 
 from __future__ import annotations
 

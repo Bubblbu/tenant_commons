@@ -19,7 +19,7 @@ those, `pid` is left null rather than emitting a non-PID value under that
 name. `address_point_id` (p_parcel_id) is always present so every row
 still has a stable join key even when no real PID exists.
 
-Reads from data/sica_core.db's `raw_addresses` table (already ingested from
+Reads from data/derived/sica_core.db's `raw_addresses` table (already ingested from
 config's `addresses` path) rather than re-parsing the source CSV, so this
 stays consistent with whatever's actually loaded.
 

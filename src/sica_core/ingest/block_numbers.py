@@ -1,4 +1,4 @@
-"""Ingest data/block-numbers.csv verbatim into raw_block_numbers."""
+"""Ingest data/raw/cov_open_data/block-numbers.csv verbatim into raw_block_numbers."""
 
 from __future__ import annotations
 

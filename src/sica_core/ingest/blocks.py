@@ -1,4 +1,4 @@
-"""Ingest data/block-outlines.csv into blocks.
+"""Ingest data/raw/cov_open_data/block-outlines.csv into blocks.
 
 Every block row is kept — the bbox filter is recorded as `in_west_end_bbox`,
 not used to drop rows, so the table stays fully browsable (see schema notes).
