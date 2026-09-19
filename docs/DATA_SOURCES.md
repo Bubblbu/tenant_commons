@@ -93,8 +93,8 @@ the raw CSVs.
   [[project_organizer_view_deferred]]) — `raw_buildings.py` strips them.
 - **License/attribution:** TODO — Vancouver Open Data's default license
   (Open Government Licence – Vancouver) likely applies to the underlying
-  Open Data portions; confirm once `vhd`'s exact dataset list per pull is
-  documented there.
+  Open Data portions; the datasets are the ones listed in
+  `src/sica_core/fetch/cov_open_data.py`; confirm the license per dataset.
 - **Geographic scope:** citywide (no West-End restriction — see CLAUDE.md
   Section 2, Q3).
 - **Format/known quirks:**
@@ -178,13 +178,13 @@ for the full rebuild order.
 - **Geographic scope:** citywide; `sica_core/ingest/blocks.py` keeps every
   row and records a `in_west_end_bbox` flag rather than dropping rows
   outside the pilot bbox, so the table stays fully browsable.
-- **Access method:** manual download (steps TODO).
+- **Access method:** scripted, `scripts/fetch_cov_open_data.py` (dataset `block-outlines`).
 - **Format/known quirks:** polygon geometry lives in a `geom` column,
   parsed via `sica_core/geometry.py::parse_geom`.
 - **Output location:** `data/raw/cov_open_data/block-outlines.csv`.
 - **Consumed by:** `sica_mapping` (`config.toml` → `blocks`), `sica_core`
   (`ingest/blocks.py`).
-- **Refresh cadence:** ad hoc / not tracked historically. TODO: decide one.
+- **Refresh cadence:** on demand (`fetch_cov_open_data.py`); last fetched 2026-09-18.
 
 ### `block-numbers.csv`
 
@@ -196,7 +196,7 @@ for the full rebuild order.
   exact URL still TODO.
 - **License/attribution:** TODO.
 - **Geographic scope:** citywide.
-- **Access method:** manual download (steps TODO).
+- **Access method:** scripted, `scripts/fetch_cov_open_data.py` (dataset `block-numbers`).
 - **Format/known quirks:** none noted beyond standard portal column naming
   (`geom`, `geo_point_2d`). `sica_core/ingest/block_numbers.py` raises on
   unexpected columns.
@@ -450,8 +450,7 @@ rather than this doc for how field-level access is handled.
   (confirmed via repo-wide search); `config.toml`'s `vtu` path points at
   `membership_full.csv` only.
 - **Recommendation:** confirm it's genuinely unused, then either delete it
-  or move it out of `data/raw/nationbuilder/` as a dated historical snapshot rather
-  than leaving it sitting in `data/` looking like a live input.
+  or move it out of `data/raw/nationbuilder/`, since it looks like a live input there.
 
 ---
 

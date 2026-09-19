@@ -105,8 +105,7 @@ def run(paths: DataPaths) -> None:
 
     # --- Join with property information ---
     # NOTE: reconstructs the notebook's undefined `addresses` reference (history
-    # is in the archived vhd scripts, ~/Projects/VTU/_archive/2026-09-18-data-restructure/)
-    # using `props` with geo_local_area -> local_area.
+    # is in the archived vhd scripts) using `props` with geo_local_area -> local_area.
     addresses_for_join = props.rename({"geo_local_area": "local_area"})
     housing = (
         rentals.drop("units_right", "occupancy_year")
@@ -177,8 +176,7 @@ def run(paths: DataPaths) -> None:
     print("businesses (housing-related, active licences):", businesses.shape)
 
     # --- Per-building index WITH landlord attribution (buildings.csv) ---
-    # (History of this step lives in the archived vhd scripts,
-    # ~/Projects/VTU/_archive/2026-09-18-data-restructure/.)
+    # (History of this step lives in the archived vhd scripts.)
     bsns_by_address = businesses.group_by("address").agg(
         bsns_group=pl.col("bsns_group").unique().drop_nulls(),
         bsns_name=pl.col("bsns_name").unique().drop_nulls(),

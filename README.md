@@ -64,10 +64,10 @@ The builder expects four CSV files. Their paths can be provided via CLI flags or
 
 | Argument | Example file | Required columns |
 | --- | --- | --- |
-| `--buildings` | `data/buildings.csv` | At minimum `address`, `local_area`, `units`, `year_built`, `value_land`, `value_bldg`, VTU-friendly ownership columns such as `bsns_group`. |
-| `--addresses` | `data/property_addresses.csv` | `civic_number`, `std_street`, and `geo_point_2d` (containing `"lat,lon"`). Optional `local_area_*` columns improve enrichment. |
-| `--blocks` | `data/block-outlines.csv` | Polygon GeoJSON in a `geom` column and any block metadata you want surfaced in tables. |
-| `--vtu` | `data/vtu_membership_public.csv` | Address-level aggregate — `addr_key`, `member_count_active`, `member_count_all`, `latest_membership_year`. Generated from the raw NationBuilder export via `scripts/build_vtu_public_extract.py`; never point this at the raw export directly (see `docs/DATA_SOURCES.md`). |
+| `--buildings` | `data/derived/buildings.csv` | At minimum `address`, `local_area`, `units`, `year_built`, `value_land`, `value_bldg`, VTU-friendly ownership columns such as `bsns_group`. |
+| `--addresses` | `data/raw/cov_open_data/property-addresses.csv` | `civic_number`, `std_street`, and `geo_point_2d` (containing `"lat,lon"`). Optional `local_area_*` columns improve enrichment. |
+| `--blocks` | `data/raw/cov_open_data/block-outlines.csv` | Polygon GeoJSON in a `geom` column and any block metadata you want surfaced in tables. |
+| `--vtu` | `data/derived/vtu_membership_public.csv` | Address-level aggregate — `addr_key`, `member_count_active`, `member_count_all`, `latest_membership_year`. Generated from the raw NationBuilder export via `scripts/build_vtu_public_extract.py`; never point this at the raw export directly (see `docs/DATA_SOURCES.md`). |
 
 The pipeline normalizes column names to lowercase snake_case, but keeping the suggested
 column names avoids surprises.
