@@ -11,6 +11,11 @@ dependencies = [
     "folium",
     "shapely",
     "loguru",
+    "polars>=1.44.2",
+    "geopandas>=1.1.4",
+    "pyogrio>=0.13.0",
+    "tomlkit>=0.15.1",
+    "requests>=2.32.5",
 ]
 
 [build-system]
