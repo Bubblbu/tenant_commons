@@ -27,8 +27,6 @@ def buildings_table(pts_df: pd.DataFrame) -> pd.DataFrame:
             "has_vtu_member",
             "latest_membership_year",
             "housing_type",
-            "rezoning_status",
-            "rezoning_status_group",
         ]
     ].copy()
     tbl["member_share_pct"] = (tbl["member_share_building"] * 100).round(0).astype(int)
@@ -130,10 +128,6 @@ def rows_buildings(df: pd.DataFrame) -> str:
         owner_key = escape(str(r.owner_key))
         local_area = "" if pd.isna(r.local_area) else str(r.local_area)
         housing_type = "" if pd.isna(r.housing_type) else str(r.housing_type)
-        rezoning_status = "" if pd.isna(r.rezoning_status) else str(r.rezoning_status)
-        rezoning_status_group = (
-            "" if pd.isna(r.rezoning_status_group) else str(r.rezoning_status_group)
-        )
         search_terms = " ".join(
             str(val).lower()
             for val in (
@@ -144,7 +138,6 @@ def rows_buildings(df: pd.DataFrame) -> str:
                 int(r.member_count),
                 r.owner_group,
                 housing_type,
-                rezoning_status,
             )
             if val not in ("", None)
         )
@@ -159,10 +152,7 @@ def rows_buildings(df: pd.DataFrame) -> str:
                 f'data-has-vtu-member="{has_vtu_val}" '
                 f'data-latest-membership-year="{membership_year_val}" '
                 f'data-member-total="{member_total}" data-search="{search_attr}" '
-                f'data-source="building" data-synthetic="0" '
-                f'data-housing-type="{escape(housing_type)}" '
-                f'data-rezoning-status="{escape(rezoning_status)}" '
-                f'data-rezoning-status-group="{escape(rezoning_status_group)}">'
+                f'data-housing-type="{escape(housing_type)}">'
                 f'<td class="select-cell"><input type="checkbox" class="row-select" '
                 f'data-type="building" data-target="{bid}"></td>'
                 f"<td>{escape(str(r.address))}</td>"
@@ -174,51 +164,6 @@ def rows_buildings(df: pd.DataFrame) -> str:
                 f"<td>{escape(str(r.owner_group))}</td>"
                 f'<td data-sort-value="{year_val}">{year_val}</td>'
                 f'<td data-sort-value="{escape(housing_type)}">{escape(housing_type)}</td>'
-                f'<td data-sort-value="{escape(rezoning_status)}">{escape(rezoning_status)}</td>'
-                f"</tr>"
-            )
-        )
-    return "\n".join(rows)
-
-
-def rows_synthetic(records: list[dict]) -> str:
-    """Unmatched SRO/co-op/rezoning records rendered as Buildings-table rows,
-    flagged by source, with real-building-only fields left blank. See
-    data.overlays.match_overlays for how these records are produced.
-    """
-    rows = []
-    for rec in records:
-        sid = escape(str(rec["synthetic_id"]))
-        source = escape(str(rec.get("source") or ""))
-        local_area = str(rec.get("local_area") or "")
-        address = str(rec.get("address") or "")
-        housing_type = str(rec.get("housing_type") or "")
-        rezoning_status = str(rec.get("rezoning_status") or "")
-        rezoning_status_group = str(rec.get("rezoning_status_group") or "")
-        search_terms = " ".join(
-            str(val).lower()
-            for val in (address, local_area, source)
-            if val not in ("", None)
-        )
-        rows.append(
-            (
-                f'<tr data-bid="{sid}" data-owner="" data-block="" '
-                f'data-area="{escape(local_area)}" '
-                f'data-value-land="" data-value-bldg="" data-value-ratio="" '
-                f'data-units="" data-year-built="" data-has-vtu-member="0" '
-                f'data-latest-membership-year="" data-member-total="0" '
-                f'data-search="{escape(search_terms)}" '
-                f'data-source="{source}" data-synthetic="1" '
-                f'data-housing-type="{escape(housing_type)}" '
-                f'data-rezoning-status="{escape(rezoning_status)}" '
-                f'data-rezoning-status-group="{escape(rezoning_status_group)}">'
-                f'<td class="select-cell"><input type="checkbox" class="row-select" '
-                f'data-type="building" data-target="{sid}"></td>'
-                f"<td>{escape(address)} <em>(unmatched {source})</em></td>"
-                f'<td data-sort-value="{escape(local_area)}">{escape(local_area)}</td>'
-                f"<td></td><td></td><td></td><td></td><td></td><td></td>"
-                f'<td data-sort-value="{escape(housing_type)}">{escape(housing_type)}</td>'
-                f'<td data-sort-value="{escape(rezoning_status)}">{escape(rezoning_status)}</td>'
                 f"</tr>"
             )
         )

@@ -60,8 +60,6 @@
       // marker._strokeColor/_strokeWeight, set in applyMarkerMetadata().
       const MARKER_STROKE_COLOR = '#ffffff';
       const MARKER_STROKE_WEIGHT = 0.6;
-      // Must match layout.py's REZONING_BADGE_RADIUS.
-      const REZONING_BADGE_RADIUS = 3.0;
       let currentZoomScale = 1;
       let colorScalingEnabled = true;
       let blockColorScalingEnabled = true;
@@ -78,8 +76,6 @@
       // filters and tab-switching never finished wiring up as a result.
       const vizShowSroChk = document.getElementById('viz-show-sro');
       const vizShowCoopChk = document.getElementById('viz-show-coop');
-      const vizRezoningOpenChk = document.getElementById('viz-show-rezoning-open');
-      const vizRezoningClosedChk = document.getElementById('viz-show-rezoning-closed');
 
       function computeZoomScale(zoom) {
         if (!Number.isFinite(zoom)) return currentZoomScale;
@@ -273,15 +269,14 @@
         return marker._strokeWeight || MARKER_STROKE_WEIGHT;
       }
 
-      // Rings (extra housing-type halo) and the rezoning badge are separate
-      // child CircleMarkers, so — unlike the single-type stroke override
+      // Extra housing-type rings (a building that is both SRO and co-op) are
+      // separate child CircleMarkers, so — unlike the single-type stroke override
       // above — they're shown/hidden by resizing to/from radius 0, mirroring
       // how setMarkerVisibility treats a fully-filtered building marker.
       // Called whenever a building's own visibility changes (from within
       // setMarkerVisibility/applyZoomScaling) AND whenever the Housing
-      // Data/Rezoning checkboxes change (from applyHousingTypeFilter/
-      // applyRezoningFilter) — a no-op (single property check) for the
-      // ~5,000 markers that have neither.
+      // Data checkboxes change (from applyHousingTypeFilter) — a no-op
+      // (single property check) for the ~5,000 markers without extra rings.
       function syncMarkerAnnotations(marker) {
         if (!marker) return;
         var buildingVisible = !marker._isFiltered;
@@ -297,18 +292,6 @@
               r.marker.setRadius(visible ? getScaledRadius(marker) + 3.0 : 0);
             }
           });
-        }
-        if (marker._badge) {
-          var showOpen = vizRezoningOpenChk ? vizRezoningOpenChk.checked !== false : true;
-          var showClosed = vizRezoningClosedChk ? vizRezoningClosedChk.checked !== false : true;
-          var badgeShown = marker._badgeStatusGroup === 'closed' ? showClosed : showOpen;
-          var visible = buildingVisible && badgeShown;
-          if (typeof marker._badge.setStyle === 'function') {
-            marker._badge.setStyle({ fillOpacity: visible ? 0.9 : 0, opacity: visible ? 1 : 0 });
-          }
-          if (typeof marker._badge.setRadius === 'function') {
-            marker._badge.setRadius(visible ? REZONING_BADGE_RADIUS : 0);
-          }
         }
       }
 
@@ -485,16 +468,12 @@
           const yearMeta = Number(meta.year_built);
           marker._yearBuilt = Number.isFinite(yearMeta) ? yearMeta : null;
 
-          // Housing-type ring / rezoning badge / synthetic (unmatched-record)
-          // bookkeeping — see data.overlays.match_overlays and
-          // add_buildings_layers/add_unmatched_overlay_layers in layout.py.
+          // Housing-type ring bookkeeping — see data.overlays.match_overlays
+          // and add_buildings_layers in layout.py.
           marker._strokeColor = (typeof meta.stroke_color === 'string' && meta.stroke_color) || marker._strokeColor || MARKER_STROKE_COLOR;
           marker._strokeWeight = (typeof meta.stroke_weight === 'number') ? meta.stroke_weight : (marker._strokeWeight || MARKER_STROKE_WEIGHT);
           marker._housingType = meta.housing_type || '';
           marker._primaryHousingType = meta.primary_housing_type || '';
-          marker._isSynthetic = !!meta.is_synthetic;
-          marker._source = meta.source || null;
-          marker._rezoningStatusGroup = meta.rezoning_status_group || null;
           marker._extraRings = null;
           if (Array.isArray(meta.extra_rings) && meta.extra_rings.length) {
             marker._extraRings = meta.extra_rings
@@ -503,13 +482,6 @@
               })
               .filter(function(r) { return !!r.marker; });
           }
-          marker._badge = null;
-          marker._badgeStatusGroup = null;
-          if (meta.rezoning_badge_var) {
-            marker._badge = window[String(meta.rezoning_badge_var)];
-            marker._badgeStatusGroup = meta.rezoning_status_group || null;
-          }
-
           ensureMarkerBase(marker);
           updateMarkerColorAppearance(marker);
 
@@ -539,15 +511,9 @@
         });
       }
 
-      // Housing type (SRO/co-op) and rezoning both have two parts to keep in
-      // sync on every checkbox change: (a) matched buildings' own ring/badge
-      // annotations (syncMarkerAnnotations, cheap — only markers that
-      // actually have a ring/badge do anything), and (b) standalone unmatched
-      // markers' own visibility, which — since they're now ordinary
-      // (synthetic) Buildings-table rows — is decided inside applyFilters()
-      // itself (see its data-synthetic/data-source handling) rather than a
-      // separate per-marker loop like the old rezoning-only mechanism this
-      // replaces.
+      // Housing type (SRO/co-op) toggles only restyle existing markers (stroke
+      // color, extra rings) — they never add, remove or hide a marker, since
+      // every SRO/co-op is a building.
       function applyHousingTypeFilter() {
         showSroChecked = vizShowSroChk ? vizShowSroChk.checked !== false : true;
         showCoopChecked = vizShowCoopChk ? vizShowCoopChk.checked !== false : true;
@@ -557,14 +523,6 @@
           if (!marker) return;
           if (marker._primaryHousingType) restyleMarkerStroke(marker);
           if (marker._extraRings) syncMarkerAnnotations(marker);
-        });
-      }
-
-      function applyRezoningFilter() {
-        applyFilters();
-        Object.keys(window.buildingIndex).forEach(function(key) {
-          var marker = window.buildingIndex[key];
-          if (marker && marker._badge) syncMarkerAnnotations(marker);
         });
       }
 
@@ -740,21 +698,13 @@
       }
 
       // Same shared-canvas insertion-order issue sendBlocksToBack() handles
-      // for blocks — except here it's the unmatched SRO/co-op/rezoning
-      // overlay markers (always present on the canvas now, shown/hidden via
-      // radius rather than being added/removed) that can end up drawn on
-      // top of building markers and silently steal their clicks wherever
-      // the two spatially overlap. Python already adds buildings after the
-      // unmatched-overlay layers so this is a no-op at initial load, but
-      // toggling "Show buildings" off/on re-inserts layerVTU/layerNon at
-      // the end of the canvas draw order regardless — this is the runtime
-      // backstop for that case. Only real buildings (not synthetic/
-      // unmatched entries, which also live in window.buildingIndex) are
-      // brought forward.
+      // for blocks: toggling "Show buildings" off/on re-inserts
+      // layerVTU/layerNon at the end of the canvas draw order, so bring the
+      // building markers back to the front.
       function sendBuildingsToFront() {
         Object.keys(window.buildingIndex).forEach(function(key) {
           const marker = window.buildingIndex[key];
-          if (marker && !marker._isSynthetic && typeof marker.bringToFront === 'function') {
+          if (marker && typeof marker.bringToFront === 'function') {
             marker.bringToFront();
           }
         });
@@ -1159,7 +1109,7 @@
         }
         setLegendDisplay(legendBlocksEl, showBlocksLegend);
         setLegendDisplay(legendBuildingsEl, showBuildingLegend);
-        // Static reference info (housing-type ring / rezoning badge colors),
+        // Static reference info (housing-type ring colors),
         // not tied to any checkbox — always shown whenever the legend panel
         // itself is visible.
         setLegendDisplay(legendHousingEl, true);
@@ -1617,14 +1567,10 @@
             summary: summary,
           };
         });
-        const showOpenRezoning = vizRezoningOpenChk ? vizRezoningOpenChk.checked !== false : true;
-        const showClosedRezoning = vizRezoningClosedChk ? vizRezoningClosedChk.checked !== false : true;
         const visibleBids = new Set();
         buildingRows.forEach(function(row) {
           const bid = row.getAttribute('data-bid');
           const marker = window.buildingIndex[bid];
-          const isSynthetic = row.getAttribute('data-synthetic') === '1';
-          const rowSource = row.getAttribute('data-source') || '';
 
           let matches = true;
           const rowArea = (row.getAttribute('data-area') || '').toLowerCase().trim();
@@ -1634,12 +1580,10 @@
             matches = false;
           }
 
-          // Synthetic (unmatched SRO/co-op/rezoning) rows have no units/year-
-          // built/value data — exempt them from those sliders entirely rather
-          // than let a NaN comparison silently hide them — but they ARE
-          // gated by their own type's show/hide checkbox, which real
-          // building rows have no equivalent of.
-          if (matches && metricKeys.length && !isSynthetic) {
+          // Rows with no value for a metric (e.g. SRO/co-op records with no
+          // building match have no units/year built) are skipped per-metric
+          // below rather than hidden by a NaN comparison.
+          if (matches && metricKeys.length) {
             for (let i = 0; i < metricKeys.length; i += 1) {
               const metric = metricKeys[i];
               const threshold = thresholds[metric];
@@ -1651,17 +1595,6 @@
               }
               if (threshold.min !== null && value < threshold.min) { matches = false; break; }
               if (threshold.max !== null && value > threshold.max) { matches = false; break; }
-            }
-          }
-
-          if (matches && isSynthetic) {
-            if (rowSource === 'sro') {
-              matches = matches && showSroChecked;
-            } else if (rowSource === 'coop') {
-              matches = matches && showCoopChecked;
-            } else if (rowSource === 'rezoning') {
-              const statusGroup = row.getAttribute('data-rezoning-status-group') || '';
-              matches = matches && (statusGroup === 'closed' ? showClosedRezoning : showOpenRezoning);
             }
           }
 
@@ -1854,13 +1787,6 @@
       applyHousingTypeFilter();
       if (vizShowSroChk) vizShowSroChk.addEventListener('change', applyHousingTypeFilter);
       if (vizShowCoopChk) vizShowCoopChk.addEventListener('change', applyHousingTypeFilter);
-      applyRezoningFilter();
-      if (vizRezoningOpenChk) {
-        vizRezoningOpenChk.addEventListener('change', applyRezoningFilter);
-      }
-      if (vizRezoningClosedChk) {
-        vizRezoningClosedChk.addEventListener('change', applyRezoningFilter);
-      }
 
       if (resetBtn) {
         resetBtn.addEventListener('click', function() {
@@ -1892,9 +1818,6 @@
           if (vizShowSroChk) vizShowSroChk.checked = true;
           if (vizShowCoopChk) vizShowCoopChk.checked = true;
           applyHousingTypeFilter();
-          if (vizRezoningOpenChk) vizRezoningOpenChk.checked = true;
-          if (vizRezoningClosedChk) vizRezoningClosedChk.checked = true;
-          applyRezoningFilter();
           if (tableSearchInput) {
             tableSearchInput.value = '';
           }

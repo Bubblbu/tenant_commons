@@ -28,13 +28,11 @@ from .data import (
     rows_blocks,
     rows_landlords,
     rows_neighbourhoods,
-    rows_synthetic,
 )
 from .frontend import (
     add_blocks_layer,
     add_buildings_layers,
     add_neighbourhoods_layer,
-    add_unmatched_overlay_layers,
     sidebar_html,
     wiring_js,
     legends_html,
@@ -240,9 +238,10 @@ def build_map(args) -> None:
             control=False,
         ).add_to(m)
     # local_area_boundary_fc loads before match_overlays() — needed for its
-    # point-in-polygon local-area lookup for unmatched overlay records — and
-    # match_overlays() enriches pts_df before anything downstream (marker
-    # rendering, table building) reads housing_type/rezoning_* columns.
+    # point-in-polygon local-area lookup for SRO/co-op records with no
+    # building match — and match_overlays() enriches pts_df (adding those
+    # records as housing rows) before anything downstream (marker rendering,
+    # table building) reads it.
     neighbourhoods_fc = local_area_boundaries_feature_collection(args.local_area_boundary)
     overlay_result = match_overlays(
         pts_df,
@@ -266,20 +265,9 @@ def build_map(args) -> None:
     fc = blocks_feature_collection(blocks_merged)
     blocks_geo = add_blocks_layer(m, fc)
     neighbourhoods_geo = add_neighbourhoods_layer(m, neighbourhoods_fc)
-    # Unmatched overlay markers are added to the SAME shared canvas
-    # (prefer_canvas=True) as buildings, and canvas z-order is just
-    # insertion order — so this needs to run BEFORE add_buildings_layers(),
-    # not after, or every unmatched marker paints (and steals clicks) on
-    # top of every building marker. wiring.js's sendBuildingsToFront() is
-    # the runtime backstop for when a checkbox toggle re-inserts buildings
-    # anyway (see its docstring for why that alone isn't enough).
-    _unmatched_layers, _unmatched_layer_names, unmatched_marker_metadata = (
-        add_unmatched_overlay_layers(m, overlay_result.unmatched_records)
-    )
     _layer_vtu, _layer_non, layer_vtu_name, layer_non_name, marker_metadata = (
         add_buildings_layers(m, pts_df)
     )
-    marker_metadata.extend(unmatched_marker_metadata)
 
     if bounds_info and all(
         k in bounds_info for k in ("lat_min", "lon_min", "lat_max", "lon_max")
@@ -303,9 +291,7 @@ def build_map(args) -> None:
     k_tbl = blocks_table(blocks_merged)
     l_tbl = landlords_table(pts_df)
     n_tbl = neighbourhoods_table(pts_df)
-    buildings_rows_html = (
-        rows_buildings(b_tbl) + "\n" + rows_synthetic(overlay_result.unmatched_records)
-    )
+    buildings_rows_html = rows_buildings(b_tbl)
     m.get_root().html.add_child(
         folium.Element(
             sidebar_html(
@@ -332,18 +318,6 @@ def build_map(args) -> None:
         except (TypeError, ValueError):
             b_key = str(b_id)
         building_records_map[b_key] = cleaned
-
-    for rec in overlay_result.unmatched_records:
-        building_records_map[str(rec["synthetic_id"])] = _sanitise_record(
-            {
-                "b_id": rec["synthetic_id"],
-                "address": rec.get("address"),
-                "local_area": rec.get("local_area"),
-                "housing_type": rec.get("housing_type"),
-                "rezoning_status": rec.get("rezoning_status"),
-                "source": rec.get("source"),
-            }
-        )
 
     building_records_payload = {
         "columns": [str(col) for col in b_tbl.columns],

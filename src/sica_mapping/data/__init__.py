@@ -31,7 +31,6 @@ from .tables import (
     rows_blocks,
     rows_landlords,
     rows_neighbourhoods,
-    rows_synthetic,
 )
 from .vtu import (
     prepare_membership_records,
@@ -70,7 +69,6 @@ __all__ = [
     "rows_blocks",
     "rows_landlords",
     "rows_neighbourhoods",
-    "rows_synthetic",
     "prepare_membership_records",
     "membership_records_by_address",
     "membership_filter_config",

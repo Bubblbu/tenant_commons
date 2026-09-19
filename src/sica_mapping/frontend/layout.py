@@ -152,33 +152,6 @@ RING_STROKE_WEIGHT = 2.2
 DEFAULT_STROKE_COLOR = "#ffffff"
 DEFAULT_STROKE_WEIGHT = 0.6
 
-_REZONING_STATUS_COLORS = {
-    "approved": "#2ca25f",
-    "rezoning": "#e6550d",
-    "upcoming": "#756bb1",
-}
-REZONING_BADGE_RADIUS = 3.0
-# Small fixed (lat, lon) offset so the badge sits just NE of the building
-# marker. Not zoom-invariant in pixel space, but acceptable at this tool's
-# typical zoom 13-16 operating range, and lets the badge reuse the existing
-# CircleMarker-only show/hide machinery instead of a DivIcon.
-REZONING_BADGE_OFFSET = (0.00004, 0.00006)
-
-UNMATCHED_MARKER_RADIUS = 3.5
-UNMATCHED_MARKER_WEIGHT = 1.4
-UNMATCHED_MARKER_OPACITY = 0.55
-
-_SOURCE_LAYER_NAMES = {
-    "sro": "SRO/SRA hotels (unmatched)",
-    "coop": "Co-op housing (unmatched)",
-    "rezoning": "Rezoning applications (unmatched)",
-}
-_SOURCE_RING_COLOR = {
-    "sro": SRO_RING_COLOR,
-    "coop": COOP_RING_COLOR,
-}
-
-
 def add_buildings_layers(m: folium.Map, pts_df):
     layer_vtu = folium.FeatureGroup(
         name="VTU member buildings", show=True, overlay=True
@@ -198,8 +171,11 @@ def add_buildings_layers(m: folium.Map, pts_df):
         member_share = r.get("member_share_building", 0.0)
         units_val = None if pd.isna(r["units"]) else int(r["units"])
 
+        housing_name = str(r.get("housing_name") or "").strip()
+        name_line = f"{escape(housing_name)}<br>" if housing_name else ""
         popup_html = (
             f"<b>{escape(str(r['address']))}</b><br>"
+            f"{name_line}"
             f"Units: {'' if pd.isna(r['units']) else int(r['units'])}<br>"
             f"VTU members: {int(r['member_count'])}<br>"
             f"Member share: {member_share * 100:.0f}%<br>"
@@ -234,7 +210,6 @@ def add_buildings_layers(m: folium.Map, pts_df):
         # 853 e pender st).
         is_coop = bool(r.get("is_coop", False))
         is_sro = bool(r.get("is_sro", False))
-        is_rezoning = bool(r.get("is_rezoning", False))
 
         housing_types: list[tuple[str, str]] = []
         if is_coop:
@@ -257,6 +232,12 @@ def add_buildings_layers(m: folium.Map, pts_df):
                 popup_html += f": {escape(coop_status)}"
             if coop_ownership_model:
                 popup_html += f" ({escape(coop_ownership_model)})"
+            coop_url = str(r.get("coop_url") or "").strip()
+            if coop_url:
+                popup_html += (
+                    f' (<a href="{escape(coop_url)}" target="_blank" '
+                    f'rel="noopener">more info</a>)'
+                )
         if is_sro:
             sro_owner = str(r.get("sro_owner") or "").strip()
             sro_operator = str(r.get("sro_operator") or "").strip()
@@ -267,19 +248,9 @@ def add_buildings_layers(m: folium.Map, pts_df):
             )
             if sro_occupancy:
                 popup_html += f" · {escape(sro_occupancy)}"
-        if is_rezoning:
-            rezoning_status = str(r.get("rezoning_status") or "").strip()
-            rezoning_category = str(r.get("rezoning_category") or "").strip()
-            rezoning_link = str(r.get("rezoning_link") or "").strip()
-            popup_html += f"<br><b>Rezoning:</b> {escape(rezoning_status)}"
-            if rezoning_category:
-                popup_html += f" — {escape(rezoning_category)}"
-            if rezoning_link:
-                popup_html += (
-                    f' (<a href="{escape(rezoning_link)}" target="_blank" '
-                    f'rel="noopener">source</a>)'
-                )
-
+            sro_rooms = str(r.get("sro_registered_rooms") or "").strip()
+            if sro_rooms:
+                popup_html += f"<br>Registered rooms: {escape(sro_rooms)}"
         block_id_val = r.get("block_id")
         block_id = int(block_id_val) if pd.notna(block_id_val) else None
 
@@ -313,28 +284,6 @@ def add_buildings_layers(m: folium.Map, pts_df):
         ).add_child(folium.Popup(popup_html, max_width=320))
         target_layer.add_child(mk)
 
-        # Rezoning badge — a small filled marker offset from the building,
-        # added after it so it paints on top.
-        rezoning_badge_var = None
-        if is_rezoning:
-            badge_color = _REZONING_STATUS_COLORS.get(
-                str(r.get("rezoning_status") or "").lower(), "#999999"
-            )
-            badge = folium.CircleMarker(
-                location=[
-                    r["lat"] + REZONING_BADGE_OFFSET[0],
-                    r["lon"] + REZONING_BADGE_OFFSET[1],
-                ],
-                radius=REZONING_BADGE_RADIUS,
-                fill=True,
-                fill_opacity=0.9,
-                color="#ffffff",
-                weight=1,
-                fill_color=badge_color,
-            )
-            target_layer.add_child(badge)
-            rezoning_badge_var = badge.get_name()
-
         marker_metadata.append(
             {
                 "marker_var": mk.get_name(),
@@ -355,11 +304,6 @@ def add_buildings_layers(m: folium.Map, pts_df):
                 "stroke_color": stroke_color,
                 "stroke_weight": stroke_weight,
                 "extra_rings": extra_rings,
-                "is_rezoning": is_rezoning,
-                "rezoning_status_group": (
-                    (r.get("rezoning_status_group") or None) if is_rezoning else None
-                ),
-                "rezoning_badge_var": rezoning_badge_var,
             }
         )
 
@@ -369,154 +313,6 @@ def add_buildings_layers(m: folium.Map, pts_df):
     layer_non_name = layer_non.get_name()
 
     return layer_vtu, layer_non, layer_vtu_name, layer_non_name, marker_metadata
-
-
-def _unmatched_marker_color(rec: dict) -> str:
-    source = rec.get("source")
-    if source == "rezoning":
-        status = str(rec.get("rezoning_status") or "").lower()
-        return _REZONING_STATUS_COLORS.get(status, "#999999")
-    return _SOURCE_RING_COLOR.get(source, "#999999")
-
-
-def _unmatched_popup_html(rec: dict) -> str:
-    """Mirrors the field selection the old standalone SRO/rezoning overlay
-    popups used to show, for records that never matched an existing building.
-    """
-    fields = rec.get("popup_fields") or {}
-    source = rec.get("source")
-    address = escape(str(rec.get("address") or ""))
-
-    if source == "coop":
-        title = escape(str(fields.get("title") or "")) or address
-        html = f"<b>{title}</b><br>Address: {address}<br>"
-        status = fields.get("status")
-        if status:
-            html += f"Status: {escape(str(status))}<br>"
-        ownership_model = fields.get("ownership_model")
-        if ownership_model:
-            html += f"Ownership model: {escape(str(ownership_model))}<br>"
-        read_more = fields.get("read_more_url")
-        if read_more:
-            html += (
-                f'<a href="{escape(str(read_more))}" target="_blank" '
-                f'rel="noopener">More info</a>'
-            )
-        return html
-
-    if source == "sro":
-        name = escape(str(fields.get("building_name") or "")) or address
-        html = f"<b>{name}</b><br>Address: {address}<br>"
-        secondary = fields.get("secondary_address")
-        if secondary:
-            html += f"Secondary: {escape(str(secondary))}<br>"
-        html += (
-            f"Owner: {escape(str(fields.get('owner') or ''))}<br>"
-            f"Operator: {escape(str(fields.get('operator') or ''))}<br>"
-            f"Operator Group: {escape(str(fields.get('operator_group') or ''))}<br>"
-            f"Ownership Group: {escape(str(fields.get('ownership_group') or ''))}<br>"
-        )
-        rooms = fields.get("registered_rooms")
-        if rooms:
-            html += f"Registered rooms: {escape(str(rooms))}<br>"
-        occupancy = fields.get("occupancy_status")
-        if occupancy:
-            html += f"Occupancy: {escape(str(occupancy))}"
-        return html
-
-    # rezoning
-    name = escape(str(fields.get("name") or "")) or address
-    html = f"<b>{name}</b><br>Status: {escape(str(fields.get('status') or ''))}<br>"
-    category = fields.get("category")
-    if category:
-        html += f"Category: {escape(str(category))}<br>"
-    status_detail = fields.get("status_detail")
-    if status_detail:
-        html += f"Detail: {escape(str(status_detail))}<br>"
-    link = fields.get("link")
-    if link:
-        html += f'<a href="{escape(str(link))}" target="_blank" rel="noopener">Source</a>'
-    return html
-
-
-def add_unmatched_overlay_layers(
-    m: folium.Map, unmatched_records: list[dict]
-) -> tuple[dict[str, folium.FeatureGroup], dict[str, str], list[dict[str, object]]]:
-    """Standalone markers for SRO/co-op/rezoning records that didn't match any
-    existing building — hollow and muted so they read as clearly distinct from
-    real building markers, one FeatureGroup per source so Housing Data's two
-    checkboxes and the Rezoning section can each toggle independently.
-    """
-    layers: dict[str, folium.FeatureGroup] = {
-        source: folium.FeatureGroup(name=name, show=True, overlay=True)
-        for source, name in _SOURCE_LAYER_NAMES.items()
-    }
-    marker_metadata: list[dict[str, object]] = []
-
-    for rec in unmatched_records:
-        lat, lon = rec.get("lat"), rec.get("lon")
-        if lat is None or lon is None or pd.isna(lat) or pd.isna(lon):
-            continue
-        source = rec.get("source")
-        layer = layers.get(source)
-        if layer is None:
-            continue
-
-        color = _unmatched_marker_color(rec)
-        popup_html = _unmatched_popup_html(rec)
-
-        mk = folium.CircleMarker(
-            location=[float(lat), float(lon)],
-            radius=UNMATCHED_MARKER_RADIUS,
-            fill=False,
-            color=color,
-            weight=UNMATCHED_MARKER_WEIGHT,
-            opacity=UNMATCHED_MARKER_OPACITY,
-        ).add_child(folium.Popup(popup_html, max_width=320))
-        layer.add_child(mk)
-
-        # Reuses the buildings marker_metadata schema so it can append
-        # straight into the same list/JSON file, and applyMarkerMetadata()
-        # needs almost no new logic to pick these up (its existing owner_key/
-        # block_id guards already no-op correctly on None).
-        marker_metadata.append(
-            {
-                "marker_var": mk.get_name(),
-                "b_id": rec["synthetic_id"],
-                "owner_key": None,
-                "block_id": None,
-                "base_radius": UNMATCHED_MARKER_RADIUS,
-                "base_opacity": 0.0,
-                "base_color": color,
-                "neutral_color": color,
-                "is_vtu": False,
-                "member_count": 0,
-                "units": None,
-                "local_area": rec.get("local_area"),
-                "year_built": None,
-                "housing_type": rec.get("housing_type") or "",
-                # "" (not "coop"/"sro") — an unmatched marker's own visibility
-                # is gated by its Buildings-table row (see rows_synthetic /
-                # applyFilters's data-synthetic path), not by the ring-stroke
-                # override mechanism matched buildings use.
-                "primary_housing_type": "",
-                "stroke_color": color,
-                "stroke_weight": UNMATCHED_MARKER_WEIGHT,
-                "extra_rings": [],
-                "is_rezoning": source == "rezoning",
-                "rezoning_status_group": rec.get("rezoning_status_group") or None,
-                "rezoning_badge_var": None,
-                "is_synthetic": True,
-                "source": source,
-            }
-        )
-
-    layer_var_names: dict[str, str] = {}
-    for source, layer in layers.items():
-        layer.add_to(m)
-        layer_var_names[source] = layer.get_name()
-
-    return layers, layer_var_names, marker_metadata
 
 
 def sidebar_html(
@@ -544,11 +340,6 @@ def wiring_js(
     marker_metadata_url: str,
     building_records_url: str,
 ) -> str:
-    # Unmatched SRO/co-op/rezoning FeatureGroups (see
-    # add_unmatched_overlay_layers) are always added to the map by Python and
-    # need no JS-side layer var — their per-marker visibility is driven
-    # entirely through marker_metadata (the same Housing Data/Rezoning
-    # checkboxes hide/show individual markers, not whole layers).
     return WIRING_JS_TEMPLATE.safe_substitute(
         blocks_layer_var=blocks_layer_var,
         layer_vtu_var=layer_vtu_var,

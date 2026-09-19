@@ -3,8 +3,11 @@
 Runs after the main buildings pipeline (`pts_df` must already carry `addr_key`,
 `lat`/`lon`) and before `add_buildings_layers`/`buildings_table`. For each
 optional source CSV, splits rows into "matched" (joins onto an existing
-building by address) and "unmatched" (kept as its own standalone record, see
-`OverlayResult.unmatched_records`).
+building by address) and "unmatched". Unmatched co-op and SRO/SRA records are
+housing too, so they are appended to `pts_df` as ordinary building rows (no
+units/year/membership) and render exactly like matched ones. Unmatched
+rezoning records stay in `OverlayResult.unmatched_records`; rezoning isn't
+shown on the map for now, but its matching is kept as-is.
 
 Matching is address-key only (`core.normalization.addr_key_from_freeform`), no
 lat/lon proximity fallback — a deliberate precision-over-recall choice. Each
@@ -117,15 +120,6 @@ def _load_secondary_address_index(buildings_path: str | None) -> dict[str, str]:
     return index
 
 
-def _resolve_via_secondary(addr_keys: pd.Series, known_keys: set[str], secondary_index: dict[str, str]) -> pd.Series:
-    """Remap keys that miss `known_keys` directly but hit the secondary-address index."""
-    if not secondary_index:
-        return addr_keys
-    return addr_keys.apply(
-        lambda k: k if k in known_keys else secondary_index.get(k, k)
-    )
-
-
 def _build_boundary_polys(local_area_boundary_fc: dict) -> list[tuple[str, object]]:
     polys = []
     for feat in (local_area_boundary_fc or {}).get("features") or []:
@@ -159,13 +153,84 @@ def _resolve_local_area(lat, lon, boundary_polys: list[tuple[str, object]]) -> s
     return ""
 
 
-def _coop_addr_key(address) -> str:
-    street_part = str(address).split(",")[0].strip()
-    return addr_key_from_freeform(street_part)
+_DIRECTION_RE = re.compile(r"^(\d+)\s+(east|west|north|south)\b")
+_DIRECTION_ABBR = {"east": "e", "west": "w", "north": "n", "south": "s"}
+# "#800 - 1047 Barclay St", "100-2950 Heather St": a unit number in front of
+# the civic number. (Not a range like "2165-2195 W 45th Av" — see
+# `_match_key`, which only falls back to this when the full address misses.)
+_UNIT_PREFIX_RE = re.compile(r"^#?\s*\w+\s*-\s*(\d+\s.+)$")
+# "7401 - 7469 Talon Square", "500 & 502 Alexander St": a range of civic
+# numbers; the building is keyed by the first.
+_RANGE_RE = re.compile(r"^(\d+)\s*(?:-|&|and)\s*\d+\s+(.+)$")
+_STREET_TYPE_RE = re.compile(r"^(\d+ .+?)(?: (?:st|ave|rd|dr|blvd|pl|ct|hwy))?$")
 
 
-def _sro_addr_key(address) -> str:
-    return addr_key_from_freeform(address)
+def _loose_key(key: str) -> str:
+    """addr_key without its street type ("404 hawks av" ~ "404 hawks st")."""
+    m = _STREET_TYPE_RE.match(key)
+    return m.group(1) if m else key
+
+
+def _build_loose_index(known_keys: set[str]) -> dict[str, str]:
+    """loose key -> building key, only where exactly one building has it."""
+    seen: dict[str, set[str]] = {}
+    for key in known_keys:
+        seen.setdefault(_loose_key(key), set()).add(key)
+    return {loose: next(iter(keys)) for loose, keys in seen.items() if len(keys) == 1}
+
+
+def _address_key_variants(street: str) -> list[str]:
+    """Candidate addr_keys for a source address, most literal first.
+
+    buildings.csv keys use "e"/"w" for directions ("1865 e 10th ave") where
+    co-op sources spell them out ("1865 East 10th Avenue"), and co-op units
+    are often listed with their unit number in front. Neither is handled by
+    the shared `addr_key_from_freeform` (its output is baked into the cached
+    building keys, so it can't change), so the variants are built here.
+    """
+    base = re.sub(r"\s+", " ", str(street)).strip().lower().rstrip("*").strip()
+    raw = [base]
+    m = _UNIT_PREFIX_RE.match(base)
+    if m:
+        raw.append(m.group(1))
+    m = _RANGE_RE.match(base)
+    if m:
+        raw.append(f"{m.group(1)} {m.group(2)}")
+    keys: list[str] = []
+    for text in raw:
+        text = _DIRECTION_RE.sub(lambda d: f"{d.group(1)} {_DIRECTION_ABBR[d.group(2)]}", text)
+        key = addr_key_from_freeform(text)
+        if key not in keys:
+            keys.append(key)
+    return keys
+
+
+def _match_key(
+    street: str,
+    known_keys: set[str],
+    secondary_index: dict[str, str],
+    loose_index: dict[str, str],
+) -> str:
+    """The first variant that hits a building (directly, or via a secondary
+    address), then the first that hits one ignoring street type ("St" vs
+    "Av" typos, only when that number+street is unambiguous); otherwise the
+    most-stripped variant, so unmatched records for different units of one
+    building end up sharing a key (and one marker).
+    """
+    variants = _address_key_variants(street)
+    for key in variants:
+        if key in known_keys:
+            return key
+        if key in secondary_index:
+            return secondary_index[key]
+    for key in variants:
+        if _loose_key(key) in loose_index:
+            return loose_index[_loose_key(key)]
+    return variants[-1]
+
+
+def _coop_street(address) -> str:
+    return str(address).split(",")[0].strip()
 
 
 _REZONING_NAME_SPLIT_RE = re.compile(r"\s+and\s+|\s*&\s*|;")
@@ -175,6 +240,68 @@ def _rezoning_addr_key(name) -> str:
     s = str(name).split("(")[0]
     s = _REZONING_NAME_SPLIT_RE.split(s, maxsplit=1)[0].strip()
     return addr_key_from_freeform(s)
+
+
+def _add_extra_housing(
+    extras: dict[str, dict],
+    key: str,
+    lat,
+    lon,
+    address: str,
+    flags: dict,
+    name: str,
+) -> None:
+    """Queue a source record with no building match as a new housing row.
+
+    Keyed by address so a co-op and an SRO at the same unmatched address
+    become one building with both flags, like a matched dual-type building.
+    Records without coordinates can't be placed on the map and are skipped.
+    """
+    if lat is None or lon is None or pd.isna(lat) or pd.isna(lon):
+        logger.warning("Skipping unplaceable housing record (no lat/lon): %s", address)
+        return
+    row = extras.setdefault(
+        key, {"addr_key": key, "address": address, "lat": float(lat), "lon": float(lon)}
+    )
+    row.update(flags)
+    if name and not row.get("housing_name"):
+        row["housing_name"] = name
+
+
+def _append_extra_housing(
+    df: pd.DataFrame, extras: dict[str, dict], boundary_polys: list[tuple[str, object]]
+) -> pd.DataFrame:
+    if not extras:
+        return df
+    new = pd.DataFrame(list(extras.values()))
+    first_id = int(pd.to_numeric(df["b_id"]).max()) + 1
+    new["b_id"] = range(first_id, first_id + len(new))
+    new["local_area"] = [
+        _resolve_local_area(lat, lon, boundary_polys)
+        for lat, lon in zip(new["lat"], new["lon"])
+    ]
+    # No building-level data behind these rows: no units/year/values (NaN is
+    # already handled everywhere for missing values) and no VTU membership.
+    new["has_vtu_member"] = False
+    new["member_count"] = 0
+    new["member_count_all"] = 0
+    new["member_share_building"] = 0.0
+    new["owner_group"] = "(Unknown)"
+    new["owner_key"] = "unknown"
+    logger.info(
+        "Added %d SRO/co-op records with no building match as housing rows", len(new)
+    )
+    combined = pd.concat([df, new], ignore_index=True)
+    # Text columns default to "" (as for every matched building), not NaN.
+    text_cols = [
+        c
+        for c in df.columns
+        if c.startswith(("coop_", "sro_", "rezoning_")) or c == "housing_name"
+    ]
+    combined[text_cols] = combined[text_cols].fillna("")
+    for col in ("is_coop", "is_sro", "is_rezoning", "has_vtu_member"):
+        combined[col] = combined[col].eq(True)
+    return combined
 
 
 def match_overlays(
@@ -189,6 +316,7 @@ def match_overlays(
     addr_keys = set(df["addr_key"])
     boundary_polys = _build_boundary_polys(local_area_boundary_fc)
     secondary_index = _load_secondary_address_index(buildings_path)
+    loose_index = _build_loose_index(addr_keys)
     if secondary_index:
         logger.info(
             "Secondary-address fallback: %d addresses across buildings.csv "
@@ -196,12 +324,18 @@ def match_overlays(
             len(secondary_index),
         )
     unmatched_records: list[dict] = []
+    # SRO/co-op source records with no matching building. They are housing,
+    # so they're appended to `df` below as ordinary building rows rather than
+    # kept as a separate marker type.
+    extras: dict[str, dict] = {}
 
     # Defaults for every new column, so downstream code (add_buildings_layers,
     # buildings_table) never needs to branch on a column being absent.
     df["is_coop"] = False
     df["coop_status"] = ""
     df["coop_ownership_model"] = ""
+    df["coop_url"] = ""
+    df["housing_name"] = ""
     df["is_sro"] = False
     df["sro_owner"] = ""
     df["sro_operator"] = ""
@@ -220,8 +354,9 @@ def match_overlays(
     coops = _load_optional_csv(coops_path, "Co-op housing")
     if coops is not None:
         coops = coops.copy()
-        coops["addr_key"] = coops["address"].apply(_coop_addr_key)
-        coops["addr_key"] = _resolve_via_secondary(coops["addr_key"], addr_keys, secondary_index)
+        coops["addr_key"] = coops["address"].apply(
+            lambda a: _match_key(_coop_street(a), addr_keys, secondary_index, loose_index)
+        )
         matched_mask = coops["addr_key"].isin(addr_keys)
         matched = coops[matched_mask].drop_duplicates("addr_key")
         unmatched = coops[~matched_mask]
@@ -239,39 +374,36 @@ def match_overlays(
             df.loc[hit, "coop_ownership_model"] = (
                 df.loc[hit, "addr_key"].map(lookup["ownership_model"]).apply(_clean)
             )
+            df.loc[hit, "coop_url"] = (
+                df.loc[hit, "addr_key"].map(lookup["read_more_url"]).apply(_clean)
+            )
+            df.loc[hit, "housing_name"] = (
+                df.loc[hit, "addr_key"].map(lookup["title"]).apply(_clean)
+            )
 
-        for idx, row in unmatched.iterrows():
-            lat, lon = row.get("lat"), row.get("lon")
-            unmatched_records.append(
-                {
-                    # Suffixed with the row's own CSV index, not just its "id"
-                    # column, since that's assumed unique per-record but isn't
-                    # guaranteed to be (confirmed true for co-ops; kept
-                    # consistent across all three sources defensively).
-                    "synthetic_id": f"coop-{row.get('id')}-{idx}",
-                    "source": "coop",
-                    "lat": lat,
-                    "lon": lon,
-                    "address": _clean(row.get("address")),
-                    "local_area": _resolve_local_area(lat, lon, boundary_polys),
-                    "housing_type": "coop",
-                    "rezoning_status": "",
-                    "rezoning_status_group": "",
-                    "popup_fields": {
-                        "title": _clean(row.get("title")),
-                        "status": _clean(row.get("status")),
-                        "ownership_model": _clean(row.get("ownership_model")),
-                        "read_more_url": _clean(row.get("read_more_url")),
-                    },
-                }
+        for _, row in unmatched.iterrows():
+            _add_extra_housing(
+                extras,
+                key=row["addr_key"],
+                lat=row.get("lat"),
+                lon=row.get("lon"),
+                address=_clean(row.get("address")).split(",")[0].strip(),
+                flags={
+                    "is_coop": True,
+                    "coop_status": _clean(row.get("status")),
+                    "coop_ownership_model": _clean(row.get("ownership_model")),
+                    "coop_url": _clean(row.get("read_more_url")),
+                },
+                name=_clean(row.get("title")),
             )
 
     # ---- SRO/SRA housing ----
     sro = _load_optional_csv(sro_path, "SRO/SRA housing")
     if sro is not None:
         sro = sro.copy()
-        sro["addr_key"] = sro["address"].apply(_sro_addr_key)
-        sro["addr_key"] = _resolve_via_secondary(sro["addr_key"], addr_keys, secondary_index)
+        sro["addr_key"] = sro["address"].apply(
+            lambda a: _match_key(str(a), addr_keys, secondary_index, loose_index)
+        )
         matched_mask = sro["addr_key"].isin(addr_keys)
         matched = sro[matched_mask].drop_duplicates("addr_key")
         unmatched = sro[~matched_mask]
@@ -297,30 +429,23 @@ def match_overlays(
                         df.loc[hit, "addr_key"].map(lookup[src_col]).apply(_clean)
                     )
 
-        for idx, row in unmatched.iterrows():
-            lat, lon = row.get("latitude"), row.get("longitude")
-            unmatched_records.append(
-                {
-                    "synthetic_id": f"sro-{row.get('id')}-{idx}",
-                    "source": "sro",
-                    "lat": lat,
-                    "lon": lon,
-                    "address": _clean(row.get("address")),
-                    "local_area": _resolve_local_area(lat, lon, boundary_polys),
-                    "housing_type": "sro",
-                    "rezoning_status": "",
-                    "rezoning_status_group": "",
-                    "popup_fields": {
-                        "building_name": _clean(row.get("building_name")),
-                        "secondary_address": _clean(row.get("secondary_address")),
-                        "owner": _clean(row.get("owner")),
-                        "operator": _clean(row.get("operator")),
-                        "operator_group": _clean(row.get("operator_group")),
-                        "ownership_group": _clean(row.get("ownership_group")),
-                        "registered_rooms": _clean(row.get("#_registered_rooms")),
-                        "occupancy_status": _clean(row.get("occupancy_status")),
-                    },
-                }
+        for _, row in unmatched.iterrows():
+            _add_extra_housing(
+                extras,
+                key=row["addr_key"],
+                lat=row.get("latitude"),
+                lon=row.get("longitude"),
+                address=_clean(row.get("address")),
+                flags={
+                    "is_sro": True,
+                    "sro_owner": _clean(row.get("owner")),
+                    "sro_operator": _clean(row.get("operator")),
+                    "sro_operator_group": _clean(row.get("operator_group")),
+                    "sro_ownership_group": _clean(row.get("ownership_group")),
+                    "sro_occupancy_status": _clean(row.get("occupancy_status")),
+                    "sro_registered_rooms": _clean(row.get("#_registered_rooms")),
+                },
+                name=_clean(row.get("building_name")),
             )
 
     # ---- Rezoning applications ----
@@ -386,6 +511,7 @@ def match_overlays(
                 }
             )
 
+    df = _append_extra_housing(df, extras, boundary_polys)
     df["housing_type"] = np.where(
         df["is_coop"] & df["is_sro"],
         "co-op, sro",
