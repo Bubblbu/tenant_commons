@@ -1,9 +1,11 @@
 """Guards the data/ layout: DataPaths is the single definition, and
 config.toml's [paths] must agree with it (both are read by different code)."""
 
+import ast
 import tomllib
 from pathlib import Path
 
+from sica_core.config import DEFAULT_DB_PATH
 from sica_core.paths import DataPaths
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -50,3 +52,27 @@ def test_config_toml_matches_layout():
     p = DataPaths("data")
     for key, attr in CONFIG_KEYS.items():
         assert Path(cfg[key]) == getattr(p, attr), key
+
+
+def test_default_db_path_matches_datapaths():
+    """Guard against sica_core.config.DEFAULT_DB_PATH and DataPaths drifting apart."""
+    assert Path(DEFAULT_DB_PATH) == DataPaths("data").db
+
+
+def test_fetch_coops_default_output_matches_datapaths():
+    """Guard against scripts/fetch_coops.py's DEFAULT_OUT and DataPaths drifting apart."""
+    fetch_coops_path = REPO_ROOT / "scripts" / "fetch_coops.py"
+    tree = ast.parse(fetch_coops_path.read_text())
+
+    # Extract DEFAULT_OUT from the module-level assignments
+    default_out = None
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Assign):
+            for target in node.targets:
+                if isinstance(target, ast.Name) and target.id == "DEFAULT_OUT":
+                    if isinstance(node.value, ast.Constant):
+                        default_out = node.value.value
+                    break
+
+    assert default_out is not None, "Could not find DEFAULT_OUT in fetch_coops.py"
+    assert default_out == str(DataPaths("data").coops)
