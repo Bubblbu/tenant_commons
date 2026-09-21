@@ -9,7 +9,7 @@ separately as candidate `overlay_housing` rows. Unmatched rezoning records
 stay in the body's own `unmatched_records` list; rezoning isn't shown on the
 map for now, but its matching is kept as-is.
 
-Matching is address-key only (`core.normalization.addr_key_from_freeform`), no
+Matching is address-key only (`sica_core.normalize.addr_key_from_freeform`), no
 lat/lon proximity fallback — a deliberate precision-over-recall choice. Each
 source needs different preprocessing before it produces a clean key:
 
@@ -23,7 +23,7 @@ source needs different preprocessing before it produces a clean key:
   45th Av (Dunbar Ryerson United Church)") — strip from the first "(", split
   the remainder on " and "/"&"/";", and key the first fragment. Best-effort:
   most rezoning applications (churches, single-family lots, commercial,
-  multi-lot assemblies) don't correspond to any row in buildings.csv at all,
+  multi-lot assemblies) don't correspond to any row in `buildings` at all,
   regardless of parsing quality.
 
 Co-ops and SRO/SRA additionally get a secondary-address fallback: since the
@@ -35,7 +35,7 @@ own `address` may still key-match one of those secondary addresses; see
 `load_secondary_address_index` in `.overlay_sources`. Not applied to
 rezoning, which doesn't key off a civic address in the first place.
 
-Measured match rates against buildings.csv (5,112 rows, citywide, pre-
+Measured match rates against buildings (5,112 rows, citywide, pre-
 secondary-address fallback): co-ops 42/117 (36%), SRO/SRA 41/171 (24%),
 rezoning ~43/377 (11%).
 """
@@ -213,12 +213,16 @@ def _add_extra_housing(
     address: str,
     flags: dict,
     name: str,
+    source_table: str,
+    source_id,
 ) -> None:
     """Queue a source record with no building match as a new housing row.
 
     Keyed by address so a co-op and an SRO at the same unmatched address
     become one building with both flags, like a matched dual-type building.
     Records without coordinates can't be placed on the map and are skipped.
+    `source_row_ids` (CLAUDE.md lineage hook) keeps every contributing raw
+    row per table, since one row can merge a co-op and an SRO.
     """
     if lat is None or lon is None or pd.isna(lat) or pd.isna(lon):
         logger.warning("Skipping unplaceable housing record (no lat/lon): %s", address)
@@ -227,6 +231,10 @@ def _add_extra_housing(
         key, {"addr_key": key, "address": address, "lat": float(lat), "lon": float(lon)}
     )
     row.update(flags)
+    if source_id is not None and not pd.isna(source_id):
+        row.setdefault("source_row_ids", {}).setdefault(source_table, []).append(
+            int(source_id)
+        )
     if name and not row.get("housing_name"):
         row["housing_name"] = name
 
@@ -246,18 +254,19 @@ def match_overlays(
     rezoning = load_rezoning_frame(conn)
     if secondary_index:
         logger.info(
-            "Secondary-address fallback: %d addresses across buildings.csv "
+            "Secondary-address fallback: %d secondary addresses "
             "available for co-op/SRO matching",
             len(secondary_index),
         )
     unmatched_records: list[dict] = []
-    # SRO/co-op source records with no matching building. They are housing,
-    # so they're appended to `df` below as ordinary building rows rather than
-    # kept as a separate marker type.
+    # SRO/co-op source records with no matching building, keyed by addr_key.
+    # Returned as `unmatched`; ingest writes them to `overlay_housing`, a
+    # companion table, not to `buildings` (see overlay_write.py).
     extras: dict[str, dict] = {}
 
-    # Defaults for every new column, so downstream code (add_buildings_layers,
-    # buildings_table) never needs to branch on a column being absent.
+    # Defaults for every new column, so downstream code never needs to branch
+    # on a column being absent. overlay_write.BUILDING_OVERLAY_COLUMNS lists
+    # these same 18 (a test pins the two together).
     df["is_coop"] = False
     df["coop_status"] = ""
     df["coop_ownership_model"] = ""
@@ -321,6 +330,8 @@ def match_overlays(
                     "coop_url": _clean(row.get("read_more_url")),
                 },
                 name=_clean(row.get("title")),
+                source_table="raw_coops",
+                source_id=row.get("raw_coop_id"),
             )
 
     # ---- SRO/SRA housing ----
@@ -371,6 +382,8 @@ def match_overlays(
                     "sro_registered_rooms": _clean(row.get("#_registered_rooms")),
                 },
                 name=_clean(row.get("building_name")),
+                source_table="raw_sro",
+                source_id=row.get("raw_sro_id"),
             )
 
     # ---- Rezoning applications ----

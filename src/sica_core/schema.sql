@@ -151,7 +151,6 @@ CREATE TABLE raw_rezoning (
 -- remembering to filter, and this table's own row count is a visible
 -- data-quality metric — if it grows, address matching regressed.
 -- The export unions the two (see export.py) with a real `source` discriminator.
-DROP TABLE IF EXISTS overlay_housing;
 CREATE TABLE overlay_housing (
     overlay_id INTEGER PRIMARY KEY,
     addr_key TEXT NOT NULL,
@@ -171,7 +170,7 @@ CREATE TABLE overlay_housing (
     sro_ownership_group TEXT,
     sro_occupancy_status TEXT,
     sro_registered_rooms TEXT,
-    source_row_ids TEXT,   -- lineage hook (CLAUDE.md Q8c): raw_sro/raw_coops ids
+    source_row_ids TEXT,   -- lineage hook (CLAUDE.md Q8c): JSON {"raw_coops": [ids], "raw_sro": [ids]}
     ingested_at TEXT NOT NULL
 );
 CREATE INDEX idx_overlay_housing_addr_key ON overlay_housing(addr_key);

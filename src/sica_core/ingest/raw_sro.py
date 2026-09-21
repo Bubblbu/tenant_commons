@@ -1,11 +1,10 @@
 """Ingest data/raw/cov_foi/sra_housing_combined.csv verbatim into raw_sro.
 
 Raw storage only — no address-key matching against buildings happens here.
-That logic (and its own reasons for existing independently — see its
-docstring) stays in `src/sica_mapping/data/overlays.py::match_overlays()`,
-which runs at map-render time against the CSV directly. This table exists
-so the SRO/SRA source is actually browsable from sica_core's SQLite store
-(CLAUDE.md Q8b), same as raw_buildings/raw_addresses.
+Matching runs later in the same ingest, in `ingest/overlays.py`
+(`match_overlays()`, persisted by `overlay_write.py`), reading this table.
+Keeping the source verbatim also makes it browsable from sica_core's SQLite
+store (CLAUDE.md Q8b), same as raw_buildings/raw_addresses.
 """
 
 from __future__ import annotations

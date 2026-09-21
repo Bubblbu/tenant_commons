@@ -8,6 +8,7 @@ unmatched count remains a visible data-quality metric (see schema.sql).
 
 from __future__ import annotations
 
+import json
 import logging
 import sqlite3
 from datetime import datetime, timezone
@@ -18,9 +19,11 @@ from .overlays import match_overlays
 
 logger = logging.getLogger("sica_core.ingest.overlays")
 
-# Every column match_overlays() initialises on the buildings frame — keep
-# this list in lockstep with that block, or matcher output is silently lost.
-_BUILDING_OVERLAY_COLUMNS = [
+# Every column match_overlays() initialises on the buildings frame. The single
+# list of them: export.reconstruct_points imports it, and
+# test_building_overlay_columns_match_what_the_matcher_produces pins it to the
+# matcher and the buildings schema, so matcher output can't be silently lost.
+BUILDING_OVERLAY_COLUMNS = [
     "is_coop",
     "coop_status",
     "coop_ownership_model",
@@ -77,6 +80,8 @@ def _clean(value):
         return None
     if isinstance(value, bool):
         return int(value)
+    if isinstance(value, dict):  # source_row_ids, stored as JSON like merge.py's
+        return json.dumps(value, sort_keys=True)
     return value
 
 
@@ -90,10 +95,10 @@ def ingest_overlays(conn: sqlite3.Connection, boundary_path: str) -> int:
     matched = result.matched
     updates = []
     for _, row in matched.iterrows():
-        values = [_clean(row.get(col)) for col in _BUILDING_OVERLAY_COLUMNS]
+        values = [_clean(row.get(col)) for col in BUILDING_OVERLAY_COLUMNS]
         updates.append((*values, int(row["building_id"])))
 
-    set_sql = ", ".join(f"{col} = ?" for col in _BUILDING_OVERLAY_COLUMNS)
+    set_sql = ", ".join(f"{col} = ?" for col in BUILDING_OVERLAY_COLUMNS)
     ingested_at = datetime.now(timezone.utc).isoformat()
 
     with conn:

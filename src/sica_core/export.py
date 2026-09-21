@@ -1,7 +1,12 @@
-"""Exports sica_core's SQLite data into sica_mapping's legacy
-`.preprocessed/*.json` cache shape, so the existing, unmodified Folium map
-(`build_sica_map.py --stage frontend`) can render straight from SQLite
-instead of the CSV pipeline.
+"""Exports sica_core's SQLite data for the map.
+
+`export_artifacts()` writes the frontend artifact set (filter_config.json,
+marker_metadata.json, building_records.json, blocks.geojson and the local-area
+boundary), each with a `schema_version`. That directory is the only interface
+between sica_core and the frontend. `export_to_cache()` is the transitional
+path: it writes sica_mapping's legacy `.preprocessed/*.json` cache so the
+Folium map (`build_sica_map.py --stage frontend`) can still render from
+SQLite, until the frontend replaces it.
 
 This reproduces the same full data the current map already shows (including
 VTU membership counts) — no public/sensitive field redaction here. That's a
@@ -14,12 +19,9 @@ duplicated instead. `scripts/rebuild_map.py` is the piece that needs both
 packages (it also shells out to `build_sica_map.py`), which is why it lives
 at the top level, not inside this package.
 
-Known, deliberate simplifications (not bugs):
-- `reconstruct_blocks` filters to the static `in_west_end_bbox` flag computed
-  at ingest time. v1 instead recomputes a *dynamic* buffered bbox every run
-  (config bbox unioned with actual matched-building bounds, plus a small
-  pad) — replicating that exactly isn't worth it. This produces a working,
-  sensible map, just not byte-identical block counts to v1.
+Known, deliberate simplification (not a bug): `reconstruct_blocks` emits
+every block, citywide, rather than v1's dynamic buffered bbox, so block counts
+aren't byte-identical to v1.
 """
 
 from __future__ import annotations
@@ -35,6 +37,7 @@ from shapely.strtree import STRtree
 
 from .building_metrics import BUILDING_METRICS, _summarize_metric, build_building_metrics
 from .geometry import parse_geom
+from .ingest.overlay_write import BUILDING_OVERLAY_COLUMNS
 from .membership_metrics import compute_building_member_metrics, membership_filter_config
 from .portfolios import build_landlord_portfolios
 
@@ -111,12 +114,7 @@ def reconstruct_points(
             "value_bldg", "bldg_land_ratio", "local_area", "b_id", "block_id",
             "latest_membership_year", "portfolio_name", "portfolio_building_count",
             "portfolio_entities", "source",
-            "is_coop", "coop_status", "coop_ownership_model", "coop_url",
-            "housing_name", "is_sro", "sro_owner", "sro_operator",
-            "sro_operator_group", "sro_ownership_group", "sro_occupancy_status",
-            "sro_registered_rooms", "is_rezoning", "rezoning_status",
-            "rezoning_status_group", "rezoning_category", "rezoning_status_detail",
-            "rezoning_link",
+            *BUILDING_OVERLAY_COLUMNS,
         ]
     ]
     merged = _append_overlay_housing(conn, merged)
@@ -142,7 +140,10 @@ def _append_overlay_housing(
     type and nothing else — no units, year built, assessed values or owner —
     so they are tagged with a real `source` value rather than being passed off
     as buildings. b_id continues from the buildings table's maximum so the two
-    sets never collide.
+    sets never collide. Only the points frame's own columns are kept, so
+    overlay_housing's internals (overlay_id, source_row_ids, ingested_at) stay
+    out of the export. A record that is both co-op and SRO gets
+    source=overlay_coop; housing_type still says "co-op, sro".
     """
     overlay = pd.read_sql_query("SELECT * FROM overlay_housing", conn)
     if overlay.empty:
@@ -153,7 +154,6 @@ def _append_overlay_housing(
         return combined
 
     first_id = int(pd.to_numeric(points["b_id"]).max()) + 1 if len(points) else 1
-    overlay = overlay.rename(columns={"overlay_id": "_overlay_id"})
     overlay["b_id"] = range(first_id, first_id + len(overlay))
     overlay["source"] = [
         "overlay_coop" if bool(c) else "overlay_sro"
@@ -166,6 +166,7 @@ def _append_overlay_housing(
     overlay["has_vtu_member"] = False
     overlay["member_share_building"] = 0.0
     overlay["members_payload"] = [[] for _ in range(len(overlay))]
+    overlay = overlay.reindex(columns=points.columns)
 
     combined = pd.concat([points, overlay], ignore_index=True)
     for col in ("is_coop", "is_sro", "is_rezoning", "has_vtu_member"):
@@ -500,7 +501,7 @@ def _blocks_feature_collection(blocks_df: pd.DataFrame) -> dict:
     ]
     features = []
     for _, row in blocks_df.iterrows():
-        geom = row.get("geom_geojson") or row.get("geom")
+        geom = row.get("geom")
         if geom is None:
             continue
         if isinstance(geom, str):
@@ -553,18 +554,36 @@ def _marker_records(points_df: pd.DataFrame) -> list[dict]:
     return records
 
 
+# building_records.json's columns, in order. An explicit list, not "every
+# column of points_df": the frontend's CSV export writes these verbatim, so
+# lineage/ingest internals and per-member payloads must never reach it. The
+# first 18 are the Folium map's table columns, in its order; the rest are the
+# popup's and the overlay detail. This is also where the public/sensitive
+# filter (spec §12) will go.
+BUILDING_RECORD_COLUMNS = [
+    "b_id", "address", "local_area", "block_id", "units", "member_count",
+    "year_built", "owner_group", "owner_key", "member_count_all", "value_land",
+    "value_bldg", "bldg_land_ratio", "has_vtu_member", "latest_membership_year",
+    "housing_type", "member_share_pct", "source",
+    "lat", "lon",
+    "portfolio_name", "portfolio_building_count", "portfolio_entities",
+    *BUILDING_OVERLAY_COLUMNS,
+]
+
+
 def _building_records(points_df: pd.DataFrame) -> dict:
     """Full per-building record set — the popup and the table both read this."""
-    columns = [
-        c
-        for c in points_df.columns
-        if c not in ("geom_parsed", "members_payload")
+    df = points_df.copy()
+    # Whole percent, rounded half-to-even like the Folium table's pandas round.
+    df["member_share_pct"] = [
+        int(round(float(v) * 100)) if pd.notna(v) else 0
+        for v in df["member_share_building"]
     ]
     records = {}
-    for _, r in points_df.iterrows():
+    for _, r in df.iterrows():
         rec = {
             c: (None if isinstance(r[c], float) and pd.isna(r[c]) else r[c])
-            for c in columns
+            for c in BUILDING_RECORD_COLUMNS
         }
         records[str(int(r["b_id"]))] = rec
-    return {"columns": columns, "records": records}
+    return {"columns": list(BUILDING_RECORD_COLUMNS), "records": records}

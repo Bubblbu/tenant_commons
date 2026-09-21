@@ -2,15 +2,18 @@
 
 Order matters for FK dependencies: raw tables first, then the merge step
 (which needs both raw_buildings and raw_addresses, and needs blocks for
-point-in-polygon assignment), then membership (needs buildings.addr_key to
-resolve building_id), then ownership_claims last (independent of everything
-else, but kept at the end since it's the one optional/persistent source).
+point-in-polygon assignment), then overlays (matches raw_sro/raw_coops/
+raw_rezoning against the merged buildings: flags matched buildings, writes
+the rest to overlay_housing; needs the local-area boundary GeoJSON), then
+membership (needs buildings.addr_key to resolve building_id), then
+ownership_claims last (independent of everything else, but kept at the end
+since it's the one optional/persistent source).
 
-raw_sro/raw_coops/raw_rezoning are raw storage only (see raw_sro.py's
-docstring) — no FK relationship to buildings, so their position among the
-raw tables is arbitrary; grouped with the other raw ingests for readability.
-All three are optional, same as ownership_claims, since a fresh setup may
-not have them configured.
+raw_sro/raw_coops/raw_rezoning themselves are raw storage (see raw_sro.py's
+docstring), so their position among the raw tables is arbitrary; grouped
+with the other raw ingests for readability. All three are optional, same as
+ownership_claims, since a fresh setup may not have them configured; the
+overlays step runs regardless and matches whatever is present.
 
 Each stage's inserts are already scoped in their own transaction. If a stage
 fails partway, nothing is silently left half-correct: every REBUILDABLE table
@@ -94,9 +97,9 @@ def run_ingest(conn: sqlite3.Connection, config: IngestConfig) -> dict[str, int]
     counts["raw_block_numbers"] = run_source(
         conn, run_id, "raw_block_numbers", ingest_raw_block_numbers, conn, config.block_numbers
     )
-    # SRO/co-op/rezoning: independent of everything else (no FK, not merged
-    # into buildings — see raw_sro.py's docstring), optional since a fresh
-    # setup may not have these sources configured yet.
+    # SRO/co-op/rezoning raw storage: no FK, optional since a fresh setup may
+    # not have these sources configured yet. Matched against buildings by the
+    # overlays step after the merge.
     if config.sro_housing:
         counts["raw_sro"] = run_source(
             conn, run_id, "raw_sro", ingest_raw_sro, conn, config.sro_housing

@@ -98,3 +98,52 @@ def test_matched_building_carries_overlay_data(tmp_path):
     records = json.loads((tmp_path / "building_records.json").read_text())
     building = records["records"]["1"]
     assert building["sro_owner"] == "Owner Co"
+
+
+def _seed_with_overlay(conn):
+    _seed(conn)
+    conn.execute(
+        "INSERT INTO overlay_housing (addr_key, address, housing_name, local_area, "
+        "lat, lon, is_coop, is_sro, source_row_ids, ingested_at) VALUES "
+        "('999 nowhere rd', '999 Nowhere Rd', 'Elm Co-op', 'Downtown', 49.3, "
+        "-123.15, 1, 0, '{\"raw_coops\": [7]}', 'now')"
+    )
+    conn.commit()
+
+
+def test_building_records_columns_are_the_public_list(tmp_path):
+    """The `columns` array drives the user-facing CSV export, so it is an
+    explicit list: no lineage/ingest internals, no per-member payloads."""
+    from sica_core.export import BUILDING_RECORD_COLUMNS
+
+    conn = sqlite3.connect(":memory:")
+    init_db(conn)
+    _seed_with_overlay(conn)
+
+    export_artifacts(conn, tmp_path)
+
+    data = json.loads((tmp_path / "building_records.json").read_text())
+    assert data["columns"] == BUILDING_RECORD_COLUMNS
+    for rec in data["records"].values():
+        assert list(rec) == BUILDING_RECORD_COLUMNS
+    for internal in ("members_payload", "_overlay_id", "source_row_ids",
+                     "ingested_at", "created_at", "updated_at", "member_share_building"):
+        assert internal not in data["columns"]
+    assert data["records"]["1"]["member_share_pct"] == 0
+
+
+def test_overlay_rows_reach_the_artifacts_with_their_source(tmp_path):
+    conn = sqlite3.connect(":memory:")
+    init_db(conn)
+    _seed_with_overlay(conn)
+
+    export_artifacts(conn, tmp_path)
+
+    markers = json.loads((tmp_path / "marker_metadata.json").read_text())["markers"]
+    by_source = {m["source"]: m for m in markers}
+    assert set(by_source) == {"building", "overlay_coop"}
+    assert by_source["overlay_coop"]["housing_type"] == "co-op"
+    records = json.loads((tmp_path / "building_records.json").read_text())["records"]
+    overlay = records[str(by_source["overlay_coop"]["b_id"])]
+    assert overlay["housing_name"] == "Elm Co-op"
+    assert overlay["source"] == "overlay_coop"
