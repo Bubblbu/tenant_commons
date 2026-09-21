@@ -1,0 +1,28 @@
+import { describe, expect, it } from 'vitest';
+import { blockLegendMax, blockTicks, hoodTagsHtml } from './legend';
+
+describe('hoodTagsHtml', () => {
+  it('renders one checked filter tag per neighbourhood, as legends_html did', () => {
+    expect(hoodTagsHtml([{ name: 'West End', count: 1234, units: 56789 }])).toBe(
+      '<label class="filter-tag"><input type="checkbox" class="filter-neighbourhood-option" ' +
+        'value="west end" checked> West End ' +
+        '<span class="filter-tag-count">(1,234 bldgs · 56,789 units)</span></label>',
+    );
+  });
+  it('says so when there is no neighbourhood data', () => {
+    expect(hoodTagsHtml([])).toBe('<em class="filter-none">No neighbourhood data</em>');
+  });
+});
+
+describe('block legend', () => {
+  it('draws six ticks from 0 to the maximum', () => {
+    expect(blockTicks(1000)).toEqual(['0', '200', '400', '600', '800', '1,000']);
+    expect(blockTicks(7)).toEqual(['0', '1', '3', '4', '6', '7']);
+    expect(blockTicks(0)).toEqual(['0', '0', '0', '0', '0', '0']);
+  });
+  it('falls back to blocks_member_building_max, and to 0', () => {
+    expect(blockLegendMax({ schema_version: 1, blocks_total_units_max: 480 })).toBe(480);
+    expect(blockLegendMax({ schema_version: 1, blocks_member_building_max: 9 })).toBe(9);
+    expect(blockLegendMax({ schema_version: 1 })).toBe(0);
+  });
+});
