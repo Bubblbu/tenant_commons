@@ -51,7 +51,12 @@ def load_coops_frame(conn: sqlite3.Connection) -> pd.DataFrame | None:
 
 
 def load_rezoning_frame(conn: sqlite3.Connection) -> pd.DataFrame | None:
-    return _frame_or_none(conn, "SELECT * FROM raw_rezoning")
+    return _frame_or_none(
+        conn,
+        """
+        SELECT *, source_id AS id FROM raw_rezoning
+        """,
+    )
 
 
 def load_secondary_address_index(conn: sqlite3.Connection) -> dict[str, str]:

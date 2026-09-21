@@ -5,6 +5,7 @@ from sica_core.db import init_db
 from sica_core.ingest.overlay_sources import (
     load_boundary_feature_collection,
     load_coops_frame,
+    load_rezoning_frame,
     load_secondary_address_index,
     load_sro_frame,
 )
@@ -20,6 +21,7 @@ def test_returns_none_when_table_empty():
     conn = _conn()
     assert load_sro_frame(conn) is None
     assert load_coops_frame(conn) is None
+    assert load_rezoning_frame(conn) is None
 
 
 def test_loads_sro_rows():
@@ -55,6 +57,22 @@ def test_loads_coop_rows():
     assert len(df) == 1
     assert df.iloc[0]["title"] == "Elm Co-op"
     assert "raw_coop_id" in df.columns
+
+
+def test_loads_rezoning_rows_with_id_alias():
+    conn = _conn()
+    conn.execute(
+        "INSERT INTO raw_rezoning (source_id, name, status, ingested_at) "
+        "VALUES ('RZ285', 'Downtown Mixed-Use', 'Approved', 'now')"
+    )
+    conn.commit()
+    df = load_rezoning_frame(conn)
+    assert len(df) == 1
+    row = df.iloc[0]
+    # Returned under the matcher body's name, not the table's source_id
+    assert row["id"] == "RZ285"
+    assert "source_id" in df.columns  # source_id is still there from SELECT *
+    assert row["name"] == "Downtown Mixed-Use"
 
 
 def test_secondary_address_index_maps_to_primary_addr_key():
