@@ -10,7 +10,7 @@
 
 **Spec:** [`docs/superpowers/specs/2026-09-19-renderer-rewrite-design.md`](../specs/2026-09-19-renderer-rewrite-design.md), revised 2026-09-21. This plan implements §9 steps 4–8, with §6, §7 and §11 as the detail.
 
-**Builds on:** [`2026-09-20-overlay-port-and-data-contract.md`](2026-09-20-overlay-port-and-data-contract.md), complete on branch `overlay-port-data-contract` at `83258e8`. Its final whole-branch review was never run, and its deferred minors are in that plan's SDD ledger. Test baseline: 54 passed.
+**Builds on:** [`2026-09-20-overlay-port-and-data-contract.md`](2026-09-20-overlay-port-and-data-contract.md), merged into `main` at `83258e8`. Its whole-branch review ran on 2026-09-21; the fixes it asked for landed on this plan's branch before Task 1: `building_records.json` has an explicit public column list (`export.BUILDING_RECORD_COLUMNS`, 41 columns, `member_share_pct` instead of `member_share_building`), `overlay_housing.source_row_ids` is populated, and stale docstrings are corrected. Test baseline: 58 passed.
 
 ## Global Constraints
 
@@ -329,7 +329,7 @@ Expected: all pass.
 - [ ] **Step 7: Run the full suite**
 
 Run: `uv run pytest -q`
-Expected: 56 passed (54 + 2).
+Expected: 60 passed (58 + 2).
 
 - [ ] **Step 8: Verify on real data**
 
@@ -517,6 +517,13 @@ In `_building_records`, after the `rec = {...}` comprehension and before `record
                 rec[c] = _round_coord(rec[c])
 ```
 
+In `_write_json`, drop `default=str`, so a numpy value that leaks into a record raises instead of being silently stringified (the previous plan's review verified the real export holds only native types):
+
+```python
+def _write_json(path: Path, payload: object) -> None:
+    path.write_text(json.dumps(payload, separators=(",", ":")), encoding="utf-8")
+```
+
 - [ ] **Step 5: Run the tests**
 
 Run: `uv run pytest tests/test_export_artifacts.py -v`
@@ -525,7 +532,7 @@ Expected: all pass, including the existing `test_marker_metadata_carries_coordin
 - [ ] **Step 6: Run the full suite**
 
 Run: `uv run pytest -q`
-Expected: 59 passed (56 + 3).
+Expected: 63 passed (60 + 3).
 
 - [ ] **Step 7: Measure on real data**
 
@@ -1048,7 +1055,11 @@ export interface FilterConfig {
   [key: string]: unknown;
 }
 
-/** One row of building_records.json; ~46 columns, read defensively. */
+/**
+ * One row of building_records.json: the 41 columns of sica_core's
+ * export.BUILDING_RECORD_COLUMNS, read defensively. Overlay text fields are ''
+ * on building rows and null on overlay rows; treat both as empty.
+ */
 export type BuildingRecord = { b_id: number } & Record<string, unknown>;
 
 export interface BuildingData {
@@ -1717,7 +1728,7 @@ import type { BlocksCollection, BuildingRecord } from './types';
 
 const rec = (over: Partial<BuildingRecord>): BuildingRecord => ({
   b_id: 1, address: 'A', local_area: 'West End', block_id: 1, units: 10, member_count: 0,
-  member_share_building: 0, year_built: 1970, owner_group: 'O', owner_key: 'o', member_count_all: 0,
+  member_share_pct: 0, year_built: 1970, owner_group: 'O', owner_key: 'o', member_count_all: 0,
   value_land: 1, value_bldg: 1, bldg_land_ratio: 1, has_vtu_member: false, latest_membership_year: null,
   housing_type: '', ...over,
 });
@@ -1726,7 +1737,7 @@ describe('buildingRow', () => {
   it("reproduces rows_buildings' markup exactly", () => {
     const row = buildingRow(rec({
       b_id: 7, address: '12 Oak & Elm St', block_id: 3.0, units: 40.0, member_count: 1,
-      member_share_building: 0.0625, year_built: 1965.0, owner_group: 'Example "Holdings"',
+      member_share_pct: 6, year_built: 1965.0, owner_group: 'Example "Holdings"',
       owner_key: 'example-holdings', member_count_all: 2, value_land: 5000000.4, value_bldg: 800000.0,
       bldg_land_ratio: 0.16, has_vtu_member: true, latest_membership_year: 2025.0, housing_type: 'sro',
     }));
@@ -1852,7 +1863,7 @@ export function buildingRow(r: BuildingRecord): string {
   const ratioVal = ratio === null ? '' : String(roundHalfEven(ratio, 3));
   const memberCount = Math.trunc(num(r.member_count) ?? 0);
   const memberTotal = Math.trunc(num(r.member_count_all) ?? memberCount);
-  const sharePct = roundHalfEven((num(r.member_share_building) ?? 0) * 100);
+  const sharePct = Math.trunc(num(r.member_share_pct) ?? 0); // already rounded half-even by the export
   const area = text(r.local_area);
   const housing = text(r.housing_type);
   const owner = text(r.owner_group);
@@ -2638,7 +2649,7 @@ Replace `const buildings = createBuildingLayers(styled);` with:
 - [ ] **Step 6: Run the tests and the type check**
 
 Run: `npm test && npm run typecheck`, then `cd .. && uv run pytest -q`
-Expected: 43 frontend tests passed (36 + 7); `tsc` reports nothing; Python suite 60 passed (59 + 1).
+Expected: 43 frontend tests passed (36 + 7); `tsc` reports nothing; Python suite 64 passed (63 + 1).
 
 - [ ] **Step 7: Check popups in the browser**
 
@@ -2720,7 +2731,7 @@ Row counts in the Vite build (browser console):
 - [ ] Sidebar tabs: row counts match; header sorting; row hover highlights; selection checkboxes; footer totals
 - [ ] Filters: sliders (currency labels show one `$`), neighbourhood tags with counts, select all / clear, search, hide empty blocks, colour and layer toggles, reset
 - [ ] Status bar: totals (5,128 buildings) and in-view counts on pan/zoom
-- [ ] CSV export of visible buildings — *expected:* more columns than Folium's 18 (building_records now carries ~46, incl. internal ones; a deferred minor from the previous plan)
+- [ ] CSV export of visible buildings — *expected:* Folium's 18 columns first, in Folium's order, then 23 more (`lat`/`lon`, portfolio, co-op/SRO/rezoning detail); no internal columns
 - [ ] Building popups (spec §7 redesign, not parity): check the 11 migrated fields on a co-op, an SRO, a portfolio building and an overlay-only record
 - [ ] Page weight / load time (see "total transfer" above); no console errors
 ```
@@ -2818,7 +2829,7 @@ cd frontend && npm ci && npm run build                          # frontend/dist 
 - [ ] **Step 8: Run both suites**
 
 Run: `uv run pytest -q`, then `cd frontend && npm test && npm run typecheck && npm run build`
-Expected: Python 60 passed (no test removed; one mapping entry dropped); frontend 43 passed; build succeeds.
+Expected: Python 64 passed (no test removed; one mapping entry dropped); frontend 43 passed; build succeeds.
 
 - [ ] **Step 9: Commit** *(ask first)*
 
@@ -3054,7 +3065,7 @@ Expected: the build succeeds and `dist/data/` holds the five fixture files.
 - [ ] **Step 6: Run the full Python suite**
 
 Run: `uv run pytest -q`
-Expected: 63 passed (60 + 3).
+Expected: 67 passed (64 + 3).
 
 - [ ] **Step 7: Commit** *(ask first)*
 
@@ -3218,13 +3229,13 @@ Renaming the CI job from `check` to `backend` and `frontend` changes the status-
 - `sica_mapping`, `build_sica_map.py`, `validate_migration.py` and `build_vtu_public_extract.py` are gone. `folium` and `loguru` are dropped. `config.toml` has no `[options]` and no `vtu` key.
 - `scripts/rebuild_map.py` is ingest + export only.
 - CI runs a backend job and a frontend job, the frontend job building against generated fixtures. `deploy.yml` no longer runs on push.
-- Python: 63 passed. Frontend: 43 passed; `tsc --noEmit` clean.
+- Python: 67 passed. Frontend: 43 passed; `tsc --noEmit` clean.
 - Artifact transfer about 2 MB gzipped (coordinates rounded to 6 decimals), against the Folium page's ~4.2 MB.
 
 ## Carried forward, not in this plan
 
 - How deploy gets real artifacts (spec §11). Blocked on the public export profile (spec §12).
 - The membership-exposure step (spec §12).
-- The previous plan's deferred minors, notably `overlay_housing.source_row_ids` never being populated, and internal columns (`_overlay_id`, `ingested_at`, `source_row_ids`) reaching `building_records.json`. The latter now also shows up in the CSV export.
+- The previous plan's remaining minors (dropped or deferred by its review): the matcher's unused rezoning `unmatched_records`, and '' vs null for empty overlay text fields (documented on `BuildingRecord`).
 - `config.toml`'s `local_area_boundary` (CSV) key becomes unused after Task 11. The fetcher still downloads the CSV. It's harmless; retire it separately.
 - Converting `wiring.js` to TypeScript, and formal JSON Schemas for the artifacts (spec §2 non-goals).

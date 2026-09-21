@@ -134,8 +134,8 @@ fails loudly on mismatch instead of rendering an empty map.
 | Artifact | Shape | Change from today |
 |---|---|---|
 | `filter_config.json` | unchanged | now emitted by `sica_core`, not `build.py` |
-| `marker_metadata.json` | list of per-building style records | **gains `lat`/`lon`**; **drops `marker_var`** |
-| `building_records.json` | `{columns, records}` | now from the buildings table unioned with `overlay_housing` (§5), not a post-overlay frame; **gains the 11 popup-only fields** (§7); `source` becomes a real discriminator |
+| `marker_metadata.json` | `{schema_version, markers}`: per-building data records (as built, 2026-09-21; styling is computed by the frontend, plan 2 D3) | **gains `lat`/`lon`**; **drops `marker_var`** |
+| `building_records.json` | `{columns, records}` | now from the buildings table unioned with `overlay_housing` (§5), not a post-overlay frame; **gains the 11 popup-only fields** (§7); `source` becomes a real discriminator; `columns` is an explicit public list (`export.BUILDING_RECORD_COLUMNS`, 41 columns), since the CSV export writes it verbatim |
 | `blocks.geojson` | FeatureCollection | **new**; replaces the 9.8 MB inline payload |
 | `local-area-boundary.geojson` | FeatureCollection | **copied from `raw/`** — see below |
 
@@ -167,7 +167,10 @@ already carries GeoJSON in its `geom` column, so the only gain is avoiding a
 10 MB CSV parse, against the cost of rewriting `ingest/blocks.py`'s column
 mapping.
 
-Export loses its shapely dependency entirely. Shapely remains in `sica_core` for
+Export no longer round-trips geometry through shapely. As built (2026-09-21) it
+still uses shapely inside `reconstruct_blocks()`, for block-number local-area
+resolution and block labels; moving those to ingest time would remove it from
+export entirely, but nothing needs that now. Shapely remains in `sica_core` for
 ingest-time work (overlay point-in-polygon, block spatial join).
 
 ## 5. The overlay port
@@ -314,8 +317,9 @@ today; `bootstrap.ts` imports `leaflet` and assigns `window.L` once, so
 **`bootstrap.ts`** is the only genuinely new logic: create the map, fetch the
 artifacts, construct markers from `marker_metadata.json` keyed by `b_id`, build
 the two GeoJSON layers, expose the four handles `wiring.js` reads, hand off.
-All marker styling is already specified in the metadata (`base_radius`,
-`base_color`, `stroke_color`, `stroke_weight`, `extra_rings`).
+Marker styling (`base_radius`, `base_color`, `stroke_color`, `stroke_weight`,
+`extra_rings`) was baked into Folium's metadata; the artifacts carry only data,
+so styling is presentation computed by the frontend (`markers.ts`, plan 2 D3).
 
 **Presentation logic moves from Python to TS, not data logic.** Three pieces of
 `layout.py` compute from artifact values at render time and have to be
