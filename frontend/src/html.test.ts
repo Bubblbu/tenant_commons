@@ -17,6 +17,13 @@ describe('roundHalfEven', () => {
     expect(roundHalfEven(2.675, 2)).toBe(2.67); // binary 2.67499…, as in Python
     expect(roundHalfEven(12.6)).toBe(13);
   });
+  it('handles exact binary ties like Python', () => {
+    expect(roundHalfEven(0.375, 2)).toBe(0.38);
+    expect(roundHalfEven(0.875, 2)).toBe(0.88);
+    expect(roundHalfEven(-0.375, 2)).toBe(-0.38);
+    expect(roundHalfEven(0.335, 2)).toBe(0.34);
+    expect(roundHalfEven(1966.5)).toBe(1966);
+  });
 });
 
 describe('groupThousands / isMissing', () => {
