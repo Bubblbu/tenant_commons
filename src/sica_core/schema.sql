@@ -13,6 +13,7 @@ DROP TABLE IF EXISTS raw_block_numbers;
 DROP TABLE IF EXISTS raw_sro;
 DROP TABLE IF EXISTS raw_coops;
 DROP TABLE IF EXISTS raw_rezoning;
+DROP TABLE IF EXISTS overlay_housing;
 DROP VIEW IF EXISTS block_stats;
 
 CREATE TABLE raw_buildings (
@@ -142,6 +143,38 @@ CREATE TABLE raw_rezoning (
     link TEXT,
     ingested_at TEXT NOT NULL
 );
+
+-- SRO/co-op source records whose address matched no building (see
+-- ingest/overlays.py). Deliberately NOT merged into `buildings`: these are a
+-- matching *failure* artifact, not buildings we have property data for.
+-- Keeping them separate means COUNT(*) over `buildings` stays correct without
+-- remembering to filter, and this table's own row count is a visible
+-- data-quality metric — if it grows, address matching regressed.
+-- The export unions the two (see export.py) with a real `source` discriminator.
+DROP TABLE IF EXISTS overlay_housing;
+CREATE TABLE overlay_housing (
+    overlay_id INTEGER PRIMARY KEY,
+    addr_key TEXT NOT NULL,
+    address TEXT,
+    housing_name TEXT,
+    local_area TEXT,
+    lat REAL,
+    lon REAL,
+    is_coop INTEGER NOT NULL DEFAULT 0,
+    is_sro INTEGER NOT NULL DEFAULT 0,
+    coop_status TEXT,
+    coop_ownership_model TEXT,
+    coop_url TEXT,
+    sro_owner TEXT,
+    sro_operator TEXT,
+    sro_operator_group TEXT,
+    sro_ownership_group TEXT,
+    sro_occupancy_status TEXT,
+    sro_registered_rooms TEXT,
+    source_row_ids TEXT,   -- lineage hook (CLAUDE.md Q8c): raw_sro/raw_coops ids
+    ingested_at TEXT NOT NULL
+);
+CREATE INDEX idx_overlay_housing_addr_key ON overlay_housing(addr_key);
 
 CREATE TABLE blocks (
     block_id INTEGER PRIMARY KEY,
