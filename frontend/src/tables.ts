@@ -1,0 +1,212 @@
+/**
+ * Sidebar table rows, ported from sica_mapping/data/tables.py. Attributes,
+ * columns, sort keys and rounding follow the Python, because wiring.js reads
+ * these rows as its filter model: data-* attributes, fixed column indices
+ * (wiring.js cacheRowCells) and .row-select checkboxes. Known cosmetic
+ * differences, neither affecting sorting or filtering: numeric sort values
+ * render as JS numbers (15, not Python's 15.0), and tied rows may order
+ * differently. Must render before wiring.js starts; it queries the rows once.
+ */
+import { escapeHtml, isMissing, roundHalfEven } from './html';
+import type { BlocksCollection, BuildingData, BuildingRecord } from './types';
+
+const num = (v: unknown): number | null => (typeof v === 'number' && Number.isFinite(v) ? v : null);
+/** Python int() of a present number, else "". */
+const intStr = (v: unknown): string => {
+  const n = num(v);
+  return n === null ? '' : String(Math.trunc(n));
+};
+const text = (v: unknown): string => (isMissing(v) ? '' : String(v));
+
+/** pandas sort_values(ascending=False): larger first, missing last. Stable. */
+function descMissingLast(a: number | null, b: number | null): number {
+  if (a === null && b === null) return 0;
+  if (a === null) return 1;
+  if (b === null) return -1;
+  return b - a;
+}
+
+/** Python's str ordering (code points), not localeCompare. */
+function byCodePoint(a: string, b: string): number {
+  return a < b ? -1 : a > b ? 1 : 0;
+}
+
+export function buildingRow(r: BuildingRecord): string {
+  const bid = Math.trunc(Number(r.b_id));
+  const block = intStr(r.block_id);
+  const units = intStr(r.units);
+  const year = intStr(r.year_built);
+  const membershipYear = intStr(r.latest_membership_year);
+  const land = num(r.value_land);
+  const bldg = num(r.value_bldg);
+  const ratio = num(r.bldg_land_ratio);
+  const valLand = land === null ? '' : String(roundHalfEven(land));
+  const valBldg = bldg === null ? '' : String(roundHalfEven(bldg));
+  const ratioVal = ratio === null ? '' : String(roundHalfEven(ratio, 3));
+  const memberCount = Math.trunc(num(r.member_count) ?? 0);
+  const memberTotal = Math.trunc(num(r.member_count_all) ?? memberCount);
+  const sharePct = Math.trunc(num(r.member_share_pct) ?? 0); // already rounded half-even by the export
+  const area = text(r.local_area);
+  const housing = text(r.housing_type);
+  const owner = text(r.owner_group);
+  const search = [text(r.address), area, block, units, String(memberCount), owner, housing]
+    .filter((v) => v !== '')
+    .map((v) => v.toLowerCase())
+    .join(' ');
+  const a = escapeHtml(area);
+  const h = escapeHtml(housing);
+  return (
+    `<tr data-bid="${bid}" data-owner="${escapeHtml(text(r.owner_key))}" data-block="${block}" ` +
+    `data-area="${a}" ` +
+    `data-value-land="${valLand}" data-value-bldg="${valBldg}" ` +
+    `data-value-ratio="${ratioVal}" data-units="${units}" ` +
+    `data-year-built="${year}" ` +
+    `data-has-vtu-member="${r.has_vtu_member ? 1 : 0}" ` +
+    `data-latest-membership-year="${membershipYear}" ` +
+    `data-member-total="${memberTotal}" data-search="${escapeHtml(search)}" ` +
+    `data-housing-type="${h}">` +
+    `<td class="select-cell"><input type="checkbox" class="row-select" ` +
+    `data-type="building" data-target="${bid}"></td>` +
+    `<td>${escapeHtml(text(r.address))}</td>` +
+    `<td data-sort-value="${a}">${a}</td>` +
+    `<td data-sort-value="${block}">${block}</td>` +
+    `<td data-sort-value="${units}">${units}</td>` +
+    `<td data-sort-value="${memberCount}">${memberCount}</td>` +
+    `<td data-sort-value="${sharePct}">${sharePct}%</td>` +
+    `<td>${escapeHtml(owner)}</td>` +
+    `<td data-sort-value="${year}">${year}</td>` +
+    `<td data-sort-value="${h}">${h}</td>` +
+    `</tr>`
+  );
+}
+
+export function buildingRowsHtml(records: BuildingRecord[]): string {
+  return [...records]
+    .sort(
+      (x, y) =>
+        descMissingLast(num(x.member_count), num(y.member_count)) || descMissingLast(num(x.units), num(y.units)),
+    )
+    .map(buildingRow)
+    .join('\n');
+}
+
+const avgUnits = (total: number, bldgs: number): number => (bldgs > 0 ? roundHalfEven(total / bldgs, 1) : 0);
+
+export function blockRowsHtml(fc: BlocksCollection): string {
+  const rows = fc.features.map((f) => f.properties ?? ({} as BlocksCollection['features'][number]['properties']));
+  return rows
+    .map((p) => ({ p, label: text(p.block_label) }))
+    .sort((x, y) => {
+      const ux = x.label.startsWith('(Unknown)') ? 1 : 0;
+      const uy = y.label.startsWith('(Unknown)') ? 1 : 0;
+      return ux - uy || byCodePoint(x.label, y.label);
+    })
+    .map(({ p, label }) => {
+      const id = Math.trunc(Number(p.block_id));
+      const bldgs = Math.trunc(num(p.buildings) ?? 0);
+      const totalRaw = num(p.total_units) ?? 0;
+      const total = Math.trunc(totalRaw);
+      const avg = avgUnits(totalRaw, bldgs);
+      const median = num(p.median_year_built);
+      const year = median === null ? '' : String(roundHalfEven(median));
+      const vtu = Math.trunc(num(p.member_buildings) ?? 0);
+      const l = escapeHtml(label);
+      return (
+        `<tr data-block="${id}" data-area="${escapeHtml(text(p.local_area))}" ` +
+        `data-bldgs="${bldgs}" data-units="${total}" ` +
+        `data-vtu-bldgs="${vtu}">` +
+        `<td class="select-cell"><input type="checkbox" class="row-select" ` +
+        `data-type="block" data-target="${id}"></td>` +
+        `<td data-sort-value="${l}">${l}</td>` +
+        `<td data-sort-value="${bldgs}">${bldgs}</td>` +
+        `<td data-sort-value="${total}">${total}</td>` +
+        `<td data-sort-value="${avg}">${avg.toFixed(1)}</td>` +
+        `<td data-sort-value="${year}">${year}</td>` +
+        `<td data-sort-value="${vtu}">${vtu}</td>` +
+        `</tr>`
+      );
+    })
+    .join('\n');
+}
+
+interface Group {
+  label: string;
+  key: string;
+  buildings: number;
+  totalUnits: number;
+  memberBuildings: number;
+}
+
+/** pandas groupby(...).agg(count address, sum units, sum has_vtu_member), then sort by units, buildings desc. */
+function aggregate(records: BuildingRecord[], labelOf: (r: BuildingRecord) => string, keyOf: (r: BuildingRecord) => string): Group[] {
+  const groups = new Map<string, Group>();
+  for (const r of records) {
+    const label = labelOf(r);
+    const key = keyOf(r);
+    const id = `${label}\u0000${key}`;
+    let g = groups.get(id);
+    if (!g) {
+      g = { label, key, buildings: 0, totalUnits: 0, memberBuildings: 0 };
+      groups.set(id, g);
+    }
+    if (!isMissing(r.address)) g.buildings += 1;
+    g.totalUnits += num(r.units) ?? 0;
+    if (r.has_vtu_member === true) g.memberBuildings += 1;
+  }
+  return [...groups.values()]
+    .sort((a, b) => byCodePoint(a.label, b.label) || byCodePoint(a.key, b.key)) // groupby's key order
+    .sort((a, b) => b.totalUnits - a.totalUnits || b.buildings - a.buildings);
+}
+
+function groupRow(g: Group, type: 'owner' | 'neighbourhood', target: string, first: string, dataKey: string): string {
+  const units = Math.trunc(g.totalUnits);
+  const avg = avgUnits(g.totalUnits, g.buildings);
+  return (
+    `<tr ${dataKey}="${target}" ` +
+    `data-bldgs="${g.buildings}" data-units="${units}" ` +
+    `data-vtu-bldgs="${g.memberBuildings}">` +
+    `<td class="select-cell"><input type="checkbox" class="row-select" ` +
+    `data-type="${type}" data-target="${target}"></td>` +
+    `<td>${first}</td>` +
+    `<td data-sort-value="${g.buildings}">${g.buildings}</td>` +
+    `<td data-sort-value="${units}">${units}</td>` +
+    `<td data-sort-value="${avg}">${avg.toFixed(1)}</td>` +
+    `<td data-sort-value="${g.memberBuildings}">${g.memberBuildings}</td>` +
+    `</tr>`
+  );
+}
+
+export function landlordRowsHtml(records: BuildingRecord[]): string {
+  return aggregate(
+    records,
+    (r) => (isMissing(r.owner_group) ? '(Unknown)' : String(r.owner_group)),
+    (r) => (isMissing(r.owner_key) ? 'unknown' : String(r.owner_key)),
+  )
+    .map((g) => groupRow(g, 'owner', escapeHtml(g.key), escapeHtml(g.label), 'data-owner'))
+    .join('\n');
+}
+
+export function neighbourhoodRowsHtml(records: BuildingRecord[]): string {
+  return aggregate(
+    records,
+    (r) => (isMissing(r.local_area) ? '(Unknown)' : String(r.local_area)),
+    () => '',
+  )
+    .map((g) => {
+      const area = escapeHtml(g.label);
+      return groupRow(g, 'neighbourhood', area, area, 'data-area');
+    })
+    .join('\n');
+}
+
+export function renderTables(data: BuildingData, blocks: BlocksCollection, doc: Document = document): void {
+  const records = Object.values(data.records);
+  const fill = (tableId: string, html: string) => {
+    const tbody = doc.querySelector(`#${tableId} tbody`);
+    if (tbody) tbody.innerHTML = html;
+  };
+  fill('buildings-table', buildingRowsHtml(records));
+  fill('blocks-table', blockRowsHtml(blocks));
+  fill('landlords-table', landlordRowsHtml(records));
+  fill('neighbourhoods-table', neighbourhoodRowsHtml(records));
+}
