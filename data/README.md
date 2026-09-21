@@ -8,17 +8,17 @@ Everything under `data/` is ignored by git except this README and the
 | `raw/` | As received from the source. Never hand-edited. One folder per source, each with a `MANIFEST.md`. |
 | `curated/` | Hand-authored: `ownership_claims.csv`, `landlord_mapping.toml`, `chinatown_boundary.geojson`. No backup in git — keep your own copy. |
 | `derived/` | Regenerable by scripts; safe to delete and rebuild. Includes the SQLite db. |
-| `exports/` | Reserved for what leaves the pipeline. Today the map feed still goes to `.preprocessed/` and `www/`. |
+| `exports/` | Reserved for what leaves the pipeline. The map's feed is `derived/artifacts/`. |
 
 ## Rebuild order
 
 ```bash
 uv run python scripts/fetch_cov_open_data.py                    # raw/cov_open_data
 uv run python scripts/prepare_data.py                           # derived/interim, derived/buildings.csv
-uv run python scripts/build_vtu_public_extract.py               # derived/vtu_membership_public.csv (needs raw/nationbuilder)
 uv run python -m sica_core.ingest --config config.toml          # derived/sica_core.db
 uv run python scripts/export_pid_address_map.py                 # derived/pid_address_map.csv
 uv run python scripts/rebuild_map.py                            # derived/artifacts (the frontend's input)
+cd frontend && npm ci && npm run build                          # frontend/dist (see frontend/README.md)
 ```
 
 Ingest always needs `raw/cov_open_data/local-area-boundary.geojson` (fetched

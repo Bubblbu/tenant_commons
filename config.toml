@@ -7,9 +7,7 @@ block_numbers = "data/raw/cov_open_data/block-numbers.csv"
 local_area_boundary = "data/raw/cov_open_data/local-area-boundary.csv"
 local_area_boundary_geojson = "data/raw/cov_open_data/local-area-boundary.geojson"
 artifacts = "data/derived/artifacts"
-vtu = "data/derived/vtu_membership_public.csv"
-# Raw NationBuilder export, gitignored (see data/raw/nationbuilder/) — used only by
-# sica_core's internal-tool ingest, never by the public sica_mapping build above.
+# Raw NationBuilder export, gitignored (see data/raw/nationbuilder/).
 vtu_raw = "data/raw/nationbuilder/membership_full.csv"
 sica_core_db = "data/derived/sica_core.db"
 pid_address_map = "data/derived/pid_address_map.csv"
@@ -18,10 +16,3 @@ rezoning_applications = "data/raw/cov_foi/rezoning_applications.csv"
 coops = "data/raw/chf_bc/coops_vancouver.csv"
 ownership_claims = "data/curated/ownership_claims.csv"
 lotr_ownership = "data/raw/samwise/samwise-export.csv"
-
-[options]
-out = "index.html"
-bbox = "-123.18,49.265,-123.10,49.295"
-tiles = "esri-gray"
-sidebar_width = 540
-verbose = true

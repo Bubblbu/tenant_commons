@@ -3,21 +3,12 @@
 `export_artifacts()` writes the frontend artifact set (filter_config.json,
 marker_metadata.json, building_records.json, blocks.geojson and the local-area
 boundary), each with a `schema_version`. That directory is the only interface
-between sica_core and the frontend. `export_to_cache()` is the transitional
-path: it writes sica_mapping's legacy `.preprocessed/*.json` cache so the
-Folium map (`build_sica_map.py --stage frontend`) can still render from
-SQLite, until the frontend replaces it.
+between sica_core and the frontend.
 
 This reproduces the same full data the current map already shows (including
 VTU membership counts) — no public/sensitive field redaction here. That's a
 separate, later piece of work for whenever an actual public-facing map
 exists to feed; see CLAUDE.md's sensitivity-model notes.
-
-No import from `sica_mapping` happens here (see `__init__.py`'s
-dependency-free docstring): the tiny amount of `json.dump` boilerplate is
-duplicated instead. `scripts/rebuild_map.py` is the piece that needs both
-packages (it also shells out to `build_sica_map.py`), which is why it lives
-at the top level, not inside this package.
 
 Known, deliberate simplification (not a bug): `reconstruct_blocks` emits
 every block, citywide, rather than v1's dynamic buffered bbox, so block counts
@@ -387,42 +378,6 @@ def reconstruct_filter_config(
         int(blocks_df["total_units"].max()) if not blocks_df.empty else 0
     )
     return cfg
-
-
-def export_to_cache(
-    conn: sqlite3.Connection,
-    data_dir: str | Path,
-    now: pd.Timestamp | None = None,
-    pid_address_map_path: str | None = None,
-) -> None:
-    if now is None:
-        now = pd.Timestamp.now(tz="UTC")
-    data_dir = Path(data_dir)
-    data_dir.mkdir(parents=True, exist_ok=True)
-
-    points_df = reconstruct_points(conn, now, pid_address_map_path)
-    blocks_df = reconstruct_blocks(conn, points_df)
-    filter_cfg = reconstruct_filter_config(conn, points_df, blocks_df, now)
-
-    points_records = json.loads(points_df.to_json(orient="records"))
-    (data_dir / "building_points.json").write_text(
-        json.dumps(points_records, indent=2), encoding="utf-8"
-    )
-
-    blocks_out = blocks_df.copy()
-    blocks_out["geom_geojson"] = blocks_out["geom_parsed"].apply(
-        lambda g: g.__geo_interface__ if g is not None else None
-    )
-    blocks_records = json.loads(
-        blocks_out.drop(columns=["geom_parsed", "geom"]).to_json(orient="records")
-    )
-    (data_dir / "blocks.json").write_text(
-        json.dumps(blocks_records, indent=2), encoding="utf-8"
-    )
-
-    (data_dir / "filter_config.json").write_text(
-        json.dumps(filter_cfg, indent=2, default=str), encoding="utf-8"
-    )
 
 
 SCHEMA_VERSION = 1

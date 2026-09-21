@@ -8,9 +8,7 @@ requires-python = ">=3.12"
 dependencies = [
     "numpy",
     "pandas",
-    "folium",
     "shapely",
-    "loguru",
     "polars>=1.44.2",
     "geopandas>=1.1.4",
     "pyogrio>=0.13.0",
@@ -22,6 +20,9 @@ dependencies = [
 [build-system]
 requires = ["uv_build>=0.9.3,<0.10.0"]
 build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-name = "sica_core"
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]

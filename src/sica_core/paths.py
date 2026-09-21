@@ -2,7 +2,7 @@
 
 Stages: raw/ (as received, never hand-edited) + curated/ (hand-authored)
 -> derived/ (regenerable) -> exports/ (what leaves the pipeline).
-config.toml's [paths] is read by the ingest and by sica_mapping; a test
+config.toml's [paths] is read by the ingest and by scripts/rebuild_map.py; a test
 (tests/test_data_layout.py) keeps it in agreement with this class.
 """
 
@@ -54,7 +54,6 @@ class DataPaths:
         self.properties = self.interim / "properties.csv"
         self.buildings = self.derived / "buildings.csv"
         self.ct_properties = self.derived / "ct_properties.csv"
-        self.vtu_public = self.derived / "vtu_membership_public.csv"
         self.pid_address_map = self.derived / "pid_address_map.csv"
         self.db = self.derived / "sica_core.db"
         self.artifacts = self.derived / "artifacts"

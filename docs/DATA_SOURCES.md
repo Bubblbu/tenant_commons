@@ -51,16 +51,16 @@ format, cadence, quirks). It stops there.
 
 | Source | Category | Last fetched | Refresh cadence | Consumed by |
 |---|---|---|---|---|
-| [`buildings.csv`](#buildingscsv) | Derived: built by `prepare_data.py` from Open Data + FOI | 2026-09-18 | Rebuilt after a fetch | `sica_mapping`, `sica_core` |
-| [`property_addresses.csv`](#property_addressescsv) | Open Data portal | 2026-09-18 | On demand (`fetch_cov_open_data.py`) | `sica_mapping`, `sica_core` |
-| [`block-outlines.csv`](#block-outlinescsv) | Open Data portal | 2026-09-18 | On demand (`fetch_cov_open_data.py`) | `sica_mapping`, `sica_core` |
-| [`block-numbers.csv`](#block-numberscsv) | Open Data portal | 2026-09-18 | On demand (`fetch_cov_open_data.py`) | `sica_mapping`, `sica_core` |
-| [`local-area-boundary.csv`](#local-area-boundarycsv) | Open Data portal | 2026-09-18 | On demand (`fetch_cov_open_data.py`) | `sica_mapping` |
-| [`sra_housing_combined.csv`](#sra_housing_combinedcsv) | FOI? — unverified ⚠️ | 2026-07-30 (file date) | TODO | `sica_mapping`, `sica_core` |
-| [`rezoning_applications.csv`](#rezoning_applicationscsv) | FOI? — unverified ⚠️ | 2026-07-30 (file date) | TODO | `sica_mapping`, `sica_core` |
-| [`coops_vancouver.csv`](#coops_vancouvercsv) | Third-party online | 2026-08-04 | Periodic (re-run script) | `sica_mapping`, `sica_core` |
+| [`buildings.csv`](#buildingscsv) | Derived: built by `prepare_data.py` from Open Data + FOI | 2026-09-18 | Rebuilt after a fetch | `sica_core` |
+| [`property_addresses.csv`](#property_addressescsv) | Open Data portal | 2026-09-18 | On demand (`fetch_cov_open_data.py`) | `sica_core` |
+| [`block-outlines.csv`](#block-outlinescsv) | Open Data portal | 2026-09-18 | On demand (`fetch_cov_open_data.py`) | `sica_core` |
+| [`block-numbers.csv`](#block-numberscsv) | Open Data portal | 2026-09-18 | On demand (`fetch_cov_open_data.py`) | `sica_core` |
+| [`local-area-boundary.csv`](#local-area-boundarycsv) | Open Data portal | 2026-09-18 | On demand (`fetch_cov_open_data.py`) | none (`sica_core` uses the GeoJSON export) |
+| [`sra_housing_combined.csv`](#sra_housing_combinedcsv) | FOI? — unverified ⚠️ | 2026-07-30 (file date) | TODO | `sica_core` |
+| [`rezoning_applications.csv`](#rezoning_applicationscsv) | FOI? — unverified ⚠️ | 2026-07-30 (file date) | TODO | `sica_core` |
+| [`coops_vancouver.csv`](#coops_vancouvercsv) | Third-party online | 2026-08-04 | Periodic (re-run script) | `sica_core` |
 | [`samwise-export.csv`](#samwise-exportcsv) | Third-party online (BC LOTR, via `samwise`) | 2026-09-16 | Ad hoc | `sica_core` |
-| [`membership_full.csv`](#membership_fullcsv) | Internal / organizational | TODO | VTU's own cadence | `sica_mapping`, `sica_core` |
+| [`membership_full.csv`](#membership_fullcsv) | Internal / organizational | TODO | VTU's own cadence | `sica_core` |
 | [`vtu_members.csv`](#vtu_memberscsv) | Internal / organizational — likely orphaned ⚠️ | — | — | none found |
 
 ⚠️ = flagged for your attention, see that source's entry.
@@ -117,7 +117,7 @@ the raw CSVs.
   - `secondary_addresses` (new 2026-08-07): semicolon-joined list of other
     civic addresses VanMaps resolves to the same building as `address`
     (e.g. multiple street-facing entrances on one podium building). Used by
-    `src/sica_mapping/data/overlays.py::_load_secondary_address_index()` as
+    `src/sica_core/ingest/overlay_sources.py::load_secondary_address_index()` as
     a fallback when matching co-op/SRO records that were geocoded to a
     secondary address rather than the building's primary one — lifted
     SRO/SRA match rate from 41/171 (24%) to 53/171 (31%) on the 2026-08-07
@@ -133,8 +133,7 @@ the raw CSVs.
     in `raw_buildings.py`'s column list as always-null rather than removed.
   - `clean_address` (ported unchanged) rewrites any word starting with ` str` (e.g. `strathcona` becomes `stathcona`). Both sides of each join use the same function, so matching works; do not change it without rebuilding everything.
 - **Output location:** `data/derived/buildings.csv`.
-- **Consumed by:** `sica_mapping` (`config.toml` → `buildings`), `sica_core`
-  (`ingest/raw_buildings.py`).
+- **Consumed by:** `sica_core` (`ingest/raw_buildings.py`).
 - **Refresh cadence:** rebuilt by `prepare_data.py` after each fetch. Last
   fetched 2026-09-18.
 
@@ -158,7 +157,7 @@ the raw CSVs.
   systems support multi-lingual characters."); it is stored in
   `raw_addresses.note`.
 - **Output location:** `data/raw/cov_open_data/property-addresses.csv`.
-- **Consumed by:** `sica_mapping` (`config.toml` → `addresses`), `sica_core`
+- **Consumed by:** `sica_core`
   (`ingest/raw_addresses.py`).
 - **Refresh cadence:** on demand. Last fetched 2026-09-18.
 
@@ -182,7 +181,7 @@ for the full rebuild order.
 - **Format/known quirks:** polygon geometry lives in a `geom` column,
   parsed via `sica_core/geometry.py::parse_geom`.
 - **Output location:** `data/raw/cov_open_data/block-outlines.csv`.
-- **Consumed by:** `sica_mapping` (`config.toml` → `blocks`), `sica_core`
+- **Consumed by:** `sica_core`
   (`ingest/blocks.py`).
 - **Refresh cadence:** on demand (`fetch_cov_open_data.py`); last fetched 2026-09-18.
 
@@ -192,7 +191,7 @@ for the full rebuild order.
   to resolve which of the 22 official local areas a block/building falls
   in (point-in-polygon primary, nearest-centroid fallback).
 - **Origin:** confirmed to be Vancouver Open Data's "block-numbers" dataset
-  by name (`src/sica_mapping/data/spatial.py` docstring cites it directly);
+  by name (the retired `sica_mapping` `spatial.py` docstring cited it directly);
   exact URL still TODO.
 - **License/attribution:** TODO.
 - **Geographic scope:** citywide.
@@ -201,8 +200,7 @@ for the full rebuild order.
   (`geom`, `geo_point_2d`). `sica_core/ingest/block_numbers.py` raises on
   unexpected columns.
 - **Output location:** `data/raw/cov_open_data/block-numbers.csv`.
-- **Consumed by:** `sica_mapping` (`spatial.py::resolve_local_area_from_block_numbers`),
-  `sica_core` (`ingest/block_numbers.py`).
+- **Consumed by:** `sica_core` (`ingest/block_numbers.py`).
 - **Refresh cadence:** rare — local area/block boundaries change
   infrequently. Re-pull only if the City revises them.
 
@@ -217,13 +215,13 @@ for the full rebuild order.
   portal default) — TODO: confirm no additional attribution needed.
 - **Geographic scope:** citywide, all 22 local areas.
 - **Format/known quirks:** GeoJSON-style `FeatureCollection`, `properties.name`
-  used as the area label. `src/sica_mapping/data/overlays.py` deliberately
+  used as the area label. `src/sica_core/ingest/overlays.py` deliberately
   does *not* trust each overlay source's own free-text area field (e.g. the
   SRO CSV's "Area" is a DTES-style composite label) — always resolves via
   point-in-polygon against this file instead.
 - **Output location:** `data/raw/cov_open_data/local-area-boundary.csv`.
-- **Consumed by:** `sica_mapping` only (`overlays.py`) — not yet ingested
-  into `sica_core`.
+- **Consumed by:** no longer consumed (`sica_core` uses the GeoJSON export,
+  `local-area-boundary.geojson`, instead).
 - **Refresh cadence:** rare — official boundaries change infrequently. Last
   fetched 2026-09-18.
 
@@ -265,19 +263,17 @@ Sections kept here for now since that's the best guess available.
 - **Format/known quirks:** the file's own `match_method` column is an
   upstream address-matching flag from whoever combined the source lists —
   unrelated to and not used by this project's own address-key matching in
-  `src/sica_mapping/data/overlays.py`.
+  `src/sica_core/ingest/overlays.py`.
 - **Provenance/original retained:** **not yet** — no original document is
   currently kept. Per the retain-originals convention above, the source
   document(s) this was combined from should be saved under
   `data/raw/cov_foi/` going forward, with a note on how the merge
   was done. TODO once the origin is confirmed.
 - **Output location:** `data/raw/cov_foi/sra_housing_combined.csv`.
-- **Consumed by:** `sica_mapping` (`overlays.py`) — 53/171 rows (31%, since
-  the 2026-08-07 `secondary_addresses` fallback) match an existing building
-  by address; the rest surface as standalone unmatched markers. Also
-  `sica_core` (`ingest/raw_sro.py`, since 2026-08-07) — raw storage only,
-  for browsability; the address-key matching above is not repeated in
-  sica_core.
+- **Consumed by:** `sica_core` — raw storage (`ingest/raw_sro.py`) and
+  address-key matching onto buildings (`ingest/overlays.py`). 53/171 rows
+  (31%, since the 2026-08-07 `secondary_addresses` fallback) match an
+  existing building; the rest surface as standalone unmatched markers.
 - **Refresh cadence:** TODO.
 
 ### `rezoning_applications.csv`
@@ -296,7 +292,7 @@ Sections kept here for now since that's the best guess available.
   per row — a multi-site "umbrella" application can cover two entirely
   different addresses/lat-lons as separate rows with the same `id`
   (confirmed via a real duplicate-key collision during testing — see
-  `overlays.py`). `name` is free text, not a clean address (e.g.
+  `ingest/overlays.py`). `name` is free text, not a clean address (e.g.
   `"2165-2195 and 2205-2291 W 45th Av (Dunbar Ryerson United Church)"`) —
   parsed by stripping from the first `(`, then splitting on
   `" and "`/`"&"`/`";"` and keying the first fragment. Most rezoning
@@ -305,9 +301,8 @@ Sections kept here for now since that's the best guess available.
   regardless of parsing quality — ~43/377 (11%) match.
 - **Provenance/original retained:** **not yet** — TODO, same as above.
 - **Output location:** `data/raw/cov_foi/rezoning_applications.csv`.
-- **Consumed by:** `sica_mapping` (`overlays.py`), split into open/closed
-  status groups. Also `sica_core` (`ingest/raw_rezoning.py`, since
-  2026-08-07) — raw storage only, for browsability.
+- **Consumed by:** `sica_core` — raw storage (`ingest/raw_rezoning.py`)
+  and matching (`ingest/overlays.py`), split into open/closed status groups.
 - **Refresh cadence:** TODO.
 
 ---
@@ -348,10 +343,9 @@ not the City's Open Data portal, not FOI, not VTU's own systems.
   not done yet (TODO, low priority given the script re-fetches live data
   cleanly).
 - **Output location:** `data/raw/chf_bc/coops_vancouver.csv`.
-- **Consumed by:** `sica_mapping` (`overlays.py`) — 42/117 rows (36%) match
-  an existing building by address; the rest surface as standalone unmatched
-  markers. Also `sica_core` (`ingest/raw_coops.py`, since 2026-08-07) — raw
-  storage only, for browsability.
+- **Consumed by:** `sica_core` — raw storage (`ingest/raw_coops.py`) and
+  address-key matching (`ingest/overlays.py`). 42/117 rows (36%) match an
+  existing building; the rest surface as standalone unmatched markers.
 - **Refresh cadence:** periodic, re-run by hand
   (`python scripts/fetch_coops.py`) when a refresh is wanted. 117 co-ops as
   of 2026-08-04 (287 province-wide).
@@ -398,8 +392,7 @@ not the City's Open Data portal, not FOI, not VTU's own systems.
   local-only — see Sensitivity above).
 - **Consumed by:** `sica_core` only — `ingest/raw_lotr.py` (raw storage)
   and `ingest/lotr_claims.py` (derives `common_owner` `ownership_claims`
-  from shared beneficial-interest holders). Not part of `sica_mapping`'s
-  public build; not wired into the main `run_ingest()` pipeline — imported
+  from shared beneficial-interest holders). Not wired into the main `run_ingest()` pipeline — imported
   standalone via `scripts/import_lotr_claims.py`.
 - **Refresh cadence:** ad hoc, whenever `samwise` produces a new export —
   re-run `scripts/import_lotr_claims.py` to pick it up.
@@ -436,8 +429,7 @@ rather than this doc for how field-level access is handled.
 - **Access method:** manual export from NationBuilder by VTU; not
   scriptable from this project's side.
 - **Output location:** `data/raw/nationbuilder/membership_full.csv`.
-- **Consumed by:** `sica_mapping` (`data/vtu.py`), `sica_core`
-  (`ingest/membership.py`).
+- **Consumed by:** `sica_core` (`ingest/membership.py`).
 - **Refresh cadence:** VTU's own cadence — TODO: confirm how often VTU
   re-exports and whether there's a standing arrangement for this.
 
@@ -446,8 +438,8 @@ rather than this doc for how field-level access is handled.
 - **⚠️ Likely orphaned.** 566 rows, only 3 columns
   (`nationbuilder_id`, `primary_address1`, `address`) — looks like an older,
   already-narrowed export that predates `membership_full.csv`. No code in
-  either `sica_mapping` or `sica_core` references this file by name
-  (confirmed via repo-wide search); `config.toml`'s `vtu` path points at
+  `sica_core` references this file by name
+  (confirmed via repo-wide search); `config.toml`'s `vtu_raw` path points at
   `membership_full.csv` only.
 - **Recommendation:** confirm it's genuinely unused, then either delete it
   or move it out of `data/raw/nationbuilder/`, since it looks like a live input there.

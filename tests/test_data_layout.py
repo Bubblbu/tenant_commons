@@ -17,7 +17,6 @@ CONFIG_KEYS = {
     "blocks": "block_outlines_csv",
     "block_numbers": "block_numbers_csv",
     "local_area_boundary": "local_area_boundary_csv",
-    "vtu": "vtu_public",
     "vtu_raw": "membership_full",
     "sica_core_db": "db",
     "pid_address_map": "pid_address_map",

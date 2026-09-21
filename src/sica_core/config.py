@@ -21,11 +21,8 @@ DEFAULT_DB_PATH = "data/derived/sica_core.db"
 DEFAULT_BBOX = "-123.18,49.265,-123.10,49.295"
 DEFAULT_BOUNDARY_GEOJSON = "data/raw/cov_open_data/local-area-boundary.geojson"
 DEFAULT_ARTIFACTS_DIR = "data/derived/artifacts"
-# "vtu_raw", not "vtu" — config.toml's "vtu" key is sica_mapping's public,
-# address-aggregated extract (data/derived/vtu_membership_public.csv). sica_core's
-# ingest needs the raw, un-anonymized NationBuilder export instead (allow-
-# listed down to a few columns by ingest/membership.py); giving it its own
-# key avoids the two builds silently fighting over one config value.
+# "vtu_raw" is the raw NationBuilder export (data/raw/nationbuilder/), allow-
+# listed down to a few columns by ingest/membership.py.
 _REQUIRED_PATHS = ("buildings", "addresses", "blocks", "block_numbers", "vtu_raw")
 
 
@@ -57,7 +54,7 @@ class IngestConfig:
     lotr_ownership: str | None = None
     # Optional: PID -> addr_key bridge (scripts/export_pid_address_map.py).
     # Used by portfolios.py to join claims-derived landlord clusters onto
-    # buildings for the map export; absent it, export_to_cache() just skips
+    # buildings for the map export; absent it, export_artifacts() just skips
     # portfolio attachment.
     pid_address_map: str | None = None
     # Neighbourhood boundaries, read straight off disk rather than ingested
