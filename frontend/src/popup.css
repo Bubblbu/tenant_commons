@@ -1,0 +1,5 @@
+.sica-popup { font-size: 13px; line-height: 1.4; min-width: 200px; }
+.sica-popup .popup-section + .popup-section { border-top: 1px solid #ddd; margin-top: 6px; padding-top: 6px; }
+.sica-popup .popup-address { font-weight: 700; }
+.sica-popup .popup-name { color: #555; }
+.sica-popup .popup-owner { font-weight: 600; }

@@ -8,12 +8,14 @@ import 'leaflet/dist/leaflet.css';
 // Folium's page loaded Bootstrap; the sidebar's font, box-sizing and spacing
 // come from its reboot layer (no Bootstrap classes or JS are used).
 import 'bootstrap/dist/css/bootstrap-reboot.min.css';
+import './popup.css';
 import * as L from 'leaflet';
 import { BASEMAPS, DEFAULT_BASEMAP, DEFAULT_CENTER, DEFAULT_ZOOM } from './config';
 import { loadArtifacts } from './data';
 import { createBlocksLayer, createBuildingLayers, createNeighbourhoodsLayer } from './layers';
 import { renderLegend } from './legend';
 import { markerStyle } from './markers';
+import { renderPopup } from './popup';
 import { renderTables } from './tables';
 import { startWiring } from './wiring.js';
 
@@ -37,7 +39,11 @@ async function main(): Promise<void> {
   const blocks = createBlocksLayer(artifacts.blocks).addTo(map);
   const neighbourhoods = createNeighbourhoodsLayer(artifacts.boundaries).addTo(map);
   const styled = artifacts.markers.map((m) => ({ ...m, ...markerStyle(m) }));
-  const buildings = createBuildingLayers(styled);
+  const records = artifacts.buildingData.records;
+  // Lazy: the markup is built on first open, from the one record the table and filters also read.
+  const buildings = createBuildingLayers(styled, (marker, m) => {
+    marker.bindPopup(() => renderPopup(records[String(m.b_id)] ?? { b_id: m.b_id }), { maxWidth: 320 });
+  });
   buildings.non.addTo(map);
   buildings.vtu.addTo(map);
 

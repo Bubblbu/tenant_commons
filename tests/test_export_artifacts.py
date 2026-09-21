@@ -224,3 +224,23 @@ def test_boundary_passthrough_is_byte_identical(tmp_path):
     export_artifacts(conn, tmp_path / "out", boundary_geojson_path=str(src))
 
     assert (tmp_path / "out" / "local-area-boundary.geojson").read_text() == content
+
+
+POPUP_FIELDS = [
+    "housing_name", "portfolio_name", "portfolio_building_count", "portfolio_entities",
+    "coop_status", "coop_ownership_model", "coop_url",
+    "sro_owner", "sro_operator", "sro_occupancy_status", "sro_registered_rooms",
+]
+
+
+def test_building_records_carry_the_popup_fields(tmp_path):
+    """Spec §7: the redesigned popup reads these 11 fields from building_records.json."""
+    conn = sqlite3.connect(":memory:")
+    init_db(conn)
+    _seed(conn)
+
+    export_artifacts(conn, tmp_path)
+
+    columns = json.loads((tmp_path / "building_records.json").read_text())["columns"]
+    missing = [f for f in POPUP_FIELDS if f not in columns]
+    assert missing == []
