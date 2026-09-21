@@ -5,7 +5,7 @@ import ast
 import tomllib
 from pathlib import Path
 
-from sica_core.config import DEFAULT_DB_PATH
+from sica_core.config import DEFAULT_ARTIFACTS_DIR, DEFAULT_DB_PATH
 from sica_core.paths import DataPaths
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -26,6 +26,8 @@ CONFIG_KEYS = {
     "coops": "coops",
     "ownership_claims": "ownership_claims",
     "lotr_ownership": "samwise_export",
+    "artifacts": "artifacts",
+    "local_area_boundary_geojson": "local_area_boundary_geojson",
 }
 
 
@@ -57,6 +59,11 @@ def test_config_toml_matches_layout():
 def test_default_db_path_matches_datapaths():
     """Guard against sica_core.config.DEFAULT_DB_PATH and DataPaths drifting apart."""
     assert Path(DEFAULT_DB_PATH) == DataPaths("data").db
+
+
+def test_default_artifacts_dir_matches_datapaths():
+    """Guard against sica_core.config.DEFAULT_ARTIFACTS_DIR and DataPaths drifting apart."""
+    assert Path(DEFAULT_ARTIFACTS_DIR) == DataPaths("data").artifacts
 
 
 def test_fetch_coops_default_output_matches_datapaths():

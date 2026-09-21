@@ -6,6 +6,7 @@ blocks = "data/raw/cov_open_data/block-outlines.csv"
 block_numbers = "data/raw/cov_open_data/block-numbers.csv"
 local_area_boundary = "data/raw/cov_open_data/local-area-boundary.csv"
 local_area_boundary_geojson = "data/raw/cov_open_data/local-area-boundary.geojson"
+artifacts = "data/derived/artifacts"
 vtu = "data/derived/vtu_membership_public.csv"
 # Raw NationBuilder export, gitignored (see data/raw/nationbuilder/) — used only by
 # sica_core's internal-tool ingest, never by the public sica_mapping build above.

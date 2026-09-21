@@ -18,7 +18,7 @@ uv run python scripts/prepare_data.py                           # derived/interi
 uv run python scripts/build_vtu_public_extract.py               # derived/vtu_membership_public.csv (needs raw/nationbuilder)
 uv run python -m sica_core.ingest --config config.toml          # derived/sica_core.db
 uv run python scripts/export_pid_address_map.py                 # derived/pid_address_map.csv
-uv run python scripts/rebuild_map.py                            # www/index.html
+uv run python scripts/rebuild_map.py                            # derived/artifacts (the frontend's input)
 ```
 
 Ingest always needs `raw/cov_open_data/local-area-boundary.geojson` (fetched
