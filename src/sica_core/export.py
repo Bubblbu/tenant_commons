@@ -427,6 +427,32 @@ def export_to_cache(
 
 SCHEMA_VERSION = 1
 
+# ~10 cm. The sources carry 15-decimal coordinates, which made blocks.geojson
+# 3.68 MB gzipped — larger than the whole Folium page it replaces. At 6
+# decimals it is 1.45 MB; nothing on the map resolves finer.
+COORD_DECIMALS = 6
+
+
+def _round_coords(value):
+    """Round every float in a (nested) GeoJSON coordinates array."""
+    if isinstance(value, float):
+        return round(value, COORD_DECIMALS)
+    if isinstance(value, (list, tuple)):
+        return [_round_coords(v) for v in value]
+    return value
+
+
+def _round_geometry(geom: dict) -> dict:
+    if "coordinates" in geom:
+        return {**geom, "coordinates": _round_coords(geom["coordinates"])}
+    if "geometries" in geom:  # GeometryCollection
+        return {**geom, "geometries": [_round_geometry(g) for g in geom["geometries"]]}
+    return geom
+
+
+def _round_coord(value) -> float | None:
+    return None if value is None or pd.isna(value) else round(float(value), COORD_DECIMALS)
+
 
 def export_artifacts(
     conn: sqlite3.Connection,
@@ -477,9 +503,7 @@ def export_artifacts(
 
 
 def _write_json(path: Path, payload: object) -> None:
-    path.write_text(
-        json.dumps(payload, separators=(",", ":"), default=str), encoding="utf-8"
-    )
+    path.write_text(json.dumps(payload, separators=(",", ":")), encoding="utf-8")
 
 
 def _blocks_feature_collection(blocks_df: pd.DataFrame) -> dict:
@@ -509,7 +533,7 @@ def _blocks_feature_collection(blocks_df: pd.DataFrame) -> dict:
         features.append(
             {
                 "type": "Feature",
-                "geometry": geom,
+                "geometry": _round_geometry(geom),
                 "properties": {
                     col: (None if pd.isna(row.get(col)) else row.get(col))
                     for col in property_cols
@@ -525,10 +549,10 @@ def _blocks_feature_collection(blocks_df: pd.DataFrame) -> dict:
 
 
 def _marker_records(points_df: pd.DataFrame) -> list[dict]:
-    """Per-building styling records, including coordinates.
+    """Per-building marker data, including coordinates.
 
-    Styling values (radius, colors, ring weights) are computed here rather
-    than at render time so the frontend needs no styling logic of its own.
+    Styling (radius, colours, rings) is presentation and is computed by the
+    frontend (frontend/src/markers.ts); these records carry only data.
     """
     records = []
     for _, r in points_df.iterrows():
@@ -536,8 +560,8 @@ def _marker_records(points_df: pd.DataFrame) -> list[dict]:
         records.append(
             {
                 "b_id": int(r["b_id"]),
-                "lat": None if pd.isna(r["lat"]) else float(r["lat"]),
-                "lon": None if pd.isna(r["lon"]) else float(r["lon"]),
+                "lat": _round_coord(r["lat"]),
+                "lon": _round_coord(r["lon"]),
                 "owner_key": r.get("owner_key"),
                 "block_id": None if pd.isna(r.get("block_id")) else int(r["block_id"]),
                 "units": None if pd.isna(r.get("units")) else int(r["units"]),
@@ -585,5 +609,8 @@ def _building_records(points_df: pd.DataFrame) -> dict:
             c: (None if isinstance(r[c], float) and pd.isna(r[c]) else r[c])
             for c in BUILDING_RECORD_COLUMNS
         }
+        for c in ("lat", "lon"):
+            if c in rec:
+                rec[c] = _round_coord(rec[c])
         records[str(int(r["b_id"]))] = rec
     return {"columns": list(BUILDING_RECORD_COLUMNS), "records": records}

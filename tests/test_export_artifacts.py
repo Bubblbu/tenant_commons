@@ -147,3 +147,80 @@ def test_overlay_rows_reach_the_artifacts_with_their_source(tmp_path):
     overlay = records[str(by_source["overlay_coop"]["b_id"])]
     assert overlay["housing_name"] == "Elm Co-op"
     assert overlay["source"] == "overlay_coop"
+
+
+def _decimals(x: float) -> int:
+    text = repr(x)
+    return len(text.split(".")[1]) if "." in text else 0
+
+
+def _all_floats(value):
+    if isinstance(value, list):
+        for v in value:
+            yield from _all_floats(v)
+    elif isinstance(value, float):
+        yield value
+
+
+def _seed_precise(conn):
+    """Coordinates at the 15-decimal precision the real sources carry."""
+    conn.execute(
+        "INSERT INTO buildings (addr_key, address, lat, lon, local_area, units, "
+        "created_at, updated_at) VALUES ('1 a st', '1 A St', 49.283997559919406, "
+        "-123.14190280987349, 'Downtown', 10, 'now', 'now')"
+    )
+    geom = {"type": "Polygon", "coordinates": [[
+        [-123.06230338496285, 49.243279193752706],
+        [-123.06204402014143, 49.243509152622245],
+        [-123.0621556622, 49.2436],
+        [-123.06230338496285, 49.243279193752706],
+    ]]}
+    conn.execute(
+        "INSERT INTO blocks (block_id, geom, ingested_at) VALUES (1, ?, 'now')",
+        (json.dumps(geom),),
+    )
+    conn.commit()
+
+
+def test_block_geometry_is_rounded_to_six_decimals(tmp_path):
+    conn = sqlite3.connect(":memory:")
+    init_db(conn)
+    _seed_precise(conn)
+
+    export_artifacts(conn, tmp_path)
+
+    geom = json.loads((tmp_path / "blocks.geojson").read_text())["features"][0]["geometry"]
+    coords = list(_all_floats(geom["coordinates"]))
+    assert coords and all(_decimals(c) <= 6 for c in coords)
+    assert geom["coordinates"][0][0] == [-123.062303, 49.243279]
+
+
+def test_marker_and_record_coordinates_are_rounded(tmp_path):
+    conn = sqlite3.connect(":memory:")
+    init_db(conn)
+    _seed_precise(conn)
+
+    export_artifacts(conn, tmp_path)
+
+    marker = json.loads((tmp_path / "marker_metadata.json").read_text())["markers"][0]
+    records = json.loads((tmp_path / "building_records.json").read_text())["records"]
+    record = next(iter(records.values()))
+    assert (marker["lat"], marker["lon"]) == (49.283998, -123.141903)
+    assert (record["lat"], record["lon"]) == (49.283998, -123.141903)
+
+
+def test_boundary_passthrough_is_byte_identical(tmp_path):
+    """The City's file is copied, never rewritten — its precision included."""
+    content = json.dumps({"type": "FeatureCollection", "features": [{
+        "type": "Feature", "properties": {"name": "X"},
+        "geometry": {"type": "Point", "coordinates": [-123.14190280987349, 49.283997559919406]},
+    }]})
+    src = tmp_path / "boundary.geojson"
+    src.write_text(content)
+    conn = sqlite3.connect(":memory:")
+    init_db(conn)
+    _seed_precise(conn)
+
+    export_artifacts(conn, tmp_path / "out", boundary_geojson_path=str(src))
+
+    assert (tmp_path / "out" / "local-area-boundary.geojson").read_text() == content
