@@ -40,3 +40,7 @@ data/**
 !data/**/
 !data/**/MANIFEST.md
 docs/disambiguation/*
+
+# frontend/ build output and dependencies (frontend/fixtures/ IS committed)
+frontend/node_modules/
+frontend/dist/
