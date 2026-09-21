@@ -30,7 +30,7 @@ def buildings_table(pts_df: pd.DataFrame) -> pd.DataFrame:
         ]
     ].copy()
     tbl["member_share_pct"] = (tbl["member_share_building"] * 100).round(0).astype(int)
-    tbl["source"] = "building"
+    tbl["source"] = pts_df["source"] if "source" in pts_df.columns else "building"
     return tbl.drop(columns=["member_share_building"]).sort_values(
         ["member_count", "units"], ascending=[False, False]
     )

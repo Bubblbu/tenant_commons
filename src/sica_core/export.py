@@ -51,6 +51,7 @@ def reconstruct_points(
     buildings = buildings.rename(
         columns={"building_id": "b_id", "display_name": "owner_group"}
     )
+    buildings["source"] = "building"
 
     members = pd.read_sql_query(
         "SELECT * FROM vtu_membership WHERE building_id IS NOT NULL", conn
@@ -101,16 +102,56 @@ def reconstruct_points(
     merged["owner_group"] = merged["portfolio_name"].fillna(merged["owner_group"])
     merged["owner_key"] = portfolio_key.fillna(merged["owner_key"])
 
-    return merged[
+    merged = merged[
         [
             "addr_key", "address", "lat", "lon", "units", "year_built", "n_issues",
             "member_count", "has_vtu_member", "member_share_building", "owner_group",
             "owner_key", "member_count_all", "members_payload", "value_land",
             "value_bldg", "bldg_land_ratio", "local_area", "b_id", "block_id",
             "latest_membership_year", "portfolio_name", "portfolio_building_count",
-            "portfolio_entities",
+            "portfolio_entities", "source",
         ]
     ]
+    merged = _append_overlay_housing(conn, merged)
+    return merged
+
+
+def _append_overlay_housing(
+    conn: sqlite3.Connection, points: pd.DataFrame
+) -> pd.DataFrame:
+    """Union `overlay_housing` onto the points frame.
+
+    These are SRO/co-op source records that matched no building (see
+    ingest/overlay_write.py). They carry coordinates, a name and a housing
+    type and nothing else — no units, year built, assessed values or owner —
+    so they are tagged with a real `source` value rather than being passed off
+    as buildings. b_id continues from the buildings table's maximum so the two
+    sets never collide.
+    """
+    overlay = pd.read_sql_query("SELECT * FROM overlay_housing", conn)
+    if overlay.empty:
+        return points
+
+    first_id = int(pd.to_numeric(points["b_id"]).max()) + 1 if len(points) else 1
+    overlay = overlay.rename(columns={"overlay_id": "_overlay_id"})
+    overlay["b_id"] = range(first_id, first_id + len(overlay))
+    overlay["source"] = [
+        "overlay_coop" if bool(c) else "overlay_sro"
+        for c in overlay["is_coop"]
+    ]
+    overlay["owner_group"] = "(Unknown)"
+    overlay["owner_key"] = "unknown"
+    overlay["member_count"] = 0
+    overlay["member_count_all"] = 0
+    overlay["has_vtu_member"] = False
+    overlay["member_share_building"] = 0.0
+    overlay["members_payload"] = [[] for _ in range(len(overlay))]
+
+    combined = pd.concat([points, overlay], ignore_index=True)
+    for col in ("is_coop", "is_sro", "is_rezoning", "has_vtu_member"):
+        if col in combined.columns:
+            combined[col] = combined[col].fillna(False).astype(bool)
+    return combined
 
 
 def resolve_local_area_from_block_numbers(
