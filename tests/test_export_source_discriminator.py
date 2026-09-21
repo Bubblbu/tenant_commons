@@ -3,7 +3,7 @@ import sqlite3
 import pandas as pd
 
 from sica_core.db import init_db
-from sica_core.export import reconstruct_points
+from sica_core.export import reconstruct_blocks, reconstruct_filter_config, reconstruct_points
 
 
 def _seed(conn):
@@ -60,3 +60,18 @@ def test_overlay_rows_have_no_units_or_owner():
     assert overlay["units"].isna().all()
     assert (overlay["owner_group"] == "(Unknown)").all()
     assert (overlay["member_count"] == 0).all()
+
+
+def test_filter_config_counts_only_buildings():
+    conn = sqlite3.connect(":memory:")
+    init_db(conn)
+    _seed(conn)
+
+    now = pd.Timestamp("2026-09-20", tz="UTC")
+    pts = reconstruct_points(conn, now)
+    blocks = reconstruct_blocks(conn, pts)
+    cfg = reconstruct_filter_config(conn, pts, blocks, now)
+
+    assert cfg["dataset_totals"]["buildings"] == 1
+    downtown = next(n for n in cfg["neighbourhoods"] if n["name"] == "Downtown")
+    assert downtown["count"] == 1

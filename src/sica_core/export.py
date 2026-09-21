@@ -299,8 +299,24 @@ def reconstruct_filter_config(
     pts = points_df.copy()
     pts["local_area"] = pts["local_area"].fillna("(Unknown)")
     pts["units"] = pts["units"].fillna(0)
-    neighbourhood_counts = pts["local_area"].value_counts().sort_values(ascending=False)
-    neighbourhood_units = pts.groupby("local_area")["units"].sum().sort_values(ascending=False)
+
+    # Building-describing aggregates (neighbourhood counts/units, dataset
+    # totals, building_metrics) must exclude overlay_housing rows (source
+    # overlay_sro/overlay_coop) — they're SRO/co-op records with no units,
+    # value or membership data, not buildings; counting them here would
+    # inflate the map's "Buildings" stat (see _append_overlay_housing).
+    # bounds stays over every mapped point below since overlay rows are
+    # still drawn on the map.
+    buildings_only = (
+        pts[pts["source"] == "building"] if "source" in pts.columns else pts
+    )
+
+    neighbourhood_counts = (
+        buildings_only["local_area"].value_counts().sort_values(ascending=False)
+    )
+    neighbourhood_units = (
+        buildings_only.groupby("local_area")["units"].sum().sort_values(ascending=False)
+    )
     cfg["neighbourhoods"] = [
         {"name": area, "count": int(count), "units": int(round(neighbourhood_units.get(area, 0)))}
         for area, count in neighbourhood_counts.items()
@@ -319,13 +335,13 @@ def reconstruct_filter_config(
         }
     cfg["bounds"] = bounds
     cfg["dataset_totals"] = {
-        "buildings": int(len(pts)),
-        "members": int(pts["member_count"].sum()),
-        "units": int(pd.to_numeric(pts["units"], errors="coerce").fillna(0).sum()),
-        "vtu_buildings": int(pts["has_vtu_member"].sum()),
+        "buildings": int(len(buildings_only)),
+        "members": int(buildings_only["member_count"].sum()),
+        "units": int(pd.to_numeric(buildings_only["units"], errors="coerce").fillna(0).sum()),
+        "vtu_buildings": int(buildings_only["has_vtu_member"].sum()),
     }
 
-    building_metrics = build_building_metrics(pts)
+    building_metrics = build_building_metrics(buildings_only)
     cfg["building_metrics"] = building_metrics
     cfg["building_metric_order"] = [
         key for key in BUILDING_METRICS if key in building_metrics
