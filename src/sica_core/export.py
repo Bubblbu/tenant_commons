@@ -25,6 +25,7 @@ Known, deliberate simplifications (not bugs):
 from __future__ import annotations
 
 import json
+import shutil
 import sqlite3
 from pathlib import Path
 
@@ -110,9 +111,24 @@ def reconstruct_points(
             "value_bldg", "bldg_land_ratio", "local_area", "b_id", "block_id",
             "latest_membership_year", "portfolio_name", "portfolio_building_count",
             "portfolio_entities", "source",
+            "is_coop", "coop_status", "coop_ownership_model", "coop_url",
+            "housing_name", "is_sro", "sro_owner", "sro_operator",
+            "sro_operator_group", "sro_ownership_group", "sro_occupancy_status",
+            "sro_registered_rooms", "is_rezoning", "rezoning_status",
+            "rezoning_status_group", "rezoning_category", "rezoning_status_detail",
+            "rezoning_link",
         ]
     ]
     merged = _append_overlay_housing(conn, merged)
+
+    # Derived post-union (not stored): the matcher's exact expression from
+    # ingest/overlays.py, applied uniformly across both origins now that
+    # is_coop/is_sro are guaranteed boolean by _append_overlay_housing.
+    merged["housing_type"] = np.where(
+        merged["is_coop"] & merged["is_sro"],
+        "co-op, sro",
+        np.where(merged["is_coop"], "co-op", np.where(merged["is_sro"], "sro", "")),
+    )
     return merged
 
 
@@ -130,7 +146,11 @@ def _append_overlay_housing(
     """
     overlay = pd.read_sql_query("SELECT * FROM overlay_housing", conn)
     if overlay.empty:
-        return points
+        combined = points
+        for col in ("is_coop", "is_sro", "is_rezoning", "has_vtu_member"):
+            if col in combined.columns:
+                combined[col] = combined[col].fillna(False).astype(bool)
+        return combined
 
     first_id = int(pd.to_numeric(points["b_id"]).max()) + 1 if len(points) else 1
     overlay = overlay.rename(columns={"overlay_id": "_overlay_id"})
@@ -282,7 +302,7 @@ def reconstruct_blocks(conn: sqlite3.Connection, points_df: pd.DataFrame) -> pd.
     )
     merged["local_area"] = resolve_local_area_from_block_numbers(merged, block_numbers_df)
     merged["block_label"] = assign_block_labels(merged)
-    return merged.drop(columns=["geom"])
+    return merged  # keep `geom` (GeoJSON text) — callers that need shapely use geom_parsed
 
 
 def reconstruct_filter_config(
@@ -393,7 +413,7 @@ def export_to_cache(
         lambda g: g.__geo_interface__ if g is not None else None
     )
     blocks_records = json.loads(
-        blocks_out.drop(columns=["geom_parsed"]).to_json(orient="records")
+        blocks_out.drop(columns=["geom_parsed", "geom"]).to_json(orient="records")
     )
     (data_dir / "blocks.json").write_text(
         json.dumps(blocks_records, indent=2), encoding="utf-8"
@@ -402,3 +422,149 @@ def export_to_cache(
     (data_dir / "filter_config.json").write_text(
         json.dumps(filter_cfg, indent=2, default=str), encoding="utf-8"
     )
+
+
+SCHEMA_VERSION = 1
+
+
+def export_artifacts(
+    conn: sqlite3.Connection,
+    out_dir: str | Path,
+    pid_address_map_path: str | None = None,
+    boundary_geojson_path: str | None = None,
+    now: pd.Timestamp | None = None,
+) -> None:
+    """Write the complete frontend artifact set.
+
+    This is the one-directional contract: every value the map displays is
+    produced here. Each file carries a schema_version so a frontend built
+    against an older shape fails loudly instead of rendering an empty map.
+    """
+    if now is None:
+        now = pd.Timestamp.now(tz="UTC")
+    out_dir = Path(out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    points_df = reconstruct_points(conn, now, pid_address_map_path)
+    blocks_df = reconstruct_blocks(conn, points_df)
+    filter_cfg = reconstruct_filter_config(conn, points_df, blocks_df, now)
+
+    _write_json(
+        out_dir / "filter_config.json",
+        {"schema_version": SCHEMA_VERSION, **filter_cfg},
+    )
+    _write_json(
+        out_dir / "marker_metadata.json",
+        {
+            "schema_version": SCHEMA_VERSION,
+            "markers": _marker_records(points_df),
+        },
+    )
+    _write_json(
+        out_dir / "building_records.json",
+        {
+            "schema_version": SCHEMA_VERSION,
+            **_building_records(points_df),
+        },
+    )
+    _write_json(out_dir / "blocks.geojson", _blocks_feature_collection(blocks_df))
+
+    if boundary_geojson_path:
+        shutil.copyfile(
+            boundary_geojson_path, out_dir / "local-area-boundary.geojson"
+        )
+
+
+def _write_json(path: Path, payload: object) -> None:
+    path.write_text(
+        json.dumps(payload, separators=(",", ":"), default=str), encoding="utf-8"
+    )
+
+
+def _blocks_feature_collection(blocks_df: pd.DataFrame) -> dict:
+    """Emit stored GeoJSON geometry directly — no shapely round trip.
+
+    `blocks.geom` is already GeoJSON text in SQLite, so parsing it into a
+    shapely object only to re-serialize via __geo_interface__ is wasted work.
+    """
+    property_cols = [
+        "block_id",
+        "buildings",
+        "total_units",
+        "median_year_built",
+        "member_buildings",
+        "total_members",
+        "member_share",
+        "local_area",
+        "block_label",
+    ]
+    features = []
+    for _, row in blocks_df.iterrows():
+        geom = row.get("geom_geojson") or row.get("geom")
+        if geom is None:
+            continue
+        if isinstance(geom, str):
+            geom = json.loads(geom)
+        features.append(
+            {
+                "type": "Feature",
+                "geometry": geom,
+                "properties": {
+                    col: (None if pd.isna(row.get(col)) else row.get(col))
+                    for col in property_cols
+                    if col in blocks_df.columns
+                },
+            }
+        )
+    return {
+        "type": "FeatureCollection",
+        "schema_version": SCHEMA_VERSION,
+        "features": features,
+    }
+
+
+def _marker_records(points_df: pd.DataFrame) -> list[dict]:
+    """Per-building styling records, including coordinates.
+
+    Styling values (radius, colors, ring weights) are computed here rather
+    than at render time so the frontend needs no styling logic of its own.
+    """
+    records = []
+    for _, r in points_df.iterrows():
+        has_member = bool(r.get("has_vtu_member"))
+        records.append(
+            {
+                "b_id": int(r["b_id"]),
+                "lat": None if pd.isna(r["lat"]) else float(r["lat"]),
+                "lon": None if pd.isna(r["lon"]) else float(r["lon"]),
+                "owner_key": r.get("owner_key"),
+                "block_id": None if pd.isna(r.get("block_id")) else int(r["block_id"]),
+                "units": None if pd.isna(r.get("units")) else int(r["units"]),
+                "year_built": None
+                if pd.isna(r.get("year_built"))
+                else int(r["year_built"]),
+                "local_area": r.get("local_area"),
+                "is_vtu": has_member,
+                "member_count": int(r.get("member_count") or 0),
+                "housing_type": r.get("housing_type") or "",
+                "source": r.get("source", "building"),
+            }
+        )
+    return records
+
+
+def _building_records(points_df: pd.DataFrame) -> dict:
+    """Full per-building record set — the popup and the table both read this."""
+    columns = [
+        c
+        for c in points_df.columns
+        if c not in ("geom_parsed", "members_payload")
+    ]
+    records = {}
+    for _, r in points_df.iterrows():
+        rec = {
+            c: (None if isinstance(r[c], float) and pd.isna(r[c]) else r[c])
+            for c in columns
+        }
+        records[str(int(r["b_id"]))] = rec
+    return {"columns": columns, "records": records}

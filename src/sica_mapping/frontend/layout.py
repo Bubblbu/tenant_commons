@@ -288,6 +288,8 @@ def add_buildings_layers(m: folium.Map, pts_df):
             {
                 "marker_var": mk.get_name(),
                 "b_id": int(r["b_id"]),
+                "lat": float(r["lat"]),
+                "lon": float(r["lon"]),
                 "owner_key": r["owner_key"],
                 "block_id": block_id,
                 "base_radius": radius_val,
