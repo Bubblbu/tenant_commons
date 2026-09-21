@@ -27,13 +27,13 @@ source needs different preprocessing before it produces a clean key:
   regardless of parsing quality.
 
 Co-ops and SRO/SRA additionally get a secondary-address fallback: since the
-vhd pipeline's 2026-08-07 refresh, `buildings.csv` carries a
+vhd pipeline's 2026-08-07 refresh, `raw_buildings` carries a
 `secondary_addresses` column (other civic addresses VanMaps resolves to the
 same building — e.g. a podium building with several street-facing unit
 entrances). A source record whose address doesn't key-match any building's
 own `address` may still key-match one of those secondary addresses; see
-`_load_secondary_address_index`. Not applied to rezoning, which doesn't key
-off a civic address in the first place.
+`load_secondary_address_index` in `.overlay_sources`. Not applied to
+rezoning, which doesn't key off a civic address in the first place.
 
 Measured match rates against buildings.csv (5,112 rows, citywide, pre-
 secondary-address fallback): co-ops 42/117 (36%), SRO/SRA 41/171 (24%),
@@ -440,5 +440,10 @@ def match_overlays(
         "co-op, sro",
         np.where(df["is_coop"], "co-op", np.where(df["is_sro"], "sro", "")),
     )
+
+    for rec in extras.values():
+        rec["local_area"] = _resolve_local_area(
+            rec.get("lat"), rec.get("lon"), boundary_polys
+        )
 
     return OverlayMatchResult(matched=df, unmatched=list(extras.values()))

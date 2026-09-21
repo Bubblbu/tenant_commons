@@ -81,11 +81,11 @@ CREATE TABLE raw_block_numbers (
 );
 
 -- SRO/SRA, co-op, and rezoning-application sources: raw storage only, for
--- browsability (CLAUDE.md Q8b) — no address/name-key matching against
--- buildings happens at ingest time. That logic stays in
--- src/sica_mapping/data/overlays.py::match_overlays(), which runs at
--- map-render time directly against the source CSVs. See docs/DATA_SOURCES.md
--- for each source's (partially unverified) origin.
+-- browsability (CLAUDE.md Q8b). Address/name-key matching against buildings
+-- runs at ingest time, in src/sica_core/ingest/overlays.py (see
+-- ingest/overlay_write.py), writing flags onto `buildings` and unmatched
+-- records to `overlay_housing`. See docs/DATA_SOURCES.md for each source's
+-- (partially unverified) origin.
 CREATE TABLE raw_sro (
     raw_sro_id INTEGER PRIMARY KEY,
     source_id TEXT,            -- the source's own "ID" column
@@ -210,6 +210,24 @@ CREATE TABLE buildings (
     landlord_id INTEGER REFERENCES landlords(landlord_id),
     block_id INTEGER REFERENCES blocks(block_id),
     source_row_ids TEXT,
+    is_coop INTEGER NOT NULL DEFAULT 0,
+    coop_status TEXT,
+    coop_ownership_model TEXT,
+    coop_url TEXT,
+    housing_name TEXT,
+    is_sro INTEGER NOT NULL DEFAULT 0,
+    sro_owner TEXT,
+    sro_operator TEXT,
+    sro_operator_group TEXT,
+    sro_ownership_group TEXT,
+    sro_occupancy_status TEXT,
+    sro_registered_rooms TEXT,
+    is_rezoning INTEGER NOT NULL DEFAULT 0,
+    rezoning_status TEXT,
+    rezoning_status_group TEXT,
+    rezoning_category TEXT,
+    rezoning_status_detail TEXT,
+    rezoning_link TEXT,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
 );

@@ -42,6 +42,7 @@ from .block_numbers import ingest_raw_block_numbers
 from .blocks import ingest_blocks
 from .membership import ingest_membership
 from .merge import run_merge
+from .overlay_write import ingest_overlays
 from .ownership_claims import ingest_ownership_claims
 from .raw_addresses import ingest_raw_addresses
 from .raw_buildings import ingest_raw_buildings
@@ -109,6 +110,10 @@ def run_ingest(conn: sqlite3.Connection, config: IngestConfig) -> dict[str, int]
             conn, run_id, "raw_rezoning", ingest_raw_rezoning, conn, config.rezoning_applications
         )
     counts["buildings"] = run_source(conn, run_id, "buildings", run_merge, conn)
+    counts["overlays"] = run_source(
+        conn, run_id, "overlays", ingest_overlays, conn,
+        config.local_area_boundary_geojson,
+    )
     counts["vtu_membership"] = run_source(
         conn, run_id, "vtu_membership", ingest_membership, conn, config.vtu_raw
     )

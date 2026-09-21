@@ -19,6 +19,7 @@ except ModuleNotFoundError:  # pragma: no cover - only for <3.11
 
 DEFAULT_DB_PATH = "data/derived/sica_core.db"
 DEFAULT_BBOX = "-123.18,49.265,-123.10,49.295"
+DEFAULT_BOUNDARY_GEOJSON = "data/raw/cov_open_data/local-area-boundary.geojson"
 # "vtu_raw", not "vtu" — config.toml's "vtu" key is sica_mapping's public,
 # address-aggregated extract (data/derived/vtu_membership_public.csv). sica_core's
 # ingest needs the raw, un-anonymized NationBuilder export instead (allow-
@@ -58,6 +59,11 @@ class IngestConfig:
     # buildings for the map export; absent it, export_to_cache() just skips
     # portfolio attachment.
     pid_address_map: str | None = None
+    # Neighbourhood boundaries, read straight off disk rather than ingested
+    # into a table: the fetcher already downloads this GeoJSON (see
+    # fetch/cov_open_data.py) and the overlay matcher needs it for the
+    # point-in-polygon local_area lookup on records with no building match.
+    local_area_boundary_geojson: str = DEFAULT_BOUNDARY_GEOJSON
 
 
 def _load_raw(path: str) -> dict[str, object]:
@@ -112,5 +118,8 @@ def load_ingest_config(path: str) -> IngestConfig:
         ),
         pid_address_map=(
             str(flat["pid_address_map"]) if flat.get("pid_address_map") else None
+        ),
+        local_area_boundary_geojson=str(
+            flat.get("local_area_boundary_geojson", DEFAULT_BOUNDARY_GEOJSON)
         ),
     )
