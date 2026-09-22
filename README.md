@@ -95,11 +95,11 @@ Two long-lived branches (GitHub Flow + a release branch):
 *Paused while deploy is disabled (spec §11).*
 
 1. Open a PR **from `main` into `production`**. The diff is your release notes.
-2. Merge it. `deploy.yml` fires on the push to `production` and updates GitHub Pages.
+2. Merging does nothing right now: `deploy.yml` has no push trigger while deploy is disabled.
 3. Tag the merge commit (`git tag -a v0.x.0 -m "…" && git push --tags`).
 
-`workflow_dispatch` is kept on `deploy.yml` for a manual re-deploy of whatever
-is currently on `production`.
+`workflow_dispatch` still exists on `deploy.yml`, but running it manually fails
+immediately with a pointer to spec §11 — there is no working re-deploy path yet.
 
 ### One-time GitHub setup (repo admin, in Settings → Branches)
 
