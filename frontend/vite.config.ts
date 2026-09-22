@@ -1,7 +1,7 @@
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vitest/config';
-import { sicaArtifacts } from './artifacts-plugin';
+import { sicaArtifacts } from './artifacts-plugin.ts';
 
 const HERE = fileURLToPath(new URL('.', import.meta.url));
 // Relative values resolve against the current directory (frontend/ under npm).
