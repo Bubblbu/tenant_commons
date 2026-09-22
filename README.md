@@ -82,17 +82,17 @@ Two long-lived branches (GitHub Flow + a release branch):
 | Branch | Role |
 | --- | --- |
 | `main` | Integration. Always green, always deployable. **Not** auto-deployed. All feature PRs target it. |
-| `production` | What is live. `.github/workflows/deploy.yml` builds and publishes to GitHub Pages on every push here. |
+| `production` | What should be live. Deploy is currently **disabled** (`deploy.yml` has no push trigger) until design spec §11 decides how it gets real artifacts. |
 
 ### Everyday work
 
 1. Branch off `main`, open a PR back into `main`.
-2. `.github/workflows/ci.yml` runs on the PR: tests + a build smoke test
-   (`build_sica_map.py --config config.toml` must produce `www/index.html`).
-   Lint (`ruff`) runs but is advisory until the existing findings are cleaned up.
+2. `.github/workflows/ci.yml` runs two jobs on the PR: **backend** (pytest; ruff advisory) and **frontend** (type check, unit tests, and a build against `frontend/fixtures/`).
 3. Merge once CI is green.
 
 ### Releasing (promoting to the live site)
+
+*Paused while deploy is disabled (spec §11).*
 
 1. Open a PR **from `main` into `production`**. The diff is your release notes.
 2. Merge it. `deploy.yml` fires on the push to `production` and updates GitHub Pages.
@@ -103,20 +103,9 @@ is currently on `production`.
 
 ### One-time GitHub setup (repo admin, in Settings → Branches)
 
-- Protect `main`: require a PR, require the `CI` check to pass, disallow direct pushes.
-- Protect `production`: require a PR (restrict its source to `main`), require `CI`,
+- Protect `main`: require a PR, require the `backend` and `frontend` checks to pass, disallow direct pushes.
+- Protect `production`: require a PR (restrict its source to `main`), require the `backend` and `frontend` checks to pass,
   require linear history, disallow direct pushes, restrict who can merge.
-
-### Notes
-
-- The deploy build uses the **pure-CSV path** (`build_sica_map.py`), which reads only
-  committed `data/*.csv` (`vtu_membership_public.csv`, not the gitignored raw
-  NationBuilder export). Overlay matching there falls back to
-  `sica_mapping/data/overlays.py::match_overlays`; the `sica_core` `overlay_matches`
-  pipeline (run locally via `scripts/rebuild_map.py`) produces byte-identical marker
-  output and is the source of truth for local/internal builds.
-- Multiple filtered variants (e.g. per neighbourhood) are still possible by re-running
-  with different `--local-area` filters and output names.
 
 ## To-dos
 

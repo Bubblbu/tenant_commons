@@ -1,7 +1,8 @@
 """SQLite-backed data layer for SICA Mapping v2.
 
-Lives alongside `sica_mapping` (the current, still-shipping v1 pipeline)
-without depending on it. See CLAUDE.md for the v2 rebuild rationale.
+Backend for `frontend/`: ingest, merge, and export produce the JSON/GeoJSON
+artifacts the Vite/TypeScript map reads. See CLAUDE.md for the v2 rebuild
+rationale.
 """
 
 from __future__ import annotations

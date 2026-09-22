@@ -41,9 +41,9 @@ class IngestConfig:
     ownership_claims: str | None = None
     # Optional: SRO/SRA, co-op, and rezoning-application overlays (see
     # ingest/raw_sro.py, raw_coops.py, raw_rezoning.py). Same config.toml
-    # keys sica_mapping already uses for these (sro_housing/coops/
-    # rezoning_applications) — not required, since a fresh setup may not
-    # have these sources configured yet.
+    # keys used for these (sro_housing/coops/rezoning_applications) — not
+    # required, since a fresh setup may not have these sources configured
+    # yet.
     sro_housing: str | None = None
     coops: str | None = None
     rezoning_applications: str | None = None

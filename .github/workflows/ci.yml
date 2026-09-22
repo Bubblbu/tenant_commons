@@ -1,11 +1,13 @@
 # .github/workflows/ci.yml
 # The promotion gate: nothing reaches `main` (and therefore nothing can be
-# promoted to `production`) without the build — and the test suite, once it
-# exists — passing.
+# promoted to `production`) without both jobs passing.
 #
-# Lint runs but is advisory for now: the tree has a backlog of ruff findings
-# (`ruff check .` / `ruff format --check .` both fail today). Flip
-# `continue-on-error` off once that's cleaned up in its own pass.
+# backend  — sica_core: ruff (advisory until the existing findings are
+#            cleaned up) and pytest.
+# frontend — frontend/: type check, unit tests, and a production build
+#            against frontend/fixtures/ (generated, invented data; CI cannot
+#            run ingest because data/ is gitignored). It proves the build and
+#            the artifact contract, not the data.
 name: CI
 
 on:
@@ -15,7 +17,7 @@ on:
     branches: [main]
 
 jobs:
-  check:
+  backend:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -25,8 +27,6 @@ jobs:
         with:
           python-version: "3.12"
 
-      # `--group dev` fails on branches that predate the dev dependency group;
-      # fall back to a plain sync so this workflow is green with or without it.
       - name: Sync dependencies
         run: uv sync --group dev || uv sync
 
@@ -38,20 +38,36 @@ jobs:
         continue-on-error: true
         run: uv run ruff format --check .
 
-      # Runs only once a tests/ directory is present (i.e. after the overlay
-      # work lands). No-op before then, hard gate after.
       - name: Tests
-        run: |
-          if [ -d tests ]; then
-            uv run pytest -q
-          else
-            echo "no tests/ directory on this branch yet — skipping"
-          fi
+        run: uv run pytest -q
 
-      # Build the public map the same way deploy.yml does (pure-CSV path:
-      # committed data/*.csv only, no gitignored raw membership export).
-      # Catches a broken pipeline before it can be merged.
-      - name: Build smoke test
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: frontend/.nvmrc
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install
+        run: npm ci
+
+      - name: Type check
+        run: npm run typecheck
+
+      - name: Unit tests
+        run: npm test
+
+      - name: Build against the synthetic fixtures
+        env:
+          SICA_ARTIFACTS_DIR: fixtures
         run: |
-          uv run python build_sica_map.py --config config.toml
-          test -f www/index.html
+          npm run build
+          test -f dist/index.html
+          test -f dist/data/marker_metadata.json
