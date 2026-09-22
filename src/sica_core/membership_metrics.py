@@ -1,6 +1,6 @@
 """Derives active-membership metrics from vtu_membership's allow-listed columns.
 
-Forked from the parts of `src/sica_mapping/data/vtu.py` that only touch
+Forked from the parts of the retired `src/sica_mapping/data/vtu.py` that only touch
 `tag_list`/`updated_at` (everything else there reads columns this project
 deliberately never ingests). Used by both the validation checkpoint and,
 eventually, the real public/internal export.

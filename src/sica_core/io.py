@@ -1,8 +1,8 @@
 """CSV loading helpers.
 
-Forked from `src/sica_mapping/core/io.py` (see normalize.py's provenance note
-for why this is a fork, not an import) minus `setup_logging`, which is a
-sica_mapping-specific logging concern this package doesn't need.
+Forked from `src/sica_mapping/core/io.py` (see normalize.py's provenance
+note; `sica_mapping` is retired) minus `setup_logging`, which was a
+sica_mapping-specific logging concern this package never needed.
 """
 
 from __future__ import annotations

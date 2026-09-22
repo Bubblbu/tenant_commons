@@ -310,9 +310,9 @@ partner's copy of this one, points the same variable elsewhere.
 needs the other's toolchain to iterate on its own half.
 
 **Leaflet comes from npm**, not the CDN tags Folium injected, so its version is
-pinned in `package-lock.json`. `wiring.js` uses Leaflet through the global `L`
-today; `bootstrap.ts` imports `leaflet` and assigns `window.L` once, so
-`wiring.js` needs no import rewrite.
+pinned in `package-lock.json`. `wiring.js` never references the global `L`
+(verified during implementation), so no `window.L` assignment is needed and
+`bootstrap.ts` correctly omits one.
 
 **`bootstrap.ts`** is the only genuinely new logic: create the map, fetch the
 artifacts, construct markers from `marker_metadata.json` keyed by `b_id`, build

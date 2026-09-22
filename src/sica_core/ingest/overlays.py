@@ -1,7 +1,8 @@
 """Match SRO/SRA, co-op, and rezoning-application datasets against buildings.
 
-Runs at ingest time against SQLite (ported from `sica_mapping/data/overlays.py`,
-which read these sources from CSV at render time). `buildings_df` must already
+Runs at ingest time against SQLite (ported from the retired
+`sica_mapping/data/overlays.py`, which read these sources from CSV at render
+time). `buildings_df` must already
 carry `addr_key`, `lat`/`lon`. For each optional source table, splits rows
 into "matched" (joins onto an existing building by address) and "unmatched".
 Unmatched co-op and SRO/SRA records are housing too, so they are returned

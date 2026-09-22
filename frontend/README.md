@@ -30,5 +30,3 @@ npm run preview                             # serve dist/
 npm test                                    # unit tests (Vitest)
 npm run typecheck                           # tsc --noEmit
 ```
-
-The `fixtures/` line refers to Task 12. Its commands fail with the plugin's "Artifact directory not found" message until then.

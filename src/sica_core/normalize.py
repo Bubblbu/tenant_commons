@@ -1,10 +1,9 @@
 """Address/owner normalization utilities.
 
 Forked from `src/sica_mapping/core/normalization.py` (as of the sica_core
-scaffold, 2026-07) rather than imported, so that `sica_mapping` (the frozen
-v1 pipeline) and `sica_core` (the v2 rebuild) can evolve independently.
-Divergence between the two copies should be a deliberate choice, not an
-accident — check the original before changing matching behaviour here.
+scaffold, 2026-07) rather than imported. `sica_mapping` was deleted once
+`sica_core` + `frontend/` fully replaced it (see git history before f6dea9b
+for the original); this file is now the only copy.
 """
 
 from __future__ import annotations

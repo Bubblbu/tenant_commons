@@ -1,6 +1,6 @@
 """Merge raw_buildings + raw_addresses into buildings + landlords.
 
-Ports the address-matching/dedup logic from `src/sica_mapping/data/spatial.py`
+Ports the address-matching/dedup logic from the retired `src/sica_mapping/data/spatial.py`
 (select_west_end_buildings + join_buildings_addresses + deduplicate_buildings)
 against data already sitting in SQLite, with two deliberate deviations from v1:
 

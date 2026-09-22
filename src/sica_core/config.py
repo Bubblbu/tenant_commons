@@ -1,6 +1,6 @@
 """Config loading for sica_core ingest.
 
-Forked from `src/sica_mapping/cli.py`'s `_load_config`/`_merge_config` (see
+Forked from `src/sica_mapping/cli.py`'s `_load_config`/`_merge_config` (retired; see
 normalize.py's provenance note) and trimmed to what ingest actually needs:
 the same four source CSV paths already used by `config.toml`, plus the
 sica_core database path.

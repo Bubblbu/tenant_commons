@@ -1,7 +1,7 @@
 """SQLite-backed inputs for the overlay matcher.
 
-Replaces the CSV reads that `sica_mapping/data/overlays.py` did at render
-time: the SRO/co-op/rezoning sources and buildings' secondary addresses all
+Replaces the CSV reads that the retired `sica_mapping/data/overlays.py` did
+at render time: the SRO/co-op/rezoning sources and buildings' secondary addresses all
 already live in SQLite (raw_sro, raw_coops, raw_rezoning, raw_buildings), so
 the matcher reads them from there instead of re-parsing the source files.
 

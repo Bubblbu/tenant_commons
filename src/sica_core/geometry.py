@@ -1,10 +1,9 @@
 """Geometry parsing helpers.
 
 Forked from `src/sica_mapping/data/geometry.py` (see normalize.py's
-provenance note). Only `parse_geom` is needed here — GeoJSON re-serialization
-uses `geom.__geo_interface__` directly at the export/checkpoint layer instead
-of porting `poly_to_geojson`, matching what `sica_mapping`'s own cache-writer
-already does.
+provenance note; `sica_mapping` is retired). Only `parse_geom` is needed
+here — `export.py`'s `_blocks_feature_collection` emits the stored GeoJSON
+string directly rather than round-tripping through shapely.
 """
 
 from __future__ import annotations

@@ -45,4 +45,9 @@ describe('blockPopupHtml', () => {
     expect(html).toContain('<td>1965</td>');
     expect(html).toContain('<td>1,234</td>'); // en-US grouping whatever the locale
   });
+
+  it('rounds a half-integer median year half-to-even, matching tables.ts', () => {
+    const html = blockPopupHtml({ block_label: 'X-01', buildings: 1, total_units: 10, median_year_built: 1942.5, member_buildings: 0, total_members: 0 });
+    expect(html).toContain('<td>1942</td>');
+  });
 });

@@ -5,7 +5,7 @@
  * blocks' own range as soon as it starts.
  */
 import type { PathOptions } from 'leaflet';
-import { escapeHtml, groupThousands, isMissing } from './html';
+import { escapeHtml, groupThousands, isMissing, roundHalfEven } from './html';
 import type { BlockProperties, BlocksCollection } from './types';
 
 export function greensColor(s: number | null | undefined): string {
@@ -51,7 +51,8 @@ function formatValue(field: keyof BlockProperties, value: unknown): string {
   if (isMissing(value)) return '';
   if (typeof value !== 'number') return String(value);
   // Folium's localize=True grouped years too ("1,965"); a year is not a quantity.
-  if (field === 'median_year_built') return String(Math.round(value));
+  // roundHalfEven matches tables.ts's rounding of the same field.
+  if (field === 'median_year_built') return String(roundHalfEven(value));
   // en-US like the rest of the ported markup, not the browser's locale (a
   // German browser would render 1.234). Non-integers keep their decimals.
   return Number.isInteger(value) ? groupThousands(value) : value.toLocaleString('en-US');

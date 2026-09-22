@@ -42,7 +42,7 @@ cd frontend && npm ci
 
 ## Input Data Expectations
 
-The pipeline expects three CSV files, with paths set in `config.toml` under `[paths]`.
+The pipeline reads several source files, most set in `config.toml` under `[paths]`. These three are the minimum to get a build going:
 
 | `config.toml` key | Example file | Required columns |
 | --- | --- | --- |

@@ -1,6 +1,6 @@
 """Histogram-binning for the sidebar's value/units filter sliders.
 
-Forked verbatim from `src/sica_mapping/data/pipeline.py`'s `BUILDING_METRICS`/
+Forked verbatim from `src/sica_mapping/data/pipeline.py`'s (retired) `BUILDING_METRICS`/
 `_summarize_metric`/`build_building_metrics` (see normalize.py's provenance
 note). Pure, no I/O — `wiring.js`'s `buildMetricControls()` silently omits
 the filter section when `filter_config.json` lacks a `building_metrics` key,

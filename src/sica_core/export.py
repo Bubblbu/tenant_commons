@@ -169,7 +169,7 @@ def _append_overlay_housing(
 def resolve_local_area_from_block_numbers(
     blocks_merged: pd.DataFrame, block_numbers_df: pd.DataFrame
 ) -> pd.Series:
-    """Fork of src/sica_mapping/data/spatial.py::resolve_local_area_from_block_numbers
+    """Fork of the retired src/sica_mapping/data/spatial.py::resolve_local_area_from_block_numbers
     — see its docstring. Blocks with zero buildings have no local_area to take
     a mode from and default to "(Unknown)"; resolve those from Vancouver Open
     Data's "block-numbers" dataset instead — one point per city block,
@@ -227,7 +227,7 @@ def resolve_local_area_from_block_numbers(
 
 
 def assign_block_labels(blocks_merged: pd.DataFrame) -> pd.Series:
-    """Fork of src/sica_mapping/data/spatial.py::assign_block_labels — see its
+    """Fork of the retired src/sica_mapping/data/spatial.py::assign_block_labels — see its
     docstring. Human-readable "{local_area}-{NN}" labels, reading-order
     (north-to-south, west-to-east) within each neighbourhood. Display-only;
     block_id remains the join/index key everywhere else.
