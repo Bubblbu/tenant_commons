@@ -20,6 +20,8 @@
 </head>
 <body>
 <div id="map" class="folium-map"></div>
+<button type="button" id="mobile-toggle-sidebar" class="mobile-panel-toggle mobile-panel-toggle-left" aria-expanded="false" aria-controls="sidebar-container">☰ Data</button>
+<button type="button" id="mobile-toggle-filters" class="mobile-panel-toggle mobile-panel-toggle-right" aria-expanded="false" aria-controls="filters-panel">⚙ Filters</button>
 <!-- from sica_mapping/frontend/templates/sidebar.html -->
 <style>
   html,
@@ -218,6 +220,7 @@
   }
 </style>
 <div id="sidebar-container">
+  <button type="button" class="mobile-panel-close" aria-label="Close">×</button>
   <div class="pane-resize-handle" data-target="#sidebar-container" data-side="right" data-min-width="280"
     data-max-width="760" aria-hidden="true"></div>
   <div id="sidebar-tabs">
@@ -803,6 +806,7 @@
   }
 </style>
 <div id="filters-panel">
+  <button type="button" class="mobile-panel-close" aria-label="Close">×</button>
   <div class="pane-resize-handle" data-target="#filters-panel" data-side="left" data-min-width="240" data-max-width="520"
     aria-hidden="true"></div>
   <div class="filters-card">
@@ -880,6 +884,114 @@
     </div>
   </div>
 </div>
+<!-- Mobile responsive overrides, kept in one block placed last so its rules
+     win the cascade against the fragments above (several of which declare
+     #sidebar-container/#filters-panel's base position/z-index unconditionally,
+     later in the document than a media query placed inside an earlier
+     fragment would be — equal-specificity rules are resolved by source
+     order, not by which one is inside an @media block). -->
+<style>
+  .mobile-panel-toggle,
+  .mobile-panel-close {
+    display: none;
+  }
+
+  @media (max-width: 768px) {
+    /* Below this breakpoint both side panels become fixed-position
+       off-canvas drawers instead of in-flow flex columns, so the map gets
+       the full screen by default. initMobilePanels() in wiring.js just
+       toggles the .open class these rules key off of. */
+    #sidebar-container,
+    #filters-panel {
+      position: fixed;
+      top: 0;
+      width: 100%;
+      max-width: 100%;
+      height: 100%;
+      z-index: 20000;
+      border: none;
+      box-shadow: none;
+      transition: transform 0.2s ease;
+    }
+
+    #sidebar-container {
+      left: 0;
+      transform: translateX(-100%);
+    }
+
+    #filters-panel {
+      right: 0;
+      transform: translateX(100%);
+    }
+
+    #sidebar-container.open,
+    #filters-panel.open {
+      transform: translateX(0);
+    }
+
+    #sidebar-container .pane-resize-handle,
+    #filters-panel .pane-resize-handle {
+      display: none;
+    }
+
+    .mobile-panel-toggle {
+      display: block;
+      position: fixed;
+      top: 12px;
+      z-index: 9999;
+      padding: 10px 14px;
+      border: 1px solid #cdd1dd;
+      border-radius: 8px;
+      background: #fff;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+      font-size: 13px;
+      font-weight: 600;
+      color: #27354a;
+      cursor: pointer;
+    }
+
+    /* Hide a toggle once its own drawer is open — otherwise it sits in the
+       same corner as the drawer's close button. */
+    .mobile-panel-toggle[aria-expanded="true"] {
+      display: none;
+    }
+
+    .mobile-panel-toggle-left {
+      left: 12px;
+    }
+
+    .mobile-panel-toggle-right {
+      right: 12px;
+    }
+
+    .mobile-panel-close {
+      display: block;
+      position: absolute;
+      top: 6px;
+      right: 10px;
+      z-index: 20001;
+      width: 36px;
+      height: 36px;
+      border: none;
+      background: transparent;
+      font-size: 22px;
+      line-height: 1;
+      color: #27354a;
+      cursor: pointer;
+    }
+
+    /* wiring.js's updateLegendVisibility() positions the legend relative to
+       the desktop sidebar's width (an inline `left`); that math means
+       nothing once the sidebar is an off-canvas drawer, so pin it near the
+       left edge instead and let it span the width (left+right with the
+       default auto width stretches to fill), overriding that inline style. */
+    #legend-map {
+      left: 12px !important;
+      right: 12px;
+      bottom: 12px;
+    }
+  }
+</style>
 <script type="module" src="/src/bootstrap.ts"></script>
 </body>
 </html>

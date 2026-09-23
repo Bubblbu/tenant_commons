@@ -5,6 +5,9 @@ export const SIDEBAR_WIDTH = 540;
 /** legends_html(): the block legend sits just right of the sidebar. */
 export const LEGEND_LEFT_OFFSET = SIDEBAR_WIDTH + 20;
 
+/** Must match index.html's `@media (max-width: ...)` breakpoint for the mobile drawer layout. */
+export const MOBILE_BREAKPOINT_PX = 768;
+
 /** The artifact contract version this frontend understands (spec §4). */
 export const EXPECTED_SCHEMA_VERSION = 1;
 

@@ -1165,6 +1165,48 @@ export function startWiring(ctx) {
         });
       }
 
+      // Below the mobile breakpoint (see index.html's @media rule), the
+      // sidebar/filters panels become fixed-position off-canvas drawers
+      // instead of in-flow flex columns. This just toggles the `.open`
+      // class the CSS keys off of; above the breakpoint the class is inert
+      // (no matching rule), so no width/media check is needed here.
+      function initMobilePanels() {
+        const sidebar = document.getElementById('sidebar-container');
+        const filters = document.getElementById('filters-panel');
+        const openSidebarBtn = document.getElementById('mobile-toggle-sidebar');
+        const openFiltersBtn = document.getElementById('mobile-toggle-filters');
+
+        function closeAll() {
+          if (sidebar) sidebar.classList.remove('open');
+          if (filters) filters.classList.remove('open');
+          if (openSidebarBtn) openSidebarBtn.setAttribute('aria-expanded', 'false');
+          if (openFiltersBtn) openFiltersBtn.setAttribute('aria-expanded', 'false');
+        }
+
+        // Only one drawer open at a time — opening one closes the other.
+        function openPanel(panel, btn) {
+          closeAll();
+          if (panel) panel.classList.add('open');
+          if (btn) btn.setAttribute('aria-expanded', 'true');
+        }
+
+        if (openSidebarBtn) {
+          openSidebarBtn.addEventListener('click', function() {
+            if (sidebar && sidebar.classList.contains('open')) closeAll();
+            else openPanel(sidebar, openSidebarBtn);
+          });
+        }
+        if (openFiltersBtn) {
+          openFiltersBtn.addEventListener('click', function() {
+            if (filters && filters.classList.contains('open')) closeAll();
+            else openPanel(filters, openFiltersBtn);
+          });
+        }
+        document.querySelectorAll('.mobile-panel-close').forEach(function(btn) {
+          btn.addEventListener('click', closeAll);
+        });
+      }
+
       function initPaneResize() {
         const handles = document.querySelectorAll('.pane-resize-handle[data-target]');
         handles.forEach(function(handle) {
@@ -1716,6 +1758,7 @@ export function startWiring(ctx) {
       let searchDebounce = null;
 
       initPaneResize();
+      initMobilePanels();
 
       if (showBuildingsChk) {
         toggleLayerVisibility(layerVTU, showBuildingsChk.checked !== false);

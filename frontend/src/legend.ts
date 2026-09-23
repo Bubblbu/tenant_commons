@@ -3,7 +3,7 @@
  * (legends_html). Fills the containers index.html left empty. Must run
  * before wiring.js starts: it queries .filter-neighbourhood-option once.
  */
-import { LEGEND_LEFT_OFFSET } from './config';
+import { LEGEND_LEFT_OFFSET, MOBILE_BREAKPOINT_PX } from './config';
 import { escapeHtml, groupThousands } from './html';
 import type { FilterConfig, NeighbourhoodSummary } from './types';
 
@@ -49,13 +49,28 @@ export function renderLegend(fc: FilterConfig, doc: Document = document): void {
 
 const LEGEND_COLLAPSED_KEY = 'sica-legend-collapsed';
 
-/** Whether the viewer previously collapsed the legend. Defaults to expanded if storage is unavailable (private browsing) or unset. */
-function readStoredCollapsed(): boolean {
+function prefersMobileLayout(): boolean {
   try {
-    return localStorage.getItem(LEGEND_COLLAPSED_KEY) === '1';
+    return typeof window !== 'undefined' && window.matchMedia(`(max-width: ${MOBILE_BREAKPOINT_PX}px)`).matches;
   } catch {
     return false;
   }
+}
+
+/**
+ * Whether the viewer previously collapsed the legend. Defaults to expanded
+ * if storage is unavailable (private browsing); if the viewer has never
+ * touched the toggle, defaults to collapsed on mobile (three full cards
+ * would otherwise cover most of a phone screen) and expanded on desktop.
+ */
+function readStoredCollapsed(): boolean {
+  try {
+    const stored = localStorage.getItem(LEGEND_COLLAPSED_KEY);
+    if (stored !== null) return stored === '1';
+  } catch {
+    return false;
+  }
+  return prefersMobileLayout();
 }
 
 function writeStoredCollapsed(collapsed: boolean): void {
