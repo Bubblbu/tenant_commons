@@ -395,6 +395,7 @@
 </style>
 <div id="sidebar-container">
   <button type="button" class="mobile-panel-close" aria-label="Close">×</button>
+  <div class="mobile-panel-header">Data</div>
   <div class="pane-resize-handle" data-target="#sidebar-container" data-side="right" data-min-width="280"
     data-max-width="760" aria-hidden="true"></div>
   <div id="sidebar-tabs">
@@ -965,6 +966,7 @@
 </style>
 <div id="filters-panel">
   <button type="button" class="mobile-panel-close" aria-label="Close">×</button>
+  <div class="mobile-panel-header">Filters</div>
   <div class="pane-resize-handle" data-target="#filters-panel" data-side="left" data-min-width="240" data-max-width="520"
     aria-hidden="true"></div>
   <div class="filters-card">
@@ -1041,7 +1043,8 @@
      order, not by which one is inside an @media block). -->
 <style>
   .mobile-panel-toggle,
-  .mobile-panel-close {
+  .mobile-panel-close,
+  .mobile-panel-header {
     display: none;
   }
 
@@ -1113,20 +1116,47 @@
       right: 12px;
     }
 
+    /* Leaflet's zoom control defaults to the same top-left corner as the
+       "Data" toggle above; on mobile that toggle is wide enough to bury the
+       zoom buttons underneath it, so push the control down below it. */
+    .leaflet-top.leaflet-left {
+      top: 62px;
+    }
+
     .mobile-panel-close {
-      display: block;
+      display: flex;
+      align-items: center;
+      justify-content: center;
       position: absolute;
-      top: 6px;
+      top: 10px;
       right: 10px;
       z-index: 20001;
       width: 36px;
       height: 36px;
-      border: none;
-      background: transparent;
-      font-size: 22px;
+      border: 1px solid #cdd1dd;
+      border-radius: 8px;
+      background: #fff;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+      font-size: 20px;
       line-height: 1;
       color: #27354a;
       cursor: pointer;
+    }
+
+    /* The close button is position: absolute (it doesn't push anything in
+       flow), so each drawer gets an in-flow header row — same height as the
+       button needs — labeling which panel this is and giving the button
+       somewhere to sit that isn't directly on top of the tab row / filter
+       heading underneath it. */
+    .mobile-panel-header {
+      display: flex;
+      align-items: center;
+      padding: 14px 56px 14px 16px;
+      font-size: 15px;
+      font-weight: 700;
+      color: #27354a;
+      background: #f7f8fb;
+      border-bottom: 1px solid #e3e7f0;
     }
 
     /* wiring.js's updateLegendVisibility() positions the legend relative to
