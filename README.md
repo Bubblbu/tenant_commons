@@ -77,12 +77,12 @@ For development, `cd frontend && npm run dev` serves the map with hot reload. Se
 
 ## Branching & Deployment
 
-Two long-lived branches (GitHub Flow + a release branch):
+Two branches, two different kinds of thing:
 
 | Branch | Role |
 | --- | --- |
-| `main` | Integration. Always green, always deployable. **Not** auto-deployed. All feature PRs target it. |
-| `production` | What should be live. Deploy is currently **disabled** (`deploy.yml` has no push trigger) until design spec §11 decides how it gets real artifacts. |
+| `main` | Integration. Always green. All feature PRs target it. |
+| `production` | **Not source.** A snapshot of `frontend/dist`, pushed wholesale on release. Never has its own commits or PRs — GitHub Pages serves it directly, no CI involved. |
 
 ### Everyday work
 
@@ -92,20 +92,27 @@ Two long-lived branches (GitHub Flow + a release branch):
 
 ### Releasing (promoting to the live site)
 
-*Paused while deploy is disabled (spec §11).*
+`production` holds a *built* snapshot, not source, so there is no merge and nothing to conflict — each
+release overwrites it wholesale.
 
-1. Open a PR **from `main` into `production`**. The diff is your release notes.
-2. Merging does nothing right now: `deploy.yml` has no push trigger while deploy is disabled.
-3. Tag the merge commit (`git tag -a v0.x.0 -m "…" && git push --tags`).
+1. If the data changed, rebuild it: `uv run python scripts/rebuild_map.py`.
+2. From `frontend/`: `npm run deploy`. This runs `vite build` against your real local artifacts, then
+   force-pushes `dist/`'s contents as the entirety of the `production` branch via
+   [`gh-pages`](https://www.npmjs.com/package/gh-pages) — nothing to review, nothing to merge.
+3. GitHub Pages picks it up automatically (Settings → Pages → "Deploy from a branch" → `production` / `(root)`).
+4. Optionally tag the release, on `main` (not `production` — it has no meaningful commit history):
+   `git tag -a v0.x.0 -m "…" && git push --tags`.
 
-`workflow_dispatch` still exists on `deploy.yml`, but running it manually fails
-immediately with a pointer to spec §11 — there is no working re-deploy path yet.
+The custom domain (`frontend/public/CNAME`) is copied into every build automatically, so it survives each
+overwrite without a manual step.
 
-### One-time GitHub setup (repo admin, in Settings → Branches)
+### One-time GitHub setup (repo admin, in Settings → Branches / Pages)
 
 - Protect `main`: require a PR, require the `backend` and `frontend` checks to pass, disallow direct pushes.
-- Protect `production`: require a PR (restrict its source to `main`), require the `backend` and `frontend` checks to pass,
-  require linear history, disallow direct pushes, restrict who can merge.
+- `production` needs **no** branch protection — nothing is ever committed to it except full `npm run deploy`
+  overwrites, and it's never a PR target.
+- Settings → Pages: source = "Deploy from a branch", branch = `production`, folder = `/ (root)`. Set the
+  custom domain and enable "Enforce HTTPS" once DNS has propagated.
 
 ## To-dos
 
@@ -116,5 +123,3 @@ immediately with a pointer to spec §11 — there is no working re-deploy path y
 - [ ] Deep overhaul of tool for performance
 
 ### Overall
-
-- [ ] Rethink deployment process
