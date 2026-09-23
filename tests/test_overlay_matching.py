@@ -90,6 +90,67 @@ def test_unmatched_coop_becomes_an_unmatched_record(tmp_path):
     assert rec["lat"] == 49.3
 
 
+def test_matched_sro_fills_null_units_from_registered_rooms(tmp_path):
+    conn = sqlite3.connect(":memory:")
+    init_db(conn)
+    conn.execute(
+        "INSERT INTO raw_sro (address, owner, registered_rooms, latitude, longitude, "
+        "ingested_at) VALUES ('100 Main Street', 'Owner Co', 42, 49.28, -123.1, 'now')"
+    )
+    conn.commit()
+    buildings = _buildings()
+    buildings["units"] = [None]
+
+    result = match_overlays(conn, buildings, _boundary(tmp_path))
+
+    assert result.matched.iloc[0]["units"] == 42
+
+
+def test_matched_sro_does_not_overwrite_a_reported_unit_count(tmp_path):
+    conn = sqlite3.connect(":memory:")
+    init_db(conn)
+    conn.execute(
+        "INSERT INTO raw_sro (address, owner, registered_rooms, latitude, longitude, "
+        "ingested_at) VALUES ('100 Main Street', 'Owner Co', 42, 49.28, -123.1, 'now')"
+    )
+    conn.commit()
+    buildings = _buildings()
+    buildings["units"] = [80]
+
+    result = match_overlays(conn, buildings, _boundary(tmp_path))
+
+    assert result.matched.iloc[0]["units"] == 80
+
+
+def test_unmatched_sro_carries_a_units_fallback_from_registered_rooms(tmp_path):
+    conn = sqlite3.connect(":memory:")
+    init_db(conn)
+    conn.execute(
+        "INSERT INTO raw_sro (address, owner, registered_rooms, latitude, longitude, "
+        "ingested_at) VALUES ('999 Nowhere Rd', 'Owner Co', 60, 49.3, -123.15, 'now')"
+    )
+    conn.commit()
+
+    result = match_overlays(conn, _buildings(), _boundary(tmp_path))
+
+    assert len(result.unmatched) == 1
+    assert result.unmatched[0]["units"] == 60
+
+
+def test_unmatched_coop_has_no_units_fallback(tmp_path):
+    conn = sqlite3.connect(":memory:")
+    init_db(conn)
+    conn.execute(
+        "INSERT INTO raw_coops (title, address, lat, lon, status, ingested_at) "
+        "VALUES ('Elm Co-op', '999 Nowhere Rd', 49.3, -123.15, 'Active', 'now')"
+    )
+    conn.commit()
+
+    result = match_overlays(conn, _buildings(), _boundary(tmp_path))
+
+    assert result.unmatched[0].get("units") is None
+
+
 def test_secondary_address_fallback_matches(tmp_path):
     conn = sqlite3.connect(":memory:")
     init_db(conn)

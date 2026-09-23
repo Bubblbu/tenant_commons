@@ -85,6 +85,40 @@ def test_unmatched_record_lands_in_overlay_housing(tmp_path):
     assert row[3] == "Downtown"
 
 
+def test_matched_sro_backfills_a_null_unit_count(tmp_path):
+    conn = sqlite3.connect(":memory:")
+    init_db(conn)
+    _seed_building(conn)
+    conn.execute(
+        "INSERT INTO raw_sro (address, owner, registered_rooms, latitude, longitude, "
+        "ingested_at) VALUES ('100 Main Street', 'Owner Co', 42, 49.28, -123.1, 'now')"
+    )
+    conn.commit()
+
+    ingest_overlays(conn, _boundary(tmp_path))
+
+    row = conn.execute(
+        "SELECT units FROM buildings WHERE addr_key = '100 main st'"
+    ).fetchone()
+    assert row[0] == 42
+
+
+def test_unmatched_sro_gets_a_units_fallback_in_overlay_housing(tmp_path):
+    conn = sqlite3.connect(":memory:")
+    init_db(conn)
+    _seed_building(conn)
+    conn.execute(
+        "INSERT INTO raw_sro (address, owner, registered_rooms, latitude, longitude, "
+        "ingested_at) VALUES ('999 Nowhere Rd', 'Owner Co', 60, 49.3, -123.15, 'now')"
+    )
+    conn.commit()
+
+    ingest_overlays(conn, _boundary(tmp_path))
+
+    row = conn.execute("SELECT units FROM overlay_housing WHERE is_sro = 1").fetchone()
+    assert row[0] == 60
+
+
 def test_buildings_count_is_unaffected_by_unmatched_records(tmp_path):
     conn = sqlite3.connect(":memory:")
     init_db(conn)

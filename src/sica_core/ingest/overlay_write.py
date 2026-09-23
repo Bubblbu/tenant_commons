@@ -69,6 +69,7 @@ _OVERLAY_HOUSING_COLUMNS = [
     "sro_ownership_group",
     "sro_occupancy_status",
     "sro_registered_rooms",
+    "units",
     "source_row_ids",
 ]
 
@@ -87,16 +88,22 @@ def _clean(value):
 
 def ingest_overlays(conn: sqlite3.Connection, boundary_path: str) -> int:
     buildings = pd.read_sql_query(
-        "SELECT building_id, addr_key, address, lat, lon, local_area FROM buildings",
+        "SELECT building_id, addr_key, address, lat, lon, local_area, units FROM buildings",
         conn,
     )
     result = match_overlays(conn, buildings, boundary_path)
 
     matched = result.matched
     updates = []
+    # SRO units fill-in, kept separate from BUILDING_OVERLAY_COLUMNS (the
+    # pinned "18 new columns" list) since `units` is a pre-existing buildings
+    # column the matcher only ever fills in when null, not one it introduces.
+    sro_unit_updates = []
     for _, row in matched.iterrows():
         values = [_clean(row.get(col)) for col in BUILDING_OVERLAY_COLUMNS]
         updates.append((*values, int(row["building_id"])))
+        if row.get("is_sro") and not pd.isna(row.get("units")):
+            sro_unit_updates.append((_clean(row.get("units")), int(row["building_id"])))
 
     set_sql = ", ".join(f"{col} = ?" for col in BUILDING_OVERLAY_COLUMNS)
     ingested_at = datetime.now(timezone.utc).isoformat()
@@ -105,6 +112,10 @@ def ingest_overlays(conn: sqlite3.Connection, boundary_path: str) -> int:
         conn.executemany(
             f"UPDATE buildings SET {set_sql} WHERE building_id = ?", updates
         )
+        if sro_unit_updates:
+            conn.executemany(
+                "UPDATE buildings SET units = ? WHERE building_id = ?", sro_unit_updates
+            )
         # Rebuildable in its own right: a re-run replaces the whole set rather
         # than appending, so re-running ingest without a full init_db() stays
         # idempotent.

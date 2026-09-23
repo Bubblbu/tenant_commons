@@ -366,6 +366,17 @@ def match_overlays(
                         df.loc[hit, "addr_key"].map(lookup[src_col]).apply(_clean)
                     )
 
+            # Units fill-in (a room still houses a tenant): only where the
+            # building has no real unit count already (e.g. no FOI/rental
+            # inventory match) — never overwrite a reported number. Requires
+            # the caller's buildings_df to have carried a `units` column;
+            # ingest_overlays() does, the matcher-columns pinning test does
+            # not, so this is a no-op there rather than a KeyError.
+            if "units" in df.columns:
+                rooms_numeric = pd.to_numeric(df["sro_registered_rooms"], errors="coerce")
+                fill_mask = df["is_sro"] & df["units"].isna() & rooms_numeric.notna()
+                df.loc[fill_mask, "units"] = rooms_numeric[fill_mask]
+
         for _, row in unmatched.iterrows():
             _add_extra_housing(
                 extras,
@@ -381,6 +392,10 @@ def match_overlays(
                     "sro_ownership_group": _clean(row.get("ownership_group")),
                     "sro_occupancy_status": _clean(row.get("occupancy_status")),
                     "sro_registered_rooms": _clean(row.get("#_registered_rooms")),
+                    # Same fill-in as the matched case: these records have no
+                    # building match at all, so registered_rooms is the only
+                    # units signal available.
+                    "units": pd.to_numeric(row.get("#_registered_rooms"), errors="coerce"),
                 },
                 name=_clean(row.get("building_name")),
                 source_table="raw_sro",
