@@ -1,0 +1,266 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>SICA Map</title>
+<style>html,body{width:100%;height:100%;margin:0;padding:0}#map{width:100%;height:100%;position:relative}.leaflet-container{font-size:1rem}#load-error{z-index:10000;color:#fff;background:#b00020;border-radius:4px;max-width:80vw;padding:8px 14px;font:14px/1.4 system-ui,sans-serif;position:fixed;top:12px;left:50%;transform:translate(-50%)}</style>
+  <script type="module" crossorigin src="./assets/index-B9c4ILi2.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-Fuonrojo.css">
+</head>
+<body>
+<div id="map" class="folium-map"></div>
+<button type="button" id="mobile-toggle-sidebar" class="mobile-panel-toggle mobile-panel-toggle-left" aria-expanded="false" aria-controls="sidebar-container">☰ Data</button>
+<button type="button" id="mobile-toggle-filters" class="mobile-panel-toggle mobile-panel-toggle-right" aria-expanded="false" aria-controls="filters-panel">⚙ Filters</button>
+<!-- from sica_mapping/frontend/templates/sidebar.html -->
+<style>html,body{width:100%;height:100%;margin:0;padding:0}body{color:#1d2129;background:#f0f2f7;flex-direction:row;align-items:stretch;display:flex;overflow:hidden}body>.folium-map{flex:auto;order:1;min-width:0;height:100%;position:relative}body>.folium-map>div{width:100%;height:100%}#sidebar-container{z-index:2;background:#fff;border-right:1px solid #d7dbe5;flex-direction:column;order:0;width:900px;min-width:280px;max-width:900px;height:100%;display:flex;position:relative;overflow:hidden;box-shadow:2px 0 6px #0f172a14}#sidebar-container .pane-resize-handle{cursor:ew-resize;-webkit-user-select:none;user-select:none;width:8px;position:absolute;top:0;bottom:0;right:-4px}#sidebar-container .pane-resize-handle:after{content:"";background:#d0d4dd;border-radius:2px;width:2px;position:absolute;top:20px;bottom:20px;left:3px}#sidebar-tabs{background:#f7f8fb;border-bottom:1px solid #e3e7f0;display:flex}#sidebar-tabs button{cursor:pointer;color:#27354a;background:0 0;border:none;border-right:1px solid #e3e7f0;flex:1;padding:10px 12px;font-size:13px;font-weight:600}#sidebar-tabs button:last-child{border-right:none}#sidebar-tabs button.active{background:#e6ecf7}#sidebar-content{flex-direction:column;flex:1;display:flex;overflow:hidden}.pane{flex:1;min-height:0;display:none}.pane.active{flex-direction:column;min-height:0;display:flex}.table-controls{padding:8px 12px 0;display:none}.table-wrap{flex:1;padding:12px;overflow:auto}table.data{border-collapse:collapse;color:#1d2129;width:100%;font-size:12px}table.data thead th{text-align:left;z-index:1;background:#f9fafc;border-bottom:1px solid #e0e5f2;padding:6px;position:sticky;top:0}table.data tbody td{border-bottom:1px solid #eef1f8;padding:6px}table.data tbody tr:hover{background:#fff4e5}table.data thead th[data-sort]:not([data-sort=none]){cursor:pointer}table.data thead th[data-sort-dir=asc]:after{content:" ▲";color:#6b7280;font-size:10px}table.data thead th[data-sort-dir=desc]:after{content:" ▼";color:#6b7280;font-size:10px}table.data tbody tr.selected{background:#ffe5c2}table.data tbody tr.hidden{display:none}td.select-cell,th.select-head{text-align:center;width:52px}td.select-cell input{cursor:pointer}table.data tfoot{background:#f9fafc;border-top:1px solid #e0e5f2;position:sticky;bottom:0}table.data tfoot td{padding:6px;font-weight:600}</style>
+<div id="sidebar-container">
+  <button type="button" class="mobile-panel-close" aria-label="Close">×</button>
+  <div class="pane-resize-handle" data-target="#sidebar-container" data-side="right" data-min-width="280"
+    data-max-width="760" aria-hidden="true"></div>
+  <div id="sidebar-tabs">
+    <button id="tab-neighbourhoods" class="active">Neighbourhoods</button>
+    <button id="tab-blocks">Blocks</button>
+    <button id="tab-buildings">Buildings</button>
+    <button id="tab-landlords">Landlords</button>
+  </div>
+  <div id="sidebar-content">
+    <div id="pane-neighbourhoods" class="pane active">
+      <div class="table-wrap">
+        <table class="data" id="neighbourhoods-table">
+          <thead>
+            <tr>
+              <th class="select-head" data-sort="none">Select</th>
+              <th data-sort="text">Neighbourhood</th>
+              <th data-sort="number">Bldgs</th>
+              <th data-sort="number">Units</th>
+              <th data-sort="number">Avg Units/Bldg</th>
+              <th data-sort="number">VTU bldgs</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+          <tfoot>
+            <tr class="summary-row">
+              <td></td>
+              <td id="summary-neighbourhoods-label">Totals (visible)</td>
+              <td id="summary-neighbourhoods-bldgs">0</td>
+              <td id="summary-neighbourhoods-units">0</td>
+              <td id="summary-neighbourhoods-avg">0.0</td>
+              <td id="summary-neighbourhoods-vtu">0</td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </div>
+    <div id="pane-blocks" class="pane">
+      <div class="table-wrap">
+        <table class="data" id="blocks-table">
+          <thead>
+            <tr>
+              <th class="select-head" data-sort="none">Select</th>
+              <th data-sort="text">Block</th>
+              <th data-sort="number">Bldgs</th>
+              <th data-sort="number">Units</th>
+              <th data-sort="number">Avg Units/Bldg</th>
+              <th data-sort="number">Med Yr</th>
+              <th data-sort="number">VTU bldgs</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+          <tfoot>
+            <tr class="summary-row">
+              <td></td>
+              <td id="summary-blocks-label">Totals (visible)</td>
+              <td id="summary-blocks-bldgs">0</td>
+              <td id="summary-blocks-units">0</td>
+              <td id="summary-blocks-avg">0.0</td>
+              <td></td>
+              <td id="summary-blocks-vtu">0</td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </div>
+    <div id="pane-buildings" class="pane">
+      <div class="table-controls"></div>
+      <div class="table-wrap">
+        <table class="data" id="buildings-table">
+          <thead>
+            <tr>
+              <th class="select-head" data-sort="none">Select</th>
+              <th data-sort="text">Address</th>
+              <th data-sort="text">Neighbourhood</th>
+              <th data-sort="number">Block</th>
+              <th data-sort="number">Units</th>
+              <th data-sort="number">Members</th>
+              <th data-sort="number">Share (%)</th>
+              <th data-sort="text">Landlord</th>
+              <th data-sort="number">Year</th>
+              <th data-sort="text">Housing type</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+          <tfoot>
+            <tr class="summary-row">
+              <td></td>
+              <td colspan="3" id="summary-buildings-label">Totals (visible)</td>
+              <td id="summary-buildings-units">0</td>
+              <td id="summary-buildings-members">0</td>
+              <td></td>
+              <td colspan="4" id="summary-buildings-rows">0 rows</td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </div>
+    <div id="pane-landlords" class="pane">
+      <div class="table-wrap">
+        <table class="data" id="landlords-table">
+          <thead>
+            <tr>
+              <th class="select-head" data-sort="none">Select</th>
+              <th data-sort="text">Landlord</th>
+              <th data-sort="number">Bldgs</th>
+              <th data-sort="number">Units</th>
+              <th data-sort="number">Avg Units/Bldg</th>
+              <th data-sort="number">VTU bldgs</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+          <tfoot>
+            <tr class="summary-row">
+              <td></td>
+              <td id="summary-landlords-label">Totals (visible)</td>
+              <td id="summary-landlords-bldgs">0</td>
+              <td id="summary-landlords-units">0</td>
+              <td id="summary-landlords-avg">0.0</td>
+              <td id="summary-landlords-vtu">0</td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- from sica_mapping/frontend/templates/legend_blocks.html -->
+<style>#legend-map{z-index:9998;flex-direction:column;gap:8px;font-size:14px;display:flex;position:fixed;bottom:20px}#legend-map .legend-toggle-bar{font:inherit;color:#1d2129;cursor:pointer;-webkit-user-select:none;user-select:none;background:#fff;border:1px solid #ccc;border-radius:8px;justify-content:space-between;align-items:center;gap:10px;padding:8px 12px;font-weight:600;display:flex;box-shadow:0 2px 8px #00000014}#legend-map .legend-toggle-bar:hover{background:#f7f8fb}#legend-map .legend-toggle-icon{color:#6b7280;transition:transform .15s}#legend-map .legend-toggle-bar[aria-expanded=false] .legend-toggle-icon{transform:rotate(-90deg)}#legend-map .legend-cards{flex-direction:column;gap:12px;display:flex}#legend-map.collapsed .legend-cards{display:none}#legend-map .legend-card{background:#fff;border:1px solid #ccc;border-radius:8px;padding:10px 12px;box-shadow:0 2px 8px #00000014}#legend-map .legend-heading{margin:0;font-weight:600}#legend-map .legend-gradient{border:1px solid #999;height:12px;margin-top:6px}#legend-map .legend-scale{justify-content:space-between;margin-top:6px;font-size:12px;display:flex}#legend-map .legend-note{color:#414a5a;margin-top:6px;font-size:12px}#legend-map .legend-key{flex-direction:column;gap:4px;margin-top:6px;font-size:12px;display:flex}#legend-map .legend-key-row{align-items:center;gap:6px;display:flex}#legend-map .legend-swatch{border-radius:50%;flex:none;width:12px;height:12px;display:inline-block}</style>
+<div id="legend-map" style="display:none;">
+  <button type="button" id="legend-toggle-btn" class="legend-toggle-bar" aria-expanded="true" aria-controls="legend-cards">
+    <span>Legend</span>
+    <span class="legend-toggle-icon" aria-hidden="true">▾</span>
+  </button>
+  <div id="legend-cards" class="legend-cards">
+    <div class="legend-card" id="legend-blocks-section">
+      <div class="legend-heading">Blocks — total units</div>
+      <div class="legend-gradient" style="background: linear-gradient(to right, #c7e9c0, #a1d99b, #74c476, #41ab5d, #238b45, #005a32);"></div>
+      <div class="legend-scale" id="block-legend-scale">
+      </div>
+      <div class="legend-note" id="block-legend-note"></div>
+    </div>
+    <div class="legend-card" id="legend-buildings-section">
+      <div class="legend-heading">VTU buildings</div>
+      <div class="legend-key">
+        <div class="legend-key-row"><span class="legend-swatch" style="background:#cc4778;"></span> Has a VTU member</div>
+        <div class="legend-key-row"><span class="legend-swatch" style="background:#9e9e9e;"></span> No VTU member</div>
+      </div>
+    </div>
+    <div class="legend-card" id="legend-housing-section">
+      <div class="legend-heading">Housing type</div>
+      <div class="legend-key">
+        <div class="legend-key-row"><span class="legend-swatch" style="background:transparent;border:2px solid #3182bd;"></span> SRO/SRA (ring)</div>
+        <div class="legend-key-row"><span class="legend-swatch" style="background:transparent;border:2px solid #d97706;"></span> Co-op (ring)</div>
+      </div>
+      <div class="legend-note">Fill color still shows VTU membership. Ring colors are toggled in Housing Data; the markers themselves always stay on the map.</div>
+    </div>
+  </div>
+</div>
+<!-- from sica_mapping/frontend/templates/legend_filters.html -->
+<style>#filters-panel{z-index:2;background:#fff;border-left:1px solid #d7dbe5;flex-direction:column;order:2;width:520px;min-width:240px;max-width:520px;height:100%;display:flex;position:relative;overflow:hidden;box-shadow:-2px 0 6px #0f172a0f}#filters-panel .pane-resize-handle{cursor:ew-resize;-webkit-user-select:none;user-select:none;width:8px;position:absolute;top:0;bottom:0;left:-4px}#filters-panel .pane-resize-handle:after{content:"";background:#d0d4dd;border-radius:2px;width:2px;position:absolute;top:20px;bottom:20px;right:3px}#filters-panel .filters-card{background:#fff;flex:1;padding:16px;overflow-y:auto}#filters-panel h3{color:#1d2533;margin:0 0 12px;font-size:16px}#filters-panel .filter-section{margin-bottom:18px}#filters-panel .filter-section h4{color:#27354a;margin:10px 0 8px;font-size:14px}#filters-panel label{cursor:pointer;color:#1d2129;margin-bottom:6px;font-size:13px;display:block}#filters-panel select,#filters-panel input[type=date],#filters-panel input[type=number],#filters-panel input[type=text],#filters-panel input[type=range]{box-sizing:border-box;width:100%}#filters-panel input[type=text]{border:1px solid #cdd1dd;border-radius:4px;padding:6px 8px;font-size:13px}#filters-panel .filter-grid{grid-template-columns:1fr 1fr;gap:6px;display:grid}#filters-panel .filter-grid label{color:#27354a;flex-direction:column;margin-bottom:0;font-size:12px;display:flex}#filters-panel .filter-grid label span{margin-bottom:2px}#filters-panel .status-table{border-collapse:collapse;width:100%;margin-bottom:12px;font-size:12px}#filters-panel .status-table th,#filters-panel .status-table td{text-align:right;border:1px solid #dde1eb;padding:6px}#filters-panel .status-table thead th{text-align:right;background:#f3f5fb;font-weight:600}#filters-panel .status-table tbody th{text-align:left;background:#f8f9fd;font-weight:600}#filters-panel .status-table td[data-value=none]{color:#777}#filters-panel .filter-tags{border:1px solid #ddd;border-radius:6px;max-height:160px;margin-bottom:10px;padding:6px;overflow:auto}#filters-panel .filter-tag{margin-bottom:4px;font-size:12px;display:block}#filters-panel .filter-tag-count{color:#6b7280;margin-left:4px}#filters-panel .filter-none{color:#777}#filters-panel .filter-visual{flex-direction:column;gap:6px;display:flex}#filters-panel .filter-actions{gap:6px;margin-bottom:10px;display:flex}#filters-panel .filter-actions button{cursor:pointer;background:#f3f5fb;border:1px solid #cdd1dd;border-radius:4px;flex:1;padding:4px 6px;font-size:12px}#filters-panel .filter-actions button:hover{background:#e6e9f4}#filters-panel .filter-building{flex-direction:column;gap:10px;display:flex}#filters-panel .metric-control{margin-bottom:6px}#filters-panel .metric-header{color:#27354a;margin-bottom:4px;font-size:12px;font-weight:600}#filters-panel .metric-histogram{align-items:flex-end;gap:1px;height:36px;margin-bottom:2px;display:flex}#filters-panel .metric-hist-bar{background:#9db4d8;border-radius:1px 1px 0 0;flex:1 1 0;min-width:1px}#filters-panel .metric-hist-bar:hover{background:#5b7fbd}#filters-panel .metric-sliders{height:18px;position:relative}#filters-panel .metric-sliders:before{content:"";pointer-events:none;background:#cdd1dd;border-radius:2px;height:4px;margin-top:-2px;position:absolute;top:50%;left:0;right:0}#filters-panel .metric-sliders input[type=range]{appearance:none;pointer-events:none;background:0 0;height:18px;margin:0;position:absolute;top:0;left:0;right:0}#filters-panel .metric-sliders input[type=range]::-webkit-slider-runnable-track{-webkit-appearance:none;background:0 0}#filters-panel .metric-sliders input[type=range]::-moz-range-track{background:0 0;border:none}#filters-panel .metric-sliders input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;pointer-events:auto;cursor:pointer;background:#2f5fb0;border-radius:50%;width:14px;height:14px;margin-top:2px}#filters-panel .metric-sliders input[type=range]::-moz-range-thumb{pointer-events:auto;cursor:pointer;background:#2f5fb0;border:none;border-radius:50%;width:14px;height:14px}#filters-panel .metric-values{color:#6b7280;justify-content:space-between;margin-top:2px;font-size:11px;display:flex}#filters-panel .summary-actions{gap:8px;margin-bottom:12px;display:flex}#filters-panel .summary-actions button{cursor:pointer;border:1px solid #0000;border-radius:6px;flex:1;padding:8px 10px;font-size:13px;font-weight:600}#filters-panel button#export-visible-csv{color:#fff;background:#2f5fb0;border-color:#2f5fb0}#filters-panel button#export-visible-csv:hover{background:#27508f}#filters-panel button#filter-reset{color:#27354a;background:#f3f5fb;border-color:#cdd1dd}#filters-panel button#filter-reset:hover{background:#e6e9f4}</style>
+<div id="filters-panel">
+  <button type="button" class="mobile-panel-close" aria-label="Close">×</button>
+  <div class="pane-resize-handle" data-target="#filters-panel" data-side="left" data-min-width="240" data-max-width="520"
+    aria-hidden="true"></div>
+  <div class="filters-card">
+    <div class="filter-section">
+      <h3>Map Summary</h3>
+      <div class="summary-actions">
+        <button type="button" id="export-visible-csv">Export visible buildings (CSV)</button>
+        <button type="button" id="filter-reset">Reset filters</button>
+      </div>
+      <table class="status-table">
+        <thead>
+          <tr>
+            <th></th>
+            <th># Units</th>
+            <th># Bldgs</th>
+            <th># VTU bldgs</th>
+            <th># Members</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <th scope="row">Total</th>
+            <td id="status-total-units" data-value="none">–</td>
+            <td id="status-total-buildings" data-value="none">–</td>
+            <td id="status-total-vtu" data-value="none">–</td>
+            <td id="status-total-members" data-value="none">–</td>
+          </tr>
+          <tr>
+            <th scope="row">In view</th>
+            <td id="status-view-units" data-value="none">–</td>
+            <td id="status-view-buildings" data-value="none">–</td>
+            <td id="status-view-vtu" data-value="none">–</td>
+            <td id="status-view-members" data-value="none">–</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="filter-section">
+      <h4>Map Display</h4>
+      <div class="filter-visual">
+        <label><input type="checkbox" id="viz-show-buildings" checked> Show buildings</label>
+        <label><input type="checkbox" id="viz-show-blocks" checked> Show blocks</label>
+        <label><input type="checkbox" id="viz-hide-empty-blocks"> Hide empty blocks</label>
+        <label><input type="checkbox" id="viz-color-blocks" checked> Color-scale blocks (total units)</label>
+        <label><input type="checkbox" id="viz-color-vtu" checked> Color-scale buildings w/ VTU members</label>
+        <label><input type="checkbox" id="viz-show-neighbourhoods" checked> Show neighbourhoods</label>
+      </div>
+      <!-- Hidden for now, not removed — re-enable by dropping this style. -->
+      <div id="filter-membership-year-section" class="filter-building" style="display:none;"></div>
+    </div>
+    <div class="filter-section">
+      <h4>Housing Data</h4>
+      <div class="filter-visual">
+        <label><input type="checkbox" id="viz-show-sro" checked> Show SRO/SRA hotels</label>
+        <label><input type="checkbox" id="viz-show-coop" checked> Show co-ops</label>
+      </div>
+    </div>
+    <h3>Filters</h3>
+    <div class="filter-section">
+      <h4>Landlords</h4>
+      <input type="text" id="owner-search" placeholder="Search landlord / owner name…">
+    </div>
+    <div class="filter-section">
+      <h4>Neighbourhoods</h4>
+      <div class="filter-tags" id="filter-neighbourhoods">
+      </div>
+      <div class="filter-actions">
+        <button type="button" id="hood-select-all">Select all</button>
+        <button type="button" id="hood-clear">Clear all</button>
+      </div>
+    </div>
+    <div class="filter-section">
+      <h4>Buildings</h4>
+      <div id="filter-building-section" class="filter-building"></div>
+    </div>
+  </div>
+</div>
+<!-- Mobile responsive overrides, kept in one block placed last so its rules
+     win the cascade against the fragments above (several of which declare
+     #sidebar-container/#filters-panel's base position/z-index unconditionally,
+     later in the document than a media query placed inside an earlier
+     fragment would be — equal-specificity rules are resolved by source
+     order, not by which one is inside an @media block). -->
+<style>.mobile-panel-toggle,.mobile-panel-close{display:none}@media (width<=768px){#sidebar-container,#filters-panel{z-index:20000;width:100%;max-width:100%;height:100%;box-shadow:none;border:none;transition:transform .2s;position:fixed;top:0}#sidebar-container{left:0;transform:translate(-100%)}#filters-panel{right:0;transform:translate(100%)}#sidebar-container.open,#filters-panel.open{transform:translate(0)}#sidebar-container .pane-resize-handle,#filters-panel .pane-resize-handle{display:none}.mobile-panel-toggle{z-index:9999;color:#27354a;cursor:pointer;background:#fff;border:1px solid #cdd1dd;border-radius:8px;padding:10px 14px;font-size:13px;font-weight:600;display:block;position:fixed;top:12px;box-shadow:0 2px 8px #0000001f}.mobile-panel-toggle[aria-expanded=true]{display:none}.mobile-panel-toggle-left{left:12px}.mobile-panel-toggle-right{right:12px}.mobile-panel-close{z-index:20001;color:#27354a;cursor:pointer;background:0 0;border:none;width:36px;height:36px;font-size:22px;line-height:1;display:block;position:absolute;top:6px;right:10px}#legend-map{bottom:12px;right:12px;left:12px!important}}</style>
+</body>
+</html>
