@@ -5,8 +5,6 @@ It has two halves. `tc_core` is a Python data package: it ingests the public and
 internal sources into SQLite and exports a versioned artifact directory. `frontend/` is a
 Vite + TypeScript Leaflet map that reads only that directory and derives no data itself.
 
-See [`CLAUDE.md`](CLAUDE.md) §3 for the data model and pipeline.
-
 ## Repository Layout
 
 | Path | Purpose |
@@ -102,21 +100,3 @@ release overwrites it wholesale.
 3. GitHub Pages picks it up automatically (Settings → Pages → "Deploy from a branch" → `production` / `(root)`).
 4. Optionally tag the release, on `main` (not `production` — it has no meaningful commit history):
    `git tag -a v0.x.0 -m "…" && git push --tags`.
-
-The custom domain (`frontend/public/CNAME`) is copied into every build automatically, so it survives each
-overwrite without a manual step.
-
-### One-time GitHub setup (repo admin, in Settings → Branches / Pages)
-
-- Protect `main`: require a PR, require the `backend` and `frontend` checks to pass, disallow direct pushes.
-- `production` needs **no** branch protection — nothing is ever committed to it except full `npm run deploy`
-  overwrites, and it's never a PR target.
-- Settings → Pages: source = "Deploy from a branch", branch = `production`, folder = `/ (root)`. Set the
-  custom domain and enable "Enforce HTTPS" once DNS has propagated.
-
-## To-dos
-
-### Mapping
-
-- [ ] Integrate more useful data sources
-- [ ] Deep overhaul of tool for performance
