@@ -10,7 +10,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "deploy": "vite build && gh-pages -d dist -b production",
+    "deploy": "vite build && gh-pages -d dist -b production --dotfiles",
     "typecheck": "tsc --noEmit",
     "test": "vitest run"
   },
