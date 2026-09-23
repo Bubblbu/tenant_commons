@@ -46,8 +46,8 @@ export function startWiring(ctx) {
       let blockColorScalingEnabled = true;
       let blockColorMin = 0;
       let blockColorMax = 0;
-      let showSroChecked = true;
-      let showCoopChecked = true;
+      let showSroChecked = false;
+      let showCoopChecked = false;
       // Declared here (not down with the other filter-panel DOM refs) because
       // syncMarkerAnnotations()/effectiveStrokeColor() — both called from
       // applyZoomScaling(), which runs early during wireUp() — read these.
@@ -486,9 +486,10 @@ export function startWiring(ctx) {
       // color, extra rings) — they never add, remove or hide a marker, since
       // every SRO/co-op is a building.
       function applyHousingTypeFilter() {
-        showSroChecked = vizShowSroChk ? vizShowSroChk.checked !== false : true;
-        showCoopChecked = vizShowCoopChk ? vizShowCoopChk.checked !== false : true;
+        showSroChecked = vizShowSroChk ? vizShowSroChk.checked !== false : false;
+        showCoopChecked = vizShowCoopChk ? vizShowCoopChk.checked !== false : false;
         applyFilters();
+        updateLegendVisibility();
         Object.keys(window.buildingIndex).forEach(function(key) {
           var marker = window.buildingIndex[key];
           if (!marker) return;
@@ -1042,12 +1043,12 @@ export function startWiring(ctx) {
           }
         }
         setLegendDisplay(legendBlocksEl, showBlocksLegend);
-        // Static reference info (housing-type ring colors),
-        // not tied to any checkbox — always shown whenever the legend panel
-        // itself is visible.
-        setLegendDisplay(legendHousingEl, true);
+        // Static reference info (housing-type ring colors) — only relevant
+        // once at least one housing-type toggle is actually on.
+        const showHousingLegend = showSroChecked || showCoopChecked;
+        setLegendDisplay(legendHousingEl, showHousingLegend);
         if (legendContainerEl) {
-          const shouldShow = (showBlocksLegend && legendBlocksEl) || !!legendHousingEl;
+          const shouldShow = (showBlocksLegend && legendBlocksEl) || (showHousingLegend && legendHousingEl);
           legendContainerEl.style.display = shouldShow ? 'flex' : 'none';
         }
       }
@@ -1575,7 +1576,7 @@ export function startWiring(ctx) {
           }
         });
 
-        const hideEmptyBlocks = hideEmptyBlocksChk ? hideEmptyBlocksChk.checked : false;
+        const hideEmptyBlocks = hideEmptyBlocksChk ? hideEmptyBlocksChk.checked : true;
         Object.keys(window.blocksIndex).forEach(function(blockId) {
           var ids = window.blockBuildingIndex[blockId] || [];
           var isEmpty = ids.length === 0;
@@ -1727,7 +1728,7 @@ export function startWiring(ctx) {
 
       if (resetBtn) {
         resetBtn.addEventListener('click', function() {
-          if (hideEmptyBlocksChk) hideEmptyBlocksChk.checked = false;
+          if (hideEmptyBlocksChk) hideEmptyBlocksChk.checked = true;
           hoodInputs.forEach(function(inp) { inp.checked = true; });
           if (colorBlocksChk) {
             colorBlocksChk.checked = true;
@@ -1747,8 +1748,8 @@ export function startWiring(ctx) {
             vizNeighbourhoodsChk.checked = true;
             toggleLayerVisibility(layerNeighbourhoods, true);
           }
-          if (vizShowSroChk) vizShowSroChk.checked = true;
-          if (vizShowCoopChk) vizShowCoopChk.checked = true;
+          if (vizShowSroChk) vizShowSroChk.checked = false;
+          if (vizShowCoopChk) vizShowCoopChk.checked = false;
           applyHousingTypeFilter();
           if (tableSearchInput) {
             tableSearchInput.value = '';
