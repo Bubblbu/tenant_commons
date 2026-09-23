@@ -275,6 +275,22 @@
     background: #e6ecf7;
   }
 
+  /* Disabled for now, not removed — wiring.js's block-row selection/hover
+     logic is left as-is underneath. */
+  #tab-blocks,
+  #pane-blocks {
+    display: none;
+  }
+
+  .sidebar-hint {
+    margin: 0;
+    padding: 8px 14px;
+    font-size: 12px;
+    color: #6b7280;
+    background: #fff;
+    border-bottom: 1px solid #e3e7f0;
+  }
+
   #sidebar-content {
     flex: 1;
     overflow: hidden;
@@ -387,6 +403,7 @@
     <button id="tab-buildings">Buildings</button>
     <button id="tab-landlords">Landlords</button>
   </div>
+  <p class="sidebar-hint">Select rows below to highlight them on the map.</p>
   <div id="sidebar-content">
     <div id="pane-neighbourhoods" class="pane active">
       <div class="table-wrap">
