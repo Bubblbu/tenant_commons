@@ -22,8 +22,7 @@ export function startWiring(ctx) {
   function wireUp() {
     try {
       const layerBlocks = ctx.layers.blocks;
-      const layerVTU = ctx.layers.vtu;
-      const layerNon = ctx.layers.non;
+      const layerBuildings = ctx.layers.buildings;
       const layerNeighbourhoods = ctx.layers.neighbourhoods;
       const mapInstance = ctx.map;
 
@@ -44,7 +43,6 @@ export function startWiring(ctx) {
       const MARKER_STROKE_COLOR = '#ffffff';
       const MARKER_STROKE_WEIGHT = 0.6;
       let currentZoomScale = 1;
-      let colorScalingEnabled = true;
       let blockColorScalingEnabled = true;
       let blockColorMin = 0;
       let blockColorMax = 0;
@@ -430,18 +428,11 @@ export function startWiring(ctx) {
           var key = String(meta.b_id);
           window.buildingIndex[key] = marker;
 
-          const coloredColor = (typeof meta.base_color === 'string' && meta.base_color) || marker._baseColor || (marker.options && marker.options.fillColor) || '#9e9e9e';
-          const neutralColor = (typeof meta.neutral_color === 'string' && meta.neutral_color) || '#9e9e9e';
-          marker._colorizedColor = coloredColor;
-          marker._neutralColor = neutralColor;
-          marker._baseColor = coloredColor;
+          marker._baseColor = (typeof meta.base_color === 'string' && meta.base_color) || marker._baseColor || (marker.options && marker.options.fillColor) || '#9e9e9e';
           marker._baseOpacity = (typeof meta.base_opacity === 'number') ? meta.base_opacity : (marker._baseOpacity || (marker.options && marker.options.fillOpacity) || 0.35);
           marker._baseRadius = (typeof meta.base_radius === 'number') ? meta.base_radius : (marker._baseRadius || (marker.options && marker.options.radius) || 6);
           marker._selectionRefs = 0;
           marker._isFiltered = false;
-          marker._isVtu = !!meta.is_vtu;
-          const memberCount = Number(meta.member_count);
-          marker._memberCount = Number.isFinite(memberCount) ? memberCount : 0;
           if (!marker.options) marker.options = {};
           marker.options.base_color = marker._baseColor;
           const unitsMeta = Number(meta.units);
@@ -679,7 +670,7 @@ export function startWiring(ctx) {
 
       // Same shared-canvas insertion-order issue sendBlocksToBack() handles
       // for blocks: toggling "Show buildings" off/on re-inserts
-      // layerVTU/layerNon at the end of the canvas draw order, so bring the
+      // layerBuildings at the end of the canvas draw order, so bring the
       // building markers back to the front.
       function sendBuildingsToFront() {
         Object.keys(window.buildingIndex).forEach(function(key) {
@@ -801,15 +792,15 @@ export function startWiring(ctx) {
 
       const landlordRows = Array.from(document.querySelectorAll('#landlords-table tbody tr'));
       landlordRows.forEach(function(row) { row.__checkbox = row.querySelector('.row-select'); });
-      cacheRowCells(landlordRows, { bldgs: 2, units: 3, avg: 4, vtu: 5 });
+      cacheRowCells(landlordRows, { bldgs: 2, units: 3, avg: 4 });
 
       const neighbourhoodRows = Array.from(document.querySelectorAll('#neighbourhoods-table tbody tr'));
       neighbourhoodRows.forEach(function(row) { row.__checkbox = row.querySelector('.row-select'); });
-      cacheRowCells(neighbourhoodRows, { bldgs: 2, units: 3, avg: 4, vtu: 5 });
+      cacheRowCells(neighbourhoodRows, { bldgs: 2, units: 3, avg: 4 });
 
       const blockRowById = {};
       const blockRows = Array.from(document.querySelectorAll('#blocks-table tbody tr'));
-      cacheRowCells(blockRows, { bldgs: 2, units: 3, avg: 4, year: 5, vtu: 6 });
+      cacheRowCells(blockRows, { bldgs: 2, units: 3, avg: 4, year: 5 });
       blockRows.forEach(function(row) {
         row.__checkbox = row.querySelector('.row-select');
         blockRowById[row.getAttribute('data-block')] = row;
@@ -817,7 +808,6 @@ export function startWiring(ctx) {
       const hoodSelectAllBtn = document.getElementById('hood-select-all');
       const hoodClearBtn = document.getElementById('hood-clear');
       const resetBtn = document.getElementById('filter-reset');
-      const colorScaleChk = document.getElementById('viz-color-vtu');
       const colorBlocksChk = document.getElementById('viz-color-blocks');
       const showBuildingsChk = document.getElementById('viz-show-buildings');
       const vizBlocksChk = document.getElementById('viz-show-blocks');
@@ -828,23 +818,17 @@ export function startWiring(ctx) {
         total: {
           units: document.getElementById('status-total-units'),
           buildings: document.getElementById('status-total-buildings'),
-          vtu: document.getElementById('status-total-vtu'),
-          members: document.getElementById('status-total-members'),
         },
         view: {
           units: document.getElementById('status-view-units'),
           buildings: document.getElementById('status-view-buildings'),
-          vtu: document.getElementById('status-view-vtu'),
-          members: document.getElementById('status-view-members'),
         },
       };
       const summaryLabelEl = document.getElementById('summary-buildings-label');
       const summaryUnitsEl = document.getElementById('summary-buildings-units');
-      const summaryMembersEl = document.getElementById('summary-buildings-members');
       const summaryRowsEl = document.getElementById('summary-buildings-rows');
       const legendContainerEl = document.getElementById('legend-map');
       const legendBlocksEl = document.getElementById('legend-blocks-section');
-      const legendBuildingsEl = document.getElementById('legend-buildings-section');
       const legendHousingEl = document.getElementById('legend-housing-section');
 
       const metricControls = {};
@@ -852,9 +836,7 @@ export function startWiring(ctx) {
 
       const datasetTotals = (filterConfig && filterConfig.dataset_totals) || null;
       const totalBuildings = datasetTotals && typeof datasetTotals.buildings === 'number' ? datasetTotals.buildings : null;
-      const totalMembers = datasetTotals && typeof datasetTotals.members === 'number' ? datasetTotals.members : null;
       const totalUnits = datasetTotals && typeof datasetTotals.units === 'number' ? datasetTotals.units : null;
-      const totalVtuBuildings = datasetTotals && typeof datasetTotals.vtu_buildings === 'number' ? datasetTotals.vtu_buildings : null;
 
       function setStatusCell(cell, value) {
         if (!cell) return;
@@ -871,23 +853,17 @@ export function startWiring(ctx) {
         if (!statusCells) return;
         setStatusCell(statusCells.total.units, totalUnits);
         setStatusCell(statusCells.total.buildings, totalBuildings);
-        setStatusCell(statusCells.total.vtu, totalVtuBuildings);
-        setStatusCell(statusCells.total.members, totalMembers);
         setStatusCell(statusCells.view.units, null);
         setStatusCell(statusCells.view.buildings, null);
-        setStatusCell(statusCells.view.vtu, null);
-        setStatusCell(statusCells.view.members, null);
       }
 
       function computeMapSummary() {
         if (!mapInstance || typeof mapInstance.getBounds !== 'function') {
-          return { buildings: null, members: null, units: null, vtu: null };
+          return { buildings: null, units: null };
         }
         const bounds = mapInstance.getBounds();
         let buildingCount = 0;
-        let memberTotal = 0;
         let unitTotal = 0;
-        let vtuCount = 0;
         Object.keys(window.buildingIndex).forEach(function(key) {
           const marker = window.buildingIndex[key];
           if (!marker || marker._isFiltered) return;
@@ -896,17 +872,12 @@ export function startWiring(ctx) {
           const latLng = marker.getLatLng();
           if (!latLng || typeof bounds.contains !== 'function' || !bounds.contains(latLng)) return;
           buildingCount += 1;
-          const members = Number(marker._memberCount);
-          if (Number.isFinite(members)) memberTotal += members;
           const unitsVal = Number(marker._units);
           if (Number.isFinite(unitsVal)) unitTotal += unitsVal;
-          if (marker._isVtu) vtuCount += 1;
         });
         return {
           buildings: buildingCount,
-          members: memberTotal,
           units: unitTotal,
-          vtu: vtuCount,
         };
       }
 
@@ -915,12 +886,10 @@ export function startWiring(ctx) {
         const summary = computeMapSummary();
         setStatusCell(statusCells.view.units, summary.units);
         setStatusCell(statusCells.view.buildings, summary.buildings);
-        setStatusCell(statusCells.view.vtu, summary.vtu);
-        setStatusCell(statusCells.view.members, summary.members);
       }
 
       function updateSummaryBar() {
-        if (!summaryLabelEl || !summaryUnitsEl || !summaryMembersEl || !summaryRowsEl) return;
+        if (!summaryLabelEl || !summaryUnitsEl || !summaryRowsEl) return;
         const allRows = buildingRows;
         const selectedRows = allRows.filter(function(row) {
           const cb = row.__checkbox;
@@ -931,20 +900,16 @@ export function startWiring(ctx) {
         });
         const label = selectedRows.length ? 'Totals (selected)' : 'Totals (visible)';
         let unitsSum = 0;
-        let membersSum = 0;
         targetRows.forEach(function(row) {
           const units = Number(row.getAttribute('data-units'));
-          const members = Number(row.getAttribute('data-member-total'));
           if (Number.isFinite(units)) unitsSum += units;
-          if (Number.isFinite(members)) membersSum += members;
         });
         summaryLabelEl.textContent = label;
         summaryUnitsEl.textContent = unitsSum.toLocaleString();
-        summaryMembersEl.textContent = membersSum.toLocaleString();
         summaryRowsEl.textContent = (targetRows.length || 0).toLocaleString() + (targetRows.length === 1 ? ' row' : ' rows');
       }
 
-      // Recomputes one Blocks/Landlords/Neighbourhoods row's Bldgs/Units/Avg/VTU
+      // Recomputes one Blocks/Landlords/Neighbourhoods row's Bldgs/Units/Avg
       // (and, for blocks, Median year) cells from only the buildings currently
       // passing the active filters — the row's own columns were previously baked
       // in at build time from the full dataset and never changed when a filter
@@ -960,7 +925,6 @@ export function startWiring(ctx) {
       function computeLiveGroupMetrics(items, resolveMarker, includeYear) {
         let bldgs = 0;
         let units = 0;
-        let vtu = 0;
         const years = includeYear ? [] : null;
         items.forEach(function(item) {
           const marker = resolveMarker ? resolveMarker(item) : item;
@@ -968,7 +932,6 @@ export function startWiring(ctx) {
           bldgs += 1;
           const u = Number(marker._units);
           if (Number.isFinite(u)) units += u;
-          if (marker._isVtu) vtu += 1;
           if (includeYear && marker._yearBuilt !== null && marker._yearBuilt !== undefined) {
             years.push(marker._yearBuilt);
           }
@@ -979,7 +942,7 @@ export function startWiring(ctx) {
           const mid = Math.floor(years.length / 2);
           medianYear = years.length % 2 ? years[mid] : Math.round((years[mid - 1] + years[mid]) / 2);
         }
-        return { bldgs: bldgs, units: units, vtu: vtu, avg: bldgs > 0 ? units / bldgs : 0, medianYear: medianYear };
+        return { bldgs: bldgs, units: units, avg: bldgs > 0 ? units / bldgs : 0, medianYear: medianYear };
       }
 
       function setCellValue(cell, sortValue, text) {
@@ -998,14 +961,13 @@ export function startWiring(ctx) {
         const includeYear = !!row.__cells.year;
         const m = computeLiveGroupMetrics(items, resolveMarker, includeYear);
         const prev = row.__lastMetrics;
-        if (prev && prev.bldgs === m.bldgs && prev.units === m.units && prev.vtu === m.vtu && prev.medianYear === m.medianYear) {
+        if (prev && prev.bldgs === m.bldgs && prev.units === m.units && prev.medianYear === m.medianYear) {
           return;
         }
         row.__lastMetrics = m;
         setCellValue(row.__cells.bldgs, m.bldgs, m.bldgs.toLocaleString());
         setCellValue(row.__cells.units, m.units, m.units.toLocaleString());
         setCellValue(row.__cells.avg, m.avg, m.avg.toFixed(1));
-        setCellValue(row.__cells.vtu, m.vtu, m.vtu.toLocaleString());
         if (includeYear) {
           setCellValue(row.__cells.year, m.medianYear === null ? '' : m.medianYear, m.medianYear === null ? '' : String(m.medianYear));
         }
@@ -1013,13 +975,12 @@ export function startWiring(ctx) {
         // updateGroupTableSummary()'s footer totals sum from these.
         row.setAttribute('data-bldgs', String(m.bldgs));
         row.setAttribute('data-units', String(m.units));
-        row.setAttribute('data-vtu-bldgs', String(m.vtu));
       }
 
       // Shared footer-summary logic for the Blocks/Landlords/Neighbourhoods tabs,
-      // which all use the same Bldgs/Units/Avg Units per Bldg/VTU bldgs column
-      // shape (unlike Buildings, whose footer tracks Units/Members per building
-      // row rather than a per-group aggregate).
+      // which all use the same Bldgs/Units/Avg Units per Bldg column shape
+      // (unlike Buildings, whose footer tracks Units for the building row
+      // rather than a per-group aggregate).
       function updateGroupTableSummary(rows, ids) {
         const labelEl = document.getElementById(ids.label);
         if (!labelEl) return;
@@ -1033,14 +994,11 @@ export function startWiring(ctx) {
         const label = selectedRows.length ? 'Totals (selected)' : 'Totals (visible)';
         let bldgsSum = 0;
         let unitsSum = 0;
-        let vtuSum = 0;
         targetRows.forEach(function(row) {
           const bldgs = Number(row.getAttribute('data-bldgs'));
           const units = Number(row.getAttribute('data-units'));
-          const vtu = Number(row.getAttribute('data-vtu-bldgs'));
           if (Number.isFinite(bldgs)) bldgsSum += bldgs;
           if (Number.isFinite(units)) unitsSum += units;
-          if (Number.isFinite(vtu)) vtuSum += vtu;
         });
         const avg = bldgsSum > 0 ? unitsSum / bldgsSum : 0;
         const rowCount = targetRows.length || 0;
@@ -1048,25 +1006,23 @@ export function startWiring(ctx) {
         const bldgsEl = document.getElementById(ids.bldgs);
         const unitsEl = document.getElementById(ids.units);
         const avgEl = document.getElementById(ids.avg);
-        const vtuEl = document.getElementById(ids.vtu);
         if (bldgsEl) bldgsEl.textContent = bldgsSum.toLocaleString();
         if (unitsEl) unitsEl.textContent = unitsSum.toLocaleString();
         if (avgEl) avgEl.textContent = avg.toFixed(1);
-        if (vtuEl) vtuEl.textContent = vtuSum.toLocaleString();
       }
 
       function updateGroupTableSummaries() {
         updateGroupTableSummary(blockRows, {
           label: 'summary-blocks-label', bldgs: 'summary-blocks-bldgs',
-          units: 'summary-blocks-units', avg: 'summary-blocks-avg', vtu: 'summary-blocks-vtu',
+          units: 'summary-blocks-units', avg: 'summary-blocks-avg',
         });
         updateGroupTableSummary(landlordRows, {
           label: 'summary-landlords-label', bldgs: 'summary-landlords-bldgs',
-          units: 'summary-landlords-units', avg: 'summary-landlords-avg', vtu: 'summary-landlords-vtu',
+          units: 'summary-landlords-units', avg: 'summary-landlords-avg',
         });
         updateGroupTableSummary(neighbourhoodRows, {
           label: 'summary-neighbourhoods-label', bldgs: 'summary-neighbourhoods-bldgs',
-          units: 'summary-neighbourhoods-units', avg: 'summary-neighbourhoods-avg', vtu: 'summary-neighbourhoods-vtu',
+          units: 'summary-neighbourhoods-units', avg: 'summary-neighbourhoods-avg',
         });
       }
 
@@ -1077,8 +1033,6 @@ export function startWiring(ctx) {
 
       function updateLegendVisibility() {
         const blocksVisible = vizBlocksChk ? vizBlocksChk.checked !== false : true;
-        const buildingsVisible = showBuildingsChk ? showBuildingsChk.checked !== false : true;
-        const showBuildingLegend = buildingsVisible && (colorScaleChk ? colorScaleChk.checked !== false : true);
         const showBlocksLegend = blocksVisible && blockColorScalingEnabled;
         if (legendContainerEl) {
           const sidebarEl = document.getElementById('sidebar-container');
@@ -1088,13 +1042,12 @@ export function startWiring(ctx) {
           }
         }
         setLegendDisplay(legendBlocksEl, showBlocksLegend);
-        setLegendDisplay(legendBuildingsEl, showBuildingLegend);
         // Static reference info (housing-type ring colors),
         // not tied to any checkbox — always shown whenever the legend panel
         // itself is visible.
         setLegendDisplay(legendHousingEl, true);
         if (legendContainerEl) {
-          const shouldShow = (showBlocksLegend && legendBlocksEl) || (showBuildingLegend && legendBuildingsEl) || !!legendHousingEl;
+          const shouldShow = (showBlocksLegend && legendBlocksEl) || !!legendHousingEl;
           legendContainerEl.style.display = shouldShow ? 'flex' : 'none';
         }
       }
@@ -1102,13 +1055,6 @@ export function startWiring(ctx) {
       function updateMarkerColorAppearance(marker) {
         if (!marker) return;
         ensureMarkerBase(marker);
-        const shouldColorize = colorScalingEnabled && marker._isVtu;
-        const coloredColor = marker._colorizedColor || marker._baseColor || '#9e9e9e';
-        const neutralColor = marker._neutralColor || '#9e9e9e';
-        const targetColor = shouldColorize ? coloredColor : neutralColor;
-        marker._baseColor = targetColor;
-        if (!marker.options) marker.options = {};
-        marker.options.base_color = targetColor;
         if (marker._isFiltered) {
           return;
         }
@@ -1117,14 +1063,6 @@ export function startWiring(ctx) {
         } else {
           highlightMarker(marker, false);
         }
-      }
-
-      function applyVtuColorScaling(enabled) {
-        colorScalingEnabled = enabled !== false;
-        Object.keys(window.buildingIndex).forEach(function(key) {
-          updateMarkerColorAppearance(window.buildingIndex[key]);
-        });
-        updateLegendVisibility();
       }
 
       function applyBlockColorScaling(enabled) {
@@ -1411,10 +1349,6 @@ export function startWiring(ctx) {
 
       // Renders one Craigslist-style histogram + dual-handle range slider control
       // into `container` and returns its bookkeeping object for metricControls[metric].
-      // Shared by the Buildings section's metrics and the Membership section's
-      // membership-year metric — same look and threshold-filtering behavior,
-      // just rendered into different containers so they show up in different
-      // parts of the sidebar.
       function renderMetricControl(container, metric, summary) {
           const control = document.createElement('div');
           control.className = 'metric-control';
@@ -1551,14 +1485,6 @@ export function startWiring(ctx) {
           });
         }
 
-        const membershipContainer = document.getElementById('filter-membership-year-section');
-        if (membershipContainer && filterConfig.membership_year_metric) {
-          membershipContainer.innerHTML = '';
-          metricControls['latest_membership_year'] = renderMetricControl(
-            membershipContainer, 'latest_membership_year', filterConfig.membership_year_metric
-          );
-        }
-
         metricKeys = Object.keys(metricControls);
         metricKeys.forEach(updateMetricLabels);
       }
@@ -1637,10 +1563,9 @@ export function startWiring(ctx) {
 
           const wasFiltered = marker ? marker._isFiltered : null;
           setMarkerVisibility(marker, matches);
-          // updateMarkerColorAppearance() re-applies color via another setStyle
-          // call — only worth doing when this tick actually flipped the marker's
-          // filtered state (global color-scaling toggles are handled separately
-          // by applyVtuColorScaling(), which loops explicitly).
+          // updateMarkerColorAppearance() re-applies the highlight state via
+          // another setStyle call — only worth doing when this tick actually
+          // flipped the marker's filtered state.
           if (marker && wasFiltered !== marker._isFiltered) {
             updateMarkerColorAppearance(marker);
           }
@@ -1761,25 +1686,14 @@ export function startWiring(ctx) {
       initMobilePanels();
 
       if (showBuildingsChk) {
-        toggleLayerVisibility(layerVTU, showBuildingsChk.checked !== false);
-        toggleLayerVisibility(layerNon, showBuildingsChk.checked !== false);
+        toggleLayerVisibility(layerBuildings, showBuildingsChk.checked !== false);
         showBuildingsChk.addEventListener('change', function() {
-          toggleLayerVisibility(layerVTU, showBuildingsChk.checked !== false);
-          toggleLayerVisibility(layerNon, showBuildingsChk.checked !== false);
+          toggleLayerVisibility(layerBuildings, showBuildingsChk.checked !== false);
           if (showBuildingsChk.checked) sendBuildingsToFront();
           updateLegendVisibility();
         });
       } else {
-        toggleLayerVisibility(layerVTU, true);
-        toggleLayerVisibility(layerNon, true);
-      }
-      if (colorScaleChk) {
-        applyVtuColorScaling(colorScaleChk.checked !== false);
-        colorScaleChk.addEventListener('change', function() {
-          applyVtuColorScaling(colorScaleChk.checked !== false);
-        });
-      } else {
-        applyVtuColorScaling(true);
+        toggleLayerVisibility(layerBuildings, true);
       }
       if (colorBlocksChk) {
         applyBlockColorScaling(colorBlocksChk.checked !== false);
@@ -1815,18 +1729,13 @@ export function startWiring(ctx) {
         resetBtn.addEventListener('click', function() {
           if (hideEmptyBlocksChk) hideEmptyBlocksChk.checked = false;
           hoodInputs.forEach(function(inp) { inp.checked = true; });
-          if (colorScaleChk) {
-            colorScaleChk.checked = true;
-            applyVtuColorScaling(true);
-          }
           if (colorBlocksChk) {
             colorBlocksChk.checked = true;
             applyBlockColorScaling(true);
           }
           if (showBuildingsChk) {
             showBuildingsChk.checked = true;
-            toggleLayerVisibility(layerVTU, true);
-            toggleLayerVisibility(layerNon, true);
+            toggleLayerVisibility(layerBuildings, true);
             sendBuildingsToFront();
           }
           if (vizBlocksChk) {

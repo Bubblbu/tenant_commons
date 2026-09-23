@@ -34,20 +34,19 @@ describe('maxTotalUnits', () => {
 });
 
 describe('blockPopupHtml', () => {
-  it('lists the six Folium popup fields in order, escaping text and not grouping the year', () => {
+  it('lists the four popup fields in order, escaping text and not grouping the year', () => {
     const html = blockPopupHtml({
       block_label: 'West <End>-03', buildings: 12, total_units: 1234, median_year_built: 1965.4,
-      member_buildings: 2, total_members: 3,
     });
     const aliases = [...html.matchAll(/<th>([^<]*)<\/th>/g)].map((m) => m[1]);
-    expect(aliases).toEqual(['Block', 'Buildings', '# Units', 'Median year', 'Buildings w/ VTU', 'Total VTU members']);
+    expect(aliases).toEqual(['Block', 'Buildings', '# Units', 'Median year']);
     expect(html).toContain('West &lt;End&gt;-03');
     expect(html).toContain('<td>1965</td>');
     expect(html).toContain('<td>1,234</td>'); // en-US grouping whatever the locale
   });
 
   it('rounds a half-integer median year half-to-even, matching tables.ts', () => {
-    const html = blockPopupHtml({ block_label: 'X-01', buildings: 1, total_units: 10, median_year_built: 1942.5, member_buildings: 0, total_members: 0 });
+    const html = blockPopupHtml({ block_label: 'X-01', buildings: 1, total_units: 10, median_year_built: 1942.5 });
     expect(html).toContain('<td>1942</td>');
   });
 });

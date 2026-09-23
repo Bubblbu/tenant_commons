@@ -240,7 +240,6 @@
               <th data-sort="number">Bldgs</th>
               <th data-sort="number">Units</th>
               <th data-sort="number">Avg Units/Bldg</th>
-              <th data-sort="number">VTU bldgs</th>
             </tr>
           </thead>
           <tbody></tbody>
@@ -251,7 +250,6 @@
               <td id="summary-neighbourhoods-bldgs">0</td>
               <td id="summary-neighbourhoods-units">0</td>
               <td id="summary-neighbourhoods-avg">0.0</td>
-              <td id="summary-neighbourhoods-vtu">0</td>
             </tr>
           </tfoot>
         </table>
@@ -268,7 +266,6 @@
               <th data-sort="number">Units</th>
               <th data-sort="number">Avg Units/Bldg</th>
               <th data-sort="number">Med Yr</th>
-              <th data-sort="number">VTU bldgs</th>
             </tr>
           </thead>
           <tbody></tbody>
@@ -280,7 +277,6 @@
               <td id="summary-blocks-units">0</td>
               <td id="summary-blocks-avg">0.0</td>
               <td></td>
-              <td id="summary-blocks-vtu">0</td>
             </tr>
           </tfoot>
         </table>
@@ -297,8 +293,6 @@
               <th data-sort="text">Neighbourhood</th>
               <th data-sort="number">Block</th>
               <th data-sort="number">Units</th>
-              <th data-sort="number">Members</th>
-              <th data-sort="number">Share (%)</th>
               <th data-sort="text">Landlord</th>
               <th data-sort="number">Year</th>
               <th data-sort="text">Housing type</th>
@@ -310,9 +304,7 @@
               <td></td>
               <td colspan="3" id="summary-buildings-label">Totals (visible)</td>
               <td id="summary-buildings-units">0</td>
-              <td id="summary-buildings-members">0</td>
-              <td></td>
-              <td colspan="4" id="summary-buildings-rows">0 rows</td>
+              <td colspan="3" id="summary-buildings-rows">0 rows</td>
             </tr>
           </tfoot>
         </table>
@@ -328,7 +320,6 @@
               <th data-sort="number">Bldgs</th>
               <th data-sort="number">Units</th>
               <th data-sort="number">Avg Units/Bldg</th>
-              <th data-sort="number">VTU bldgs</th>
             </tr>
           </thead>
           <tbody></tbody>
@@ -339,7 +330,6 @@
               <td id="summary-landlords-bldgs">0</td>
               <td id="summary-landlords-units">0</td>
               <td id="summary-landlords-avg">0.0</td>
-              <td id="summary-landlords-vtu">0</td>
             </tr>
           </tfoot>
         </table>
@@ -452,20 +442,13 @@
       </div>
       <div class="legend-note" id="block-legend-note"></div>
     </div>
-    <div class="legend-card" id="legend-buildings-section">
-      <div class="legend-heading">VTU buildings</div>
-      <div class="legend-key">
-        <div class="legend-key-row"><span class="legend-swatch" style="background:#cc4778;"></span> Has a VTU member</div>
-        <div class="legend-key-row"><span class="legend-swatch" style="background:#9e9e9e;"></span> No VTU member</div>
-      </div>
-    </div>
     <div class="legend-card" id="legend-housing-section">
       <div class="legend-heading">Housing type</div>
       <div class="legend-key">
         <div class="legend-key-row"><span class="legend-swatch" style="background:transparent;border:2px solid #3182bd;"></span> SRO/SRA (ring)</div>
         <div class="legend-key-row"><span class="legend-swatch" style="background:transparent;border:2px solid #d97706;"></span> Co-op (ring)</div>
       </div>
-      <div class="legend-note">Fill color still shows VTU membership. Ring colors are toggled in Housing Data; the markers themselves always stay on the map.</div>
+      <div class="legend-note">Ring colors are toggled in Housing Data; the markers themselves always stay on the map.</div>
     </div>
   </div>
 </div>
@@ -822,8 +805,6 @@
             <th></th>
             <th># Units</th>
             <th># Bldgs</th>
-            <th># VTU bldgs</th>
-            <th># Members</th>
           </tr>
         </thead>
         <tbody>
@@ -831,15 +812,11 @@
             <th scope="row">Total</th>
             <td id="status-total-units" data-value="none">–</td>
             <td id="status-total-buildings" data-value="none">–</td>
-            <td id="status-total-vtu" data-value="none">–</td>
-            <td id="status-total-members" data-value="none">–</td>
           </tr>
           <tr>
             <th scope="row">In view</th>
             <td id="status-view-units" data-value="none">–</td>
             <td id="status-view-buildings" data-value="none">–</td>
-            <td id="status-view-vtu" data-value="none">–</td>
-            <td id="status-view-members" data-value="none">–</td>
           </tr>
         </tbody>
       </table>
@@ -851,11 +828,8 @@
         <label><input type="checkbox" id="viz-show-blocks" checked> Show blocks</label>
         <label><input type="checkbox" id="viz-hide-empty-blocks"> Hide empty blocks</label>
         <label><input type="checkbox" id="viz-color-blocks" checked> Color-scale blocks (total units)</label>
-        <label><input type="checkbox" id="viz-color-vtu" checked> Color-scale buildings w/ VTU members</label>
         <label><input type="checkbox" id="viz-show-neighbourhoods" checked> Show neighbourhoods</label>
       </div>
-      <!-- Hidden for now, not removed — re-enable by dropping this style. -->
-      <div id="filter-membership-year-section" class="filter-building" style="display:none;"></div>
     </div>
     <div class="filter-section">
       <h4>Housing Data</h4>

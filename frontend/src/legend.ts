@@ -24,8 +24,7 @@ export function hoodTagsHtml(hoods: NeighbourhoodSummary[] | undefined): string 
 }
 
 export function blockLegendMax(fc: FilterConfig): number {
-  const raw = fc.blocks_total_units_max ?? fc.blocks_member_building_max;
-  const n = Math.trunc(Number(raw));
+  const n = Math.trunc(Number(fc.blocks_total_units_max));
   return Number.isFinite(n) && n > 0 ? n : 0;
 }
 

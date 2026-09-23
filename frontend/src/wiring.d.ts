@@ -5,7 +5,7 @@ import type { BuildingData, FilterConfig } from './types';
 
 export interface WiringContext {
   map: Map;
-  layers: { blocks: GeoJSON; vtu: FeatureGroup; non: FeatureGroup; neighbourhoods: FeatureGroup };
+  layers: { blocks: GeoJSON; buildings: FeatureGroup; neighbourhoods: FeatureGroup };
   markersById: Record<string, CircleMarker>;
   ringsById: Record<string, { housing_type: string; marker: CircleMarker }[]>;
   filterConfig: FilterConfig;

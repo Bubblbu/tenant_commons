@@ -4,7 +4,7 @@ import type { MarkerRecord } from './types';
 
 const base: MarkerRecord = {
   b_id: 1, lat: 49.28, lon: -123.1, owner_key: 'x', block_id: 1, units: 40, year_built: 1970,
-  local_area: 'West End', is_vtu: false, member_count: 0, housing_type: '', source: 'building',
+  local_area: 'West End', housing_type: '', source: 'building',
 };
 
 describe('markerRadius', () => {
@@ -31,9 +31,8 @@ describe('housingTypes', () => {
 });
 
 describe('markerStyle', () => {
-  it('colours VTU buildings pink at 0.75 and others grey at 0.35', () => {
-    expect(markerStyle({ ...base, is_vtu: true })).toMatchObject({ base_color: '#cc4778', base_opacity: 0.75 });
-    expect(markerStyle(base)).toMatchObject({ base_color: '#9e9e9e', base_opacity: 0.35, neutral_color: '#9e9e9e' });
+  it('colours every building the same neutral grey — no VTU membership signal', () => {
+    expect(markerStyle(base)).toMatchObject({ base_color: '#9e9e9e', base_opacity: 0.6 });
   });
 
   it('gives a single-type building that type\'s ring as its own stroke', () => {

@@ -1,9 +1,9 @@
 /**
  * The building popup, redesigned per spec §7: leads with ownership (the
  * project's differentiator), sections appear only when their data does,
- * every value goes through one escape helper. Membership is deliberately
- * absent — an editorial choice, NOT a privacy control: membership remains
- * in the artifacts and in marker colour (spec §12).
+ * every value goes through one escape helper. VTU membership data is never
+ * exported to the public artifacts at all (spec §11/§12 — see export.py),
+ * so there is nothing for the popup to read here even by omission.
  */
 import { escapeHtml, isMissing } from './html';
 import type { BuildingRecord } from './types';

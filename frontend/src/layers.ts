@@ -31,28 +31,24 @@ export function createNeighbourhoodsLayer(fc: BoundaryCollection): L.FeatureGrou
 }
 
 export interface BuildingLayers {
-  vtu: L.FeatureGroup;
-  non: L.FeatureGroup;
+  buildings: L.FeatureGroup;
   markersById: Record<string, L.CircleMarker>;
   ringsById: Record<string, { housing_type: string; marker: L.CircleMarker }[]>;
 }
 
 /**
- * Two groups (VTU / non-VTU), as add_buildings_layers built them. Markers go
- * into the groups first; the caller adds the groups to the map afterwards,
- * non-VTU then VTU, which is what sets their paint order on the shared canvas.
+ * One group for every building marker. Markers go into the group first; the
+ * caller adds it to the map afterwards.
  */
 export function createBuildingLayers(
   markers: StyledMarker[],
   bindPopup?: (marker: L.CircleMarker, m: StyledMarker) => void,
 ): BuildingLayers {
-  const vtu = L.featureGroup();
-  const non = L.featureGroup();
+  const buildings = L.featureGroup();
   const markersById: BuildingLayers['markersById'] = {};
   const ringsById: BuildingLayers['ringsById'] = {};
   for (const m of markers) {
     if (m.lat === null || m.lon === null) continue;
-    const target = m.is_vtu ? vtu : non;
     const key = String(m.b_id);
     // Extra rings first, so they paint underneath the building as a halo.
     const rings = m.extra_rings.map((ring, i) => {
@@ -63,7 +59,7 @@ export function createBuildingLayers(
         weight: RING_WEIGHT,
         opacity: RING_OPACITY,
       });
-      target.addLayer(marker);
+      buildings.addLayer(marker);
       return { housing_type: ring.housing_type, marker };
     });
     if (rings.length) ringsById[key] = rings;
@@ -76,8 +72,8 @@ export function createBuildingLayers(
       fillColor: m.base_color,
     });
     bindPopup?.(marker, m);
-    target.addLayer(marker);
+    buildings.addLayer(marker);
     markersById[key] = marker;
   }
-  return { vtu, non, markersById, ringsById };
+  return { buildings, markersById, ringsById };
 }

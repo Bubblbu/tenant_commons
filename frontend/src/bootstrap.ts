@@ -44,8 +44,7 @@ async function main(): Promise<void> {
   const buildings = createBuildingLayers(styled, (marker, m) => {
     marker.bindPopup(() => renderPopup(records[String(m.b_id)] ?? { b_id: m.b_id }), { maxWidth: 320 });
   });
-  buildings.non.addTo(map);
-  buildings.vtu.addTo(map);
+  buildings.buildings.addTo(map);
 
   const b = artifacts.filterConfig.bounds;
   if (b) map.fitBounds([[b.lat_min, b.lon_min], [b.lat_max, b.lon_max]]);
@@ -56,7 +55,7 @@ async function main(): Promise<void> {
 
   startWiring({
     map,
-    layers: { blocks, vtu: buildings.vtu, non: buildings.non, neighbourhoods },
+    layers: { blocks, buildings: buildings.buildings, neighbourhoods },
     markersById: buildings.markersById,
     ringsById: buildings.ringsById,
     filterConfig: artifacts.filterConfig,

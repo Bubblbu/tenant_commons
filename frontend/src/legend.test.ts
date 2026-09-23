@@ -20,9 +20,8 @@ describe('block legend', () => {
     expect(blockTicks(7)).toEqual(['0', '1', '3', '4', '6', '7']);
     expect(blockTicks(0)).toEqual(['0', '0', '0', '0', '0', '0']);
   });
-  it('falls back to blocks_member_building_max, and to 0', () => {
+  it('falls back to 0 when no max is set', () => {
     expect(blockLegendMax({ schema_version: 1, blocks_total_units_max: 480 })).toBe(480);
-    expect(blockLegendMax({ schema_version: 1, blocks_member_building_max: 9 })).toBe(9);
     expect(blockLegendMax({ schema_version: 1 })).toBe(0);
   });
 });

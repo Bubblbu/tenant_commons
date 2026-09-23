@@ -6,7 +6,7 @@ const building: BuildingRecord = {
   b_id: 1, address: '1234 Davie St', housing_name: null, owner_group: 'Hollyburn Properties',
   portfolio_name: 'Hollyburn Properties', portfolio_building_count: 23, portfolio_entities: ['a', 'b', 'c', 'd', 'e', 'f'],
   units: 87.0, year_built: 1974.0, local_area: 'West End', value_land: 20100000, value_bldg: 950000,
-  is_coop: false, is_sro: false, member_count: 2, member_count_all: 3, has_vtu_member: true,
+  is_coop: false, is_sro: false,
 };
 
 describe('renderPopup', () => {

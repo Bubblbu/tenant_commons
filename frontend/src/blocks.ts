@@ -43,8 +43,6 @@ const POPUP_FIELDS: [keyof BlockProperties, string][] = [
   ['buildings', 'Buildings'],
   ['total_units', '# Units'],
   ['median_year_built', 'Median year'],
-  ['member_buildings', 'Buildings w/ VTU'],
-  ['total_members', 'Total VTU members'],
 ];
 
 function formatValue(field: keyof BlockProperties, value: unknown): string {

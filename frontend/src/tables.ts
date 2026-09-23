@@ -36,20 +36,16 @@ export function buildingRow(r: BuildingRecord): string {
   const block = intStr(r.block_id);
   const units = intStr(r.units);
   const year = intStr(r.year_built);
-  const membershipYear = intStr(r.latest_membership_year);
   const land = num(r.value_land);
   const bldg = num(r.value_bldg);
   const ratio = num(r.bldg_land_ratio);
   const valLand = land === null ? '' : String(roundHalfEven(land));
   const valBldg = bldg === null ? '' : String(roundHalfEven(bldg));
   const ratioVal = ratio === null ? '' : String(roundHalfEven(ratio, 3));
-  const memberCount = Math.trunc(num(r.member_count) ?? 0);
-  const memberTotal = Math.trunc(num(r.member_count_all) ?? memberCount);
-  const sharePct = Math.trunc(num(r.member_share_pct) ?? 0); // already rounded half-even by the export
   const area = text(r.local_area);
   const housing = text(r.housing_type);
   const owner = text(r.owner_group);
-  const search = [text(r.address), area, block, units, String(memberCount), owner, housing]
+  const search = [text(r.address), area, block, units, owner, housing]
     .filter((v) => v !== '')
     .map((v) => v.toLowerCase())
     .join(' ');
@@ -60,10 +56,7 @@ export function buildingRow(r: BuildingRecord): string {
     `data-area="${a}" ` +
     `data-value-land="${valLand}" data-value-bldg="${valBldg}" ` +
     `data-value-ratio="${ratioVal}" data-units="${units}" ` +
-    `data-year-built="${year}" ` +
-    `data-has-vtu-member="${r.has_vtu_member ? 1 : 0}" ` +
-    `data-latest-membership-year="${membershipYear}" ` +
-    `data-member-total="${memberTotal}" data-search="${escapeHtml(search)}" ` +
+    `data-year-built="${year}" data-search="${escapeHtml(search)}" ` +
     `data-housing-type="${h}">` +
     `<td class="select-cell"><input type="checkbox" class="row-select" ` +
     `data-type="building" data-target="${bid}"></td>` +
@@ -71,8 +64,6 @@ export function buildingRow(r: BuildingRecord): string {
     `<td data-sort-value="${a}">${a}</td>` +
     `<td data-sort-value="${block}">${block}</td>` +
     `<td data-sort-value="${units}">${units}</td>` +
-    `<td data-sort-value="${memberCount}">${memberCount}</td>` +
-    `<td data-sort-value="${sharePct}">${sharePct}%</td>` +
     `<td>${escapeHtml(owner)}</td>` +
     `<td data-sort-value="${year}">${year}</td>` +
     `<td data-sort-value="${h}">${h}</td>` +
@@ -82,10 +73,7 @@ export function buildingRow(r: BuildingRecord): string {
 
 export function buildingRowsHtml(records: BuildingRecord[]): string {
   return [...records]
-    .sort(
-      (x, y) =>
-        descMissingLast(num(x.member_count), num(y.member_count)) || descMissingLast(num(x.units), num(y.units)),
-    )
+    .sort((x, y) => descMissingLast(num(x.units), num(y.units)))
     .map(buildingRow)
     .join('\n');
 }
@@ -109,12 +97,10 @@ export function blockRowsHtml(fc: BlocksCollection): string {
       const avg = avgUnits(totalRaw, bldgs);
       const median = num(p.median_year_built);
       const year = median === null ? '' : String(roundHalfEven(median));
-      const vtu = Math.trunc(num(p.member_buildings) ?? 0);
       const l = escapeHtml(label);
       return (
         `<tr data-block="${id}" data-area="${escapeHtml(text(p.local_area))}" ` +
-        `data-bldgs="${bldgs}" data-units="${total}" ` +
-        `data-vtu-bldgs="${vtu}">` +
+        `data-bldgs="${bldgs}" data-units="${total}">` +
         `<td class="select-cell"><input type="checkbox" class="row-select" ` +
         `data-type="block" data-target="${id}"></td>` +
         `<td data-sort-value="${l}">${l}</td>` +
@@ -122,7 +108,6 @@ export function blockRowsHtml(fc: BlocksCollection): string {
         `<td data-sort-value="${total}">${total}</td>` +
         `<td data-sort-value="${avg}">${avg.toFixed(1)}</td>` +
         `<td data-sort-value="${year}">${year}</td>` +
-        `<td data-sort-value="${vtu}">${vtu}</td>` +
         `</tr>`
       );
     })
@@ -134,10 +119,9 @@ interface Group {
   key: string;
   buildings: number;
   totalUnits: number;
-  memberBuildings: number;
 }
 
-/** pandas groupby(...).agg(count address, sum units, sum has_vtu_member), then sort by units, buildings desc. */
+/** pandas groupby(...).agg(count address, sum units), then sort by units, buildings desc. */
 function aggregate(records: BuildingRecord[], labelOf: (r: BuildingRecord) => string, keyOf: (r: BuildingRecord) => string): Group[] {
   const groups = new Map<string, Group>();
   for (const r of records) {
@@ -146,12 +130,11 @@ function aggregate(records: BuildingRecord[], labelOf: (r: BuildingRecord) => st
     const id = `${label}\u0000${key}`;
     let g = groups.get(id);
     if (!g) {
-      g = { label, key, buildings: 0, totalUnits: 0, memberBuildings: 0 };
+      g = { label, key, buildings: 0, totalUnits: 0 };
       groups.set(id, g);
     }
     if (!isMissing(r.address)) g.buildings += 1;
     g.totalUnits += num(r.units) ?? 0;
-    if (r.has_vtu_member === true) g.memberBuildings += 1;
   }
   return [...groups.values()]
     .sort((a, b) => byCodePoint(a.label, b.label) || byCodePoint(a.key, b.key)) // groupby's key order
@@ -163,15 +146,13 @@ function groupRow(g: Group, type: 'owner' | 'neighbourhood', target: string, fir
   const avg = avgUnits(g.totalUnits, g.buildings);
   return (
     `<tr ${dataKey}="${target}" ` +
-    `data-bldgs="${g.buildings}" data-units="${units}" ` +
-    `data-vtu-bldgs="${g.memberBuildings}">` +
+    `data-bldgs="${g.buildings}" data-units="${units}">` +
     `<td class="select-cell"><input type="checkbox" class="row-select" ` +
     `data-type="${type}" data-target="${target}"></td>` +
     `<td>${first}</td>` +
     `<td data-sort-value="${g.buildings}">${g.buildings}</td>` +
     `<td data-sort-value="${units}">${units}</td>` +
     `<td data-sort-value="${avg}">${avg.toFixed(1)}</td>` +
-    `<td data-sort-value="${g.memberBuildings}">${g.memberBuildings}</td>` +
     `</tr>`
   );
 }

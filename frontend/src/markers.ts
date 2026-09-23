@@ -1,12 +1,11 @@
 /**
  * Marker styling, ported from sica_mapping/frontend/layout.py
  * (marker_radius, add_buildings_layers). Presentation, so it lives here: the
- * artifacts carry the data (units, is_vtu, housing_type), not the styling.
+ * artifacts carry the data (units, housing_type), not the styling.
  * Field names match what wiring.js's applyMarkerMetadata() reads.
  */
 import type { MarkerRecord } from './types';
 
-const VTU_COLOR = '#cc4778';
 const NEUTRAL_COLOR = '#9e9e9e';
 const COOP_RING_COLOR = '#d97706';
 const SRO_RING_COLOR = '#3182bd';
@@ -23,7 +22,6 @@ export type HousingType = 'coop' | 'sro';
 
 export interface MarkerStyle {
   base_color: string;
-  neutral_color: string;
   base_opacity: number;
   base_radius: number;
   stroke_color: string;
@@ -57,9 +55,8 @@ export function ringColor(t: HousingType): string {
 export function markerStyle(r: MarkerRecord): MarkerStyle {
   const types = housingTypes(r.housing_type ?? '');
   return {
-    base_color: r.is_vtu ? VTU_COLOR : NEUTRAL_COLOR,
-    neutral_color: NEUTRAL_COLOR,
-    base_opacity: r.is_vtu ? 0.75 : 0.35,
+    base_color: NEUTRAL_COLOR,
+    base_opacity: 0.6,
     base_radius: markerRadius(r.units),
     stroke_color: types.length ? ringColor(types[0]) : DEFAULT_STROKE_COLOR,
     stroke_weight: types.length ? RING_STROKE_WEIGHT : DEFAULT_STROKE_WEIGHT,

@@ -10,8 +10,6 @@ export interface MarkerRecord {
   units: number | null;
   year_built: number | null;
   local_area: string | null;
-  is_vtu: boolean;
-  member_count: number;
   /** "co-op, sro" | "co-op" | "sro" | "" */
   housing_type: string;
   /** "building" | "overlay_sro" | "overlay_coop" */
@@ -29,7 +27,6 @@ export interface FilterConfig {
   bounds?: { lat_min: number; lat_max: number; lon_min: number; lon_max: number } | null;
   neighbourhoods?: NeighbourhoodSummary[];
   blocks_total_units_max?: number | null;
-  blocks_member_building_max?: number | null;
   [key: string]: unknown;
 }
 
@@ -53,9 +50,6 @@ export interface BlockProperties {
   buildings: number | null;
   total_units: number | null;
   median_year_built: number | null;
-  member_buildings: number | null;
-  total_members: number | null;
-  member_share: number | null;
 }
 
 export type BlocksCollection = FeatureCollection<Geometry, BlockProperties> & { schema_version: number };
