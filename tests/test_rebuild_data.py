@@ -49,7 +49,7 @@ def test_skip_ingest_exports_the_existing_database_untouched(tmp_path):
     artifacts = tmp_path / "artifacts"
 
     result = subprocess.run(
-        [sys.executable, "scripts/rebuild_map.py",
+        [sys.executable, "scripts/rebuild_data.py",
          "--config", str(_config(tmp_path, db, artifacts, boundary)), "--skip-ingest"],
         cwd=REPO_ROOT, capture_output=True, text=True,
     )

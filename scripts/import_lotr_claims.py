@@ -71,7 +71,7 @@ def main() -> int:
     except sqlite3.OperationalError as exc:
         if "no such table" in str(exc):
             parser.error(
-                f"{exc} — run `uv run python scripts/rebuild_map.py` (or "
+                f"{exc} — run `uv run python scripts/rebuild_data.py` (or "
                 "`python -m tc_core.ingest --config ...`) at least once first "
                 "to initialize the database."
             )

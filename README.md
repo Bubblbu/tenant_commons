@@ -12,7 +12,7 @@ See [`CLAUDE.md`](CLAUDE.md) §3 for the data model and pipeline.
 | Path | Purpose |
 | --- | --- |
 | `src/tc_core/` | The backend: ingest, overlay matching, claims, and the artifact export. |
-| `scripts/rebuild_map.py` | Ingest + export: rebuilds the SQLite store and writes the artifacts. |
+| `scripts/rebuild_data.py` | Ingest + export: rebuilds the SQLite store and writes the artifacts. |
 | `frontend/` | The map (Vite + TypeScript). See [`frontend/README.md`](frontend/README.md). |
 | `data/derived/artifacts/` | The contract between the two halves (gitignored). |
 | `config.toml` | Input, database, and artifact paths. |
@@ -61,7 +61,7 @@ uv run python scripts/fetch_cov_open_data.py                    # raw/cov_open_d
 uv run python scripts/prepare_data.py                           # derived/interim, derived/buildings.csv
 uv run python -m tc_core.ingest --config config.toml            # derived/tc_core.db
 uv run python scripts/export_pid_address_map.py                 # derived/pid_address_map.csv
-uv run python scripts/rebuild_map.py                            # derived/artifacts (the frontend's input)
+uv run python scripts/rebuild_data.py                           # derived/artifacts (the frontend's input)
 cd frontend && npm ci && npm run build                          # frontend/dist
 ```
 
@@ -70,7 +70,7 @@ For development, `cd frontend && npm run dev` serves the map with hot reload. Se
 
 ## Development Workflow
 
-- `uv run python scripts/rebuild_map.py [--skip-ingest]` when data or export logic
+- `uv run python scripts/rebuild_data.py [--skip-ingest]` when data or export logic
   changes (`--skip-ingest` re-exports from the existing database).
 - `npm run dev` (hot reload) for everything in `frontend/`.
 - `uv run pytest` and `npm test` (in `frontend/`) run the two test suites.
@@ -95,7 +95,7 @@ Two branches, two different kinds of thing:
 `production` holds a *built* snapshot, not source, so there is no merge and nothing to conflict — each
 release overwrites it wholesale.
 
-1. If the data changed, rebuild it: `uv run python scripts/rebuild_map.py`.
+1. If the data changed, rebuild it: `uv run python scripts/rebuild_data.py`.
 2. From `frontend/`: `npm run deploy`. This runs `vite build` against your real local artifacts, then
    force-pushes `dist/`'s contents as the entirety of the `production` branch via
    [`gh-pages`](https://www.npmjs.com/package/gh-pages) — nothing to review, nothing to merge.

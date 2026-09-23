@@ -24,7 +24,7 @@ function requireDir(dir: string): void {
   if (!existsSync(dir) || !statSync(dir).isDirectory()) {
     throw new Error(
       `Artifact directory not found: ${dir}\n` +
-        'Run `uv run python scripts/rebuild_map.py` from the repo root, ' +
+        'Run `uv run python scripts/rebuild_data.py` from the repo root, ' +
         'or point TC_ARTIFACTS_DIR at an artifact directory (e.g. TC_ARTIFACTS_DIR=fixtures).',
     );
   }
@@ -48,7 +48,7 @@ export function tcArtifacts(dir: string): Plugin {
       if (!process.env.VITEST && !existsSync(dir)) {
         server.config.logger.warn(
           `Artifact directory not found: ${dir} — the map will show a load error. ` +
-            'Run `uv run python scripts/rebuild_map.py` from the repo root, or set TC_ARTIFACTS_DIR.',
+            'Run `uv run python scripts/rebuild_data.py` from the repo root, or set TC_ARTIFACTS_DIR.',
         );
       }
       server.middlewares.use('/data', (req, res, next) => {

@@ -12,7 +12,7 @@ the frontend against `fixtures/` with Node alone.
 ## Artifacts
 
 `TC_ARTIFACTS_DIR` names the artifact directory (default
-`../data/derived/artifacts`, produced by `uv run python scripts/rebuild_map.py`
+`../data/derived/artifacts`, produced by `uv run python scripts/rebuild_data.py`
 from the repo root). It is served at `/data/` by `npm run dev` and copied into
 `dist/data/` by `npm run build`. Contract: `filter_config.json`,
 `marker_metadata.json`, `building_records.json` and `blocks.geojson` each carry

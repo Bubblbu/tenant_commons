@@ -9,7 +9,7 @@ nothing — see frontend/README.md for the map.
                (saves ~19s when only export logic changed). Never touches
                the database's tables.
 
-Usage: uv run python scripts/rebuild_map.py [--config config.toml] [--skip-ingest]
+Usage: uv run python scripts/rebuild_data.py [--config config.toml] [--skip-ingest]
 """
 
 from __future__ import annotations

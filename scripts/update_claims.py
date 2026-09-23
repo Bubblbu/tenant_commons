@@ -8,13 +8,13 @@ See CLAUDE.md Section 3 ("Claims ingestion & entity resolution") and
 src/tc_core/claims.py for the underlying semantics.
 
 Assumes the database has already been initialized at least once (via
-scripts/rebuild_map.py or `python -m tc_core.ingest`) — this script
+scripts/rebuild_data.py or `python -m tc_core.ingest`) — this script
 deliberately does NOT call init_db(), since that drops and recreates every
 REBUILDABLE table (buildings, addresses, blocks, membership); doing that
 here would silently wipe them for a script whose whole point is touching
 claims only.
 
-Lives at the top level (like fetch_coops.py, rebuild_map.py), matching this
+Lives at the top level (like fetch_coops.py, rebuild_data.py), matching this
 repo's existing convention for standalone entry points.
 
 Usage: uv run python scripts/update_claims.py [--config config.toml] [--claims-csv path]
@@ -66,7 +66,7 @@ def main() -> int:
     except sqlite3.OperationalError as exc:
         if "no such table" in str(exc):
             parser.error(
-                f"{exc} — run `uv run python scripts/rebuild_map.py` (or "
+                f"{exc} — run `uv run python scripts/rebuild_data.py` (or "
                 "`python -m tc_core.ingest --config ...`) at least once first "
                 "to initialize the database."
             )

@@ -2,7 +2,7 @@
 
 Stages: raw/ (as received, never hand-edited) + curated/ (hand-authored)
 -> derived/ (regenerable) -> exports/ (what leaves the pipeline).
-config.toml's [paths] is read by the ingest and by scripts/rebuild_map.py; a test
+config.toml's [paths] is read by the ingest and by scripts/rebuild_data.py; a test
 (tests/test_data_layout.py) keeps it in agreement with this class.
 """
 

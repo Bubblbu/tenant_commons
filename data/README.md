@@ -15,9 +15,9 @@ Everything under `data/` is ignored by git except this README and the
 ```bash
 uv run python scripts/fetch_cov_open_data.py                    # raw/cov_open_data
 uv run python scripts/prepare_data.py                           # derived/interim, derived/buildings.csv
-uv run python -m tc_core.ingest --config config.toml          # derived/tc_core.db
+uv run python -m tc_core.ingest --config config.toml            # derived/tc_core.db
 uv run python scripts/export_pid_address_map.py                 # derived/pid_address_map.csv
-uv run python scripts/rebuild_map.py                            # derived/artifacts (the frontend's input)
+uv run python scripts/rebuild_data.py                           # derived/artifacts (the frontend's input)
 cd frontend && npm ci && npm run build                          # frontend/dist (see frontend/README.md)
 ```
 

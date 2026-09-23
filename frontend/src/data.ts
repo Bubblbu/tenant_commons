@@ -16,7 +16,7 @@ export function checkSchemaVersion(name: string, payload: unknown): void {
   if (version !== EXPECTED_SCHEMA_VERSION) {
     throw new ArtifactError(
       `${name}: expected schema_version ${EXPECTED_SCHEMA_VERSION}, got ${JSON.stringify(version)}. ` +
-        'Rebuild the artifacts (uv run python scripts/rebuild_map.py) or update the frontend.',
+        'Rebuild the artifacts (uv run python scripts/rebuild_data.py) or update the frontend.',
     );
   }
 }
