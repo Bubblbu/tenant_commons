@@ -10,6 +10,7 @@ import 'leaflet/dist/leaflet.css';
 import 'bootstrap/dist/css/bootstrap-reboot.min.css';
 import './popup.css';
 import * as L from 'leaflet';
+import { initAboutModal } from './about';
 import { BASEMAPS, DEFAULT_BASEMAP, DEFAULT_CENTER, DEFAULT_ZOOM } from './config';
 import { loadArtifacts } from './data';
 import { createBlocksLayer, createBuildingLayers, createNeighbourhoodsLayer } from './layers';
@@ -51,6 +52,7 @@ async function main(): Promise<void> {
 
   renderLegend(artifacts.filterConfig);
   initLegendToggle();
+  initAboutModal(map);
   renderTables(artifacts.buildingData, artifacts.blocks);
 
   startWiring({

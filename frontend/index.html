@@ -22,6 +22,164 @@
 <div id="map" class="folium-map"></div>
 <button type="button" id="mobile-toggle-sidebar" class="mobile-panel-toggle mobile-panel-toggle-left" aria-expanded="false" aria-controls="sidebar-container">☰ Data</button>
 <button type="button" id="mobile-toggle-filters" class="mobile-panel-toggle mobile-panel-toggle-right" aria-expanded="false" aria-controls="filters-panel">⚙ Filters</button>
+<!-- About modal: a static info panel (project context, prototype status, support
+     links), wired open/closed by src/about.ts. Content lives here, not generated
+     from data, so it's plain markup rather than a container an artifact fills. -->
+<button type="button" id="about-toggle-btn" class="map-info-btn" aria-haspopup="dialog" aria-controls="about-modal" aria-expanded="false">ⓘ About</button>
+<div id="about-modal" class="about-modal" hidden role="dialog" aria-modal="true" aria-labelledby="about-modal-title">
+  <div class="about-modal-backdrop"></div>
+  <div class="about-modal-panel">
+    <button type="button" id="about-modal-close" class="about-modal-close" aria-label="Close">×</button>
+    <h2 id="about-modal-title">Tenant Commons</h2>
+    <p class="about-modal-intro">Hi, I'm Asura, the developer behind Tenant Commons. This is a
+      work in progress —
+      <a class="about-inline-link about-inline-link-kofi" href="https://ko-fi.com/bubblbu" target="_blank" rel="noopener noreferrer">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/></svg>
+        buy me a coffee</a> if you want to help keep it going.</p>
+    <p>Try to find out who owns your building, and what else they own, and you hit a wall.
+      Numbered companies, nested holdings, and law-office addresses hide the trail. City
+      records track purchases, assessments, and taxes. They say nothing about who a tenant
+      is actually dealing with. So tenant research rarely adds up. One tenant traces a
+      corporate chain and learns something real, then the next tenant in the same building
+      starts from zero.</p>
+    <p><strong>Tenant Commons</strong> is a shared reference for that knowledge. It combines
+      persistent building and unit identifiers with public ownership and assessment records.
+      Eventually it will also let tenants record and share what they find, like two shell
+      companies turning out to be the same landlord, so research adds up instead of resetting.</p>
+    <p><strong>This map is not the Tenant Commons.</strong> It's a small, early view into it: a
+      public snapshot of what the data currently knows. The claims and curation system, and
+      deeper ownership research, are still being built.</p>
+    <p><strong>Status: early prototype, actively in development.</strong> Data is incomplete
+      and will have gaps and errors. Treat everything here as a starting point, not a
+      verified record.</p>
+    <p>Tenant Commons is open source. The code is on
+      <a class="about-inline-link about-inline-link-github" href="https://github.com/Bubblbu/tenant_commons" target="_blank" rel="noopener noreferrer">
+        <svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg>
+        GitHub</a>,
+      if you want to look under the hood or contribute.</p>
+  </div>
+</div>
+<style>
+  .map-info-btn {
+    /* Top-center of the map's own box (this is reparented into #map by
+       about.ts, not left as a body-level child): the one spot free of the
+       zoom control (top-left), the legend (spans the bottom edge on both
+       desktop and mobile), and the mobile sidebar/filter toggles (top-left
+       and top-right, mobile only). */
+    position: absolute;
+    top: 12px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 1000;
+    /* Matches .mobile-panel-toggle's padding so all three top buttons are
+       the same size on mobile, where they sit in a row. */
+    padding: 10px 14px;
+    border: 1px solid #cdd1dd;
+    border-radius: 8px;
+    background: #fff;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+    font-size: 13px;
+    font-weight: 600;
+    color: #27354a;
+    cursor: pointer;
+  }
+
+  .about-modal[hidden] {
+    display: none;
+  }
+
+  .about-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 30000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .about-modal-backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(20, 24, 34, 0.55);
+  }
+
+  .about-modal-panel {
+    position: relative;
+    max-width: 520px;
+    max-height: calc(100vh - 48px);
+    width: calc(100% - 48px);
+    overflow-y: auto;
+    padding: 28px 24px;
+    border-radius: 14px;
+    background: #fff;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25);
+    font: 15px/1.6 system-ui, sans-serif;
+    color: #2b2822;
+  }
+
+  .about-modal-panel h2 {
+    margin: 0 0 14px;
+    font-size: 21px;
+    letter-spacing: -0.01em;
+    color: #a2431f;
+  }
+
+  .about-modal-panel p {
+    margin: 0 0 12px;
+  }
+
+  .about-modal-intro {
+    font-size: 16.5px;
+    font-style: italic;
+    color: #5c4632;
+    border-left: 3px solid #d68a5c;
+    padding-left: 12px;
+    margin-bottom: 16px !important;
+  }
+
+  .about-inline-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 2px 9px 2px 7px;
+    border-radius: 999px;
+    font-weight: 600;
+    text-decoration: none;
+    white-space: nowrap;
+  }
+
+  .about-inline-link-github {
+    background: #eceef1;
+    color: #24292f;
+  }
+
+  .about-inline-link-github:hover {
+    background: #dfe2e6;
+  }
+
+  .about-inline-link-kofi {
+    background: #fbe3d6;
+    color: #a2431f;
+  }
+
+  .about-inline-link-kofi:hover {
+    background: #f6d2bd;
+  }
+
+  .about-modal-close {
+    position: absolute;
+    top: 10px;
+    right: 12px;
+    width: 32px;
+    height: 32px;
+    border: none;
+    background: transparent;
+    font-size: 20px;
+    line-height: 1;
+    color: #27354a;
+    cursor: pointer;
+  }
+</style>
 <!-- from sica_mapping/frontend/templates/sidebar.html -->
 <style>
   html,
