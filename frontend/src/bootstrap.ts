@@ -13,7 +13,7 @@ import * as L from 'leaflet';
 import { BASEMAPS, DEFAULT_BASEMAP, DEFAULT_CENTER, DEFAULT_ZOOM } from './config';
 import { loadArtifacts } from './data';
 import { createBlocksLayer, createBuildingLayers, createNeighbourhoodsLayer } from './layers';
-import { renderLegend } from './legend';
+import { initLegendToggle, renderLegend } from './legend';
 import { markerStyle } from './markers';
 import { renderPopup } from './popup';
 import { renderTables } from './tables';
@@ -51,6 +51,7 @@ async function main(): Promise<void> {
   if (b) map.fitBounds([[b.lat_min, b.lon_min], [b.lat_max, b.lon_max]]);
 
   renderLegend(artifacts.filterConfig);
+  initLegendToggle();
   renderTables(artifacts.buildingData, artifacts.blocks);
 
   startWiring({

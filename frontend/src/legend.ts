@@ -46,3 +46,42 @@ export function renderLegend(fc: FilterConfig, doc: Document = document): void {
   const legend = doc.getElementById('legend-map');
   if (legend) legend.style.left = `${LEGEND_LEFT_OFFSET}px`;
 }
+
+const LEGEND_COLLAPSED_KEY = 'sica-legend-collapsed';
+
+/** Whether the viewer previously collapsed the legend. Defaults to expanded if storage is unavailable (private browsing) or unset. */
+function readStoredCollapsed(): boolean {
+  try {
+    return localStorage.getItem(LEGEND_COLLAPSED_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+function writeStoredCollapsed(collapsed: boolean): void {
+  try {
+    if (collapsed) localStorage.setItem(LEGEND_COLLAPSED_KEY, '1');
+    else localStorage.removeItem(LEGEND_COLLAPSED_KEY);
+  } catch {
+    // Storage blocked/unavailable: the toggle still works, it just won't be remembered.
+  }
+}
+
+export function setLegendCollapsed(collapsed: boolean, doc: Document = document): void {
+  const container = doc.getElementById('legend-map');
+  const toggle = doc.getElementById('legend-toggle-btn');
+  if (container) container.classList.toggle('collapsed', collapsed);
+  if (toggle) toggle.setAttribute('aria-expanded', String(!collapsed));
+}
+
+/** Wires the legend's collapse toggle. Call once, after renderLegend(). */
+export function initLegendToggle(doc: Document = document): void {
+  const toggle = doc.getElementById('legend-toggle-btn');
+  if (!toggle) return;
+  setLegendCollapsed(readStoredCollapsed(), doc);
+  toggle.addEventListener('click', () => {
+    const collapsed = !doc.getElementById('legend-map')?.classList.contains('collapsed');
+    setLegendCollapsed(collapsed, doc);
+    writeStoredCollapsed(collapsed);
+  });
+}
