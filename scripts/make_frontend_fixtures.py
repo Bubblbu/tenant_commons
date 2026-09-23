@@ -27,8 +27,8 @@ import pandas as pd
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT / "src"))
 
-from sica_core.db import init_db  # noqa: E402
-from sica_core.export import export_artifacts  # noqa: E402
+from tc_core.db import init_db  # noqa: E402
+from tc_core.export import export_artifacts  # noqa: E402
 
 NOW = pd.Timestamp("2026-01-01", tz="UTC")
 TS = "2026-01-01T00:00:00+00:00"

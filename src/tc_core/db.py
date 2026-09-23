@@ -1,4 +1,4 @@
-"""Connection and schema-loading helpers for the sica_core SQLite store."""
+"""Connection and schema-loading helpers for the tc_core SQLite store."""
 
 from __future__ import annotations
 

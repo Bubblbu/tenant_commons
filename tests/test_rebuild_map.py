@@ -4,7 +4,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from sica_core.db import init_db
+from tc_core.db import init_db
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 BLOCK_GEOM = (
@@ -22,7 +22,7 @@ def _config(tmp_path, db, artifacts, boundary):
         'blocks = "unused.csv"\n'
         'block_numbers = "unused.csv"\n'
         'vtu_raw = "unused.csv"\n'
-        f'sica_core_db = "{db}"\n'
+        f'tc_core_db = "{db}"\n'
         f'artifacts = "{artifacts}"\n'
         f'local_area_boundary_geojson = "{boundary}"\n'
     )
@@ -30,7 +30,7 @@ def _config(tmp_path, db, artifacts, boundary):
 
 
 def test_skip_ingest_exports_the_existing_database_untouched(tmp_path):
-    db = tmp_path / "sica.db"
+    db = tmp_path / "tc.db"
     conn = sqlite3.connect(db)
     init_db(conn)
     conn.execute(

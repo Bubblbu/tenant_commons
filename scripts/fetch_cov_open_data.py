@@ -20,8 +20,8 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT / "src"))
 
-from sica_core.fetch.cov_open_data import DEFAULT_TAX_REPORT_YEAR, fetch_all  # noqa: E402
-from sica_core.paths import DataPaths  # noqa: E402
+from tc_core.fetch.cov_open_data import DEFAULT_TAX_REPORT_YEAR, fetch_all  # noqa: E402
+from tc_core.paths import DataPaths  # noqa: E402
 
 
 def main() -> int:

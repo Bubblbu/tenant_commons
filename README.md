@@ -1,7 +1,7 @@
-# SICA Mapping
+# Tenant Commons
 
-SICA Mapping is a map and data toolchain for VTU (Vancouver Tenants Union) organizers.
-It has two halves. `sica_core` is a Python data package: it ingests the public and
+Tenant Commons is a map and data toolchain for VTU (Vancouver Tenants Union) organizers.
+It has two halves. `tc_core` is a Python data package: it ingests the public and
 internal sources into SQLite and exports a versioned artifact directory. `frontend/` is a
 Vite + TypeScript Leaflet map that reads only that directory and derives no data itself.
 
@@ -11,7 +11,7 @@ See [`CLAUDE.md`](CLAUDE.md) §3 for the data model and pipeline.
 
 | Path | Purpose |
 | --- | --- |
-| `src/sica_core/` | The backend: ingest, overlay matching, claims, and the artifact export. |
+| `src/tc_core/` | The backend: ingest, overlay matching, claims, and the artifact export. |
 | `scripts/rebuild_map.py` | Ingest + export: rebuilds the SQLite store and writes the artifacts. |
 | `frontend/` | The map (Vite + TypeScript). See [`frontend/README.md`](frontend/README.md). |
 | `data/derived/artifacts/` | The contract between the two halves (gitignored). |
@@ -59,7 +59,7 @@ Rebuild order (details in [`data/README.md`](data/README.md)):
 ```bash
 uv run python scripts/fetch_cov_open_data.py                    # raw/cov_open_data
 uv run python scripts/prepare_data.py                           # derived/interim, derived/buildings.csv
-uv run python -m sica_core.ingest --config config.toml          # derived/sica_core.db
+uv run python -m tc_core.ingest --config config.toml          # derived/tc_core.db
 uv run python scripts/export_pid_address_map.py                 # derived/pid_address_map.csv
 uv run python scripts/rebuild_map.py                            # derived/artifacts (the frontend's input)
 cd frontend && npm ci && npm run build                          # frontend/dist

@@ -10,7 +10,7 @@ separately as candidate `overlay_housing` rows. Unmatched rezoning records
 stay in the body's own `unmatched_records` list; rezoning isn't shown on the
 map for now, but its matching is kept as-is.
 
-Matching is address-key only (`sica_core.normalize.addr_key_from_freeform`), no
+Matching is address-key only (`tc_core.normalize.addr_key_from_freeform`), no
 lat/lon proximity fallback — a deliberate precision-over-recall choice. Each
 source needs different preprocessing before it produces a clean key:
 
@@ -61,7 +61,7 @@ from .overlay_sources import (
     load_sro_frame,
 )
 
-logger = logging.getLogger("sica_core.ingest.overlays")
+logger = logging.getLogger("tc_core.ingest.overlays")
 
 
 def rezoning_status_group(status: str) -> str:

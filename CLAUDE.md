@@ -1,4 +1,4 @@
-# SICA Mapping v2 — Spec & Roadmap
+# Tenant Commons v2 — Spec & Roadmap
 
 *Living document. Update this as decisions change — it's meant to be edited, not archived.*
 
@@ -8,7 +8,7 @@ Last updated: 2026-09-18
 
 ## 1. Purpose & vision
 
-SICA Mapping is being rebuilt from scratch to serve two goals at once:
+Tenant Commons is being rebuilt from scratch to serve two goals at once:
 
 1. **An internal organizing-intelligence tool** for VTU (Vancouver Tenants Union), combining public property/rental data with VTU's own membership data and — most importantly — manually-researched ownership intelligence gathered from tenants (e.g. "these two shell companies are secretly the same landlord").
 2. **A proof-of-concept for funding** — the internal tool itself is the core pitch, not the public map. The public map (and possibly other public-facing views) are framed as a *service that could be offered to client organizations* (e.g. Toronto tenant unions currently in conversation), not the primary product.
@@ -27,7 +27,7 @@ The manually-curated ownership knowledge — built from tenant testimony and res
 
 ---
 
-## 3. Data model & pipeline (`sica_core`)
+## 3. Data model & pipeline (`tc_core`)
 
 ### Known data sources (Q4)
 - **Vancouver Open Data platform** — addresses, shapefiles/boundary files, rental business licences.
@@ -65,9 +65,9 @@ Built with an eye toward generalizing to a broader `claims` pattern later (build
 
 ### Claims ingestion & entity resolution
 
-**Entry paths.** Two, sharing one write function (`sica_core/claims.py::record_claim()`) so there's one implementation of the upsert/normalization logic, not two:
+**Entry paths.** Two, sharing one write function (`tc_core/claims.py::record_claim()`) so there's one implementation of the upsert/normalization logic, not two:
 
-1. **Bulk-CSV import** (`sica_core/ingest/ownership_claims.py`) — for populating claims already gathered while researching (a spreadsheet you edit over time), not built for one-off entry. Each row requires a human-authored `claim_key`; import is an upsert by that key (existing key → update in place, bumping `updated_at`; new key → insert). Safe to re-run repeatedly against an evolving spreadsheet without duplicating rows. Retraction is just editing a row's `status`/`retracted_reason` and re-importing — never a delete. Run it standalone via `uv run python scripts/update_claims.py` — faster than the full pipeline since it touches only `ownership_claims`, not buildings/addresses/blocks/membership (still logs to `ingest_runs` like any other source). Assumes the database's already been initialized once via the full pipeline.
+1. **Bulk-CSV import** (`tc_core/ingest/ownership_claims.py`) — for populating claims already gathered while researching (a spreadsheet you edit over time), not built for one-off entry. Each row requires a human-authored `claim_key`; import is an upsert by that key (existing key → update in place, bumping `updated_at`; new key → insert). Safe to re-run repeatedly against an evolving spreadsheet without duplicating rows. Retraction is just editing a row's `status`/`retracted_reason` and re-importing — never a delete. Run it standalone via `uv run python scripts/update_claims.py` — faster than the full pipeline since it touches only `ownership_claims`, not buildings/addresses/blocks/membership (still logs to `ingest_runs` like any other source). Assumes the database's already been initialized once via the full pipeline.
 2. **Single-record form** (Internal app, Phase 1 — not yet built) — for the much-more-common small-scale case: a tenant names a landlord, a numbered company's real owner gets identified. Calls the same `record_claim()`; `claim_key` auto-generates (a UUID) since there's no spreadsheet to hand-author one in.
 
 **Entity resolution — no canonical-entities/alias table.** Two different problems, handled differently:
@@ -93,9 +93,9 @@ Raw source tables (Open Data extract, FOI list, NationBuilder export, ownership_
 **Field-level flags, tagged incrementally, default-public.** Not every field classified up front (too much upfront work for the time budget) — instead, known-sensitive fields are flagged now (VTU membership counts/IDs, tenant names/identifying details in claim notes), everything else defaults to public, and new fields get flagged *at the moment they're added* if they touch tenant identity or membership. This is a discipline to maintain, not just a one-time setup.
 
 ### Export mechanism (Q12)
-Two paths, sharing the same underlying "filter to public fields" logic in `sica_core`:
+Two paths, sharing the same underlying "filter to public fields" logic in `tc_core`:
 1. **Ad hoc export button** (in the internal app) — download a filtered CSV/JSON of whatever's currently in view, for sharing with e.g. a Toronto union or a funder.
-2. **Automated public feed** — the same filter logic feeds the public map's build step directly (`sica_core` → filter to public fields → JSON → public site build reads it). Keeps the public map in sync with real data without manual copy-paste.
+2. **Automated public feed** — the same filter logic feeds the public map's build step directly (`tc_core` → filter to public fields → JSON → public site build reads it). Keeps the public map in sync with real data without manual copy-paste.
 
 ---
 
@@ -158,7 +158,7 @@ Risks to actively manage (see Section 7): the "good enough" trap, premature demo
 
 ### Phase 0 — Thin slice (internal checkpoint, not for external eyes)
 
-**`sica_core` (data layer)**
+**`tc_core` (data layer)**
 - [ ] Set up SQLite schema: `landlords`, `buildings`, `units`, `vtu_membership` (basic fields only, no claims yet)
 - [ ] Write ingest scripts for Open Data (addresses, shapefiles, business licences)
 - [ ] Write ingest script for FOI purpose-built rental list
@@ -184,7 +184,7 @@ Risks to actively manage (see Section 7): the "good enough" trap, premature demo
 
 ### Phase 1 — Deepen toward the milestone gate
 
-**`sica_core`**
+**`tc_core`**
 - [x] Build `ownership_claims` table per schema in Section 3 (incl. `claim_key`)
 - [x] Bulk-CSV import for `ownership_claims` (`ingest/ownership_claims.py`), upserting by `claim_key` so a research spreadsheet can be re-imported safely — see "Claims ingestion" above
 - [x] Shared `record_claim()` write path + entity-resolution convention (`same_entity`/`common_owner`) — see "Claims ingestion" above

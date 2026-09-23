@@ -17,7 +17,7 @@ import pandas as pd
 
 from .overlays import match_overlays
 
-logger = logging.getLogger("sica_core.ingest.overlays")
+logger = logging.getLogger("tc_core.ingest.overlays")
 
 # Every column match_overlays() initialises on the buildings frame. The single
 # list of them: export.reconstruct_points imports it, and

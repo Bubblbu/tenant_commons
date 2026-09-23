@@ -46,7 +46,7 @@ export function renderLegend(fc: FilterConfig, doc: Document = document): void {
   if (legend) legend.style.left = `${LEGEND_LEFT_OFFSET}px`;
 }
 
-const LEGEND_COLLAPSED_KEY = 'sica-legend-collapsed';
+const LEGEND_COLLAPSED_KEY = 'tc-legend-collapsed';
 
 function prefersMobileLayout(): boolean {
   try {

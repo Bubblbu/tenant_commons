@@ -1,4 +1,4 @@
-from sica_core.prepare.address import clean_address, fix_street_names
+from tc_core.prepare.address import clean_address, fix_street_names
 
 
 def test_clean_address_abbreviates_and_strips():

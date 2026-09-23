@@ -3,8 +3,8 @@ import sqlite3
 
 import pandas as pd
 
-from sica_core.db import init_db
-from sica_core.ingest.overlays import match_overlays
+from tc_core.db import init_db
+from tc_core.ingest.overlays import match_overlays
 
 
 def _boundary(tmp_path):

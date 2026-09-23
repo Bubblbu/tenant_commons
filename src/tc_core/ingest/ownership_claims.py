@@ -27,7 +27,7 @@ import pandas as pd
 from ..claims import find_similar_entity, record_claim
 from ..io import normalize_cols, read_any_csv
 
-logger = logging.getLogger("sica_core.ingest")
+logger = logging.getLogger("tc_core.ingest")
 
 REQUIRED_CLAIM_COLUMNS = {"claim_key", "entity_a", "entity_b", "relationship", "source_type"}
 OPTIONAL_CLAIM_COLUMNS = {

@@ -4,7 +4,7 @@
 # deploy` (see frontend/README.md) — it never has commits or PRs of its own,
 # so there's nothing for CI to gate there.
 #
-# backend  — sica_core: ruff (advisory until the existing findings are
+# backend  — tc_core: ruff (advisory until the existing findings are
 #            cleaned up) and pytest.
 # frontend — frontend/: type check, unit tests, and a production build
 #            against frontend/fixtures/ (generated, invented data; CI cannot
@@ -68,7 +68,7 @@ jobs:
 
       - name: Build against the synthetic fixtures
         env:
-          SICA_ARTIFACTS_DIR: fixtures
+          TC_ARTIFACTS_DIR: fixtures
         run: |
           npm run build
           test -f dist/index.html

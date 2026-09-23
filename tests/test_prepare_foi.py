@@ -1,6 +1,6 @@
 import polars as pl
 
-from sica_core.prepare.foi import merge_foi_releases
+from tc_core.prepare.foi import merge_foi_releases
 
 
 def _write_inputs(tmp_path):

@@ -1,8 +1,8 @@
 import json
 import sqlite3
 
-from sica_core.db import init_db
-from sica_core.ingest.overlay_sources import (
+from tc_core.db import init_db
+from tc_core.ingest.overlay_sources import (
     load_boundary_feature_collection,
     load_coops_frame,
     load_rezoning_frame,

@@ -1,6 +1,6 @@
 import sqlite3
 
-from sica_core.db import init_db
+from tc_core.db import init_db
 
 
 def _columns(conn, table):

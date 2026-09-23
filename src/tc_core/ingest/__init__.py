@@ -1,4 +1,4 @@
-"""Ingest orchestration: CSVs -> sica_core SQLite tables.
+"""Ingest orchestration: CSVs -> tc_core SQLite tables.
 
 Order matters for FK dependencies: raw tables first, then the merge step
 (which needs both raw_buildings and raw_addresses, and needs blocks for
@@ -54,7 +54,7 @@ from .raw_rezoning import ingest_raw_rezoning
 from .raw_sro import ingest_raw_sro
 from .tracking import new_run_id, record_run
 
-logger = logging.getLogger("sica_core.ingest")
+logger = logging.getLogger("tc_core.ingest")
 
 
 def run_source(
@@ -129,7 +129,7 @@ def run_ingest(conn: sqlite3.Connection, config: IngestConfig) -> dict[str, int]
 
 def main() -> None:
     logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
-    parser = argparse.ArgumentParser(description="Ingest CSVs into sica_core's SQLite store")
+    parser = argparse.ArgumentParser(description="Ingest CSVs into tc_core's SQLite store")
     parser.add_argument("--config", required=True, help="TOML/JSON config with source paths")
     args = parser.parse_args()
 

@@ -1,9 +1,9 @@
-"""Exports sica_core's SQLite data for the map.
+"""Exports tc_core's SQLite data for the map.
 
 `export_artifacts()` writes the frontend artifact set (filter_config.json,
 marker_metadata.json, building_records.json, blocks.geojson and the local-area
 boundary), each with a `schema_version`. That directory is the only interface
-between sica_core and the frontend.
+between tc_core and the frontend.
 
 VTU membership data (per-building/per-block member counts, membership-year
 history, the VTU/non-VTU marker split) is deliberately excluded from every
@@ -29,11 +29,11 @@ import numpy as np
 import pandas as pd
 from shapely.strtree import STRtree
 
-from .building_metrics import BUILDING_METRICS, build_building_metrics
 from .geometry import parse_geom
 from .ingest.overlay_write import BUILDING_OVERLAY_COLUMNS
-from .membership_metrics import compute_building_member_metrics
-from .portfolios import build_landlord_portfolios
+from .metrics.building_metrics import BUILDING_METRICS, build_building_metrics
+from .metrics.membership_metrics import compute_building_member_metrics
+from .metrics.portfolios import build_landlord_portfolios
 
 
 def reconstruct_points(

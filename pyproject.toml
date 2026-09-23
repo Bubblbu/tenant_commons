@@ -1,5 +1,5 @@
 [project]
-name = "sica-mapping"
+name = "tenant-commons"
 version = "0.1.0"
 authors = [
     { name = "bubblbu", email = "asura.enkhbayar@gmail.com" }
@@ -22,7 +22,7 @@ requires = ["uv_build>=0.9.3,<0.10.0"]
 build-backend = "uv_build"
 
 [tool.uv.build-backend]
-module-name = "sica_core"
+module-name = "tc_core"
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]

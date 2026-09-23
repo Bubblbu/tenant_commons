@@ -7,8 +7,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
-from sica_core.db import get_connection, init_db
-from sica_core.ingest.raw_addresses import ingest_raw_addresses, load_raw_addresses_frame
+from tc_core.db import get_connection, init_db
+from tc_core.ingest.raw_addresses import ingest_raw_addresses, load_raw_addresses_frame
 
 NOTE = "Translated name until colonial systems support multi-lingual characters."
 HEADER = "civic_number;geo_local_area;geom;p_parcel_id;pcoord;site_id;std_street;note;geo_point_2d"

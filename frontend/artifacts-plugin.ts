@@ -1,7 +1,7 @@
 /**
  * The artifact directory is the frontend's only input (spec §3). Under
  * `npm run dev` it is served at /data/; `npm run build` copies it into
- * dist/data/. Which directory is a single setting, SICA_ARTIFACTS_DIR,
+ * dist/data/. Which directory is a single setting, TC_ARTIFACTS_DIR,
  * resolved in vite.config.ts.
  */
 import { cpSync, createReadStream, existsSync, statSync } from 'node:fs';
@@ -25,16 +25,16 @@ function requireDir(dir: string): void {
     throw new Error(
       `Artifact directory not found: ${dir}\n` +
         'Run `uv run python scripts/rebuild_map.py` from the repo root, ' +
-        'or point SICA_ARTIFACTS_DIR at an artifact directory (e.g. SICA_ARTIFACTS_DIR=fixtures).',
+        'or point TC_ARTIFACTS_DIR at an artifact directory (e.g. TC_ARTIFACTS_DIR=fixtures).',
     );
   }
 }
 
-export function sicaArtifacts(dir: string): Plugin {
+export function tcArtifacts(dir: string): Plugin {
   let outDir = '';
   let command: 'build' | 'serve' = 'serve';
   return {
-    name: 'sica-artifacts',
+    name: 'tc-artifacts',
     configResolved(config) {
       command = config.command;
       outDir = resolve(config.root, config.build.outDir);
@@ -48,7 +48,7 @@ export function sicaArtifacts(dir: string): Plugin {
       if (!process.env.VITEST && !existsSync(dir)) {
         server.config.logger.warn(
           `Artifact directory not found: ${dir} — the map will show a load error. ` +
-            'Run `uv run python scripts/rebuild_map.py` from the repo root, or set SICA_ARTIFACTS_DIR.',
+            'Run `uv run python scripts/rebuild_map.py` from the repo root, or set TC_ARTIFACTS_DIR.',
         );
       }
       server.middlewares.use('/data', (req, res, next) => {

@@ -14,9 +14,9 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
-from sica_core.claims import record_claim
-from sica_core.db import get_connection, init_db
-from sica_core.ingest.lotr_claims import _build_groups
+from tc_core.claims import record_claim
+from tc_core.db import get_connection, init_db
+from tc_core.ingest.lotr_claims import _build_groups
 
 
 def _conn():

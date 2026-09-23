@@ -9,7 +9,7 @@ local_area_boundary_geojson = "data/raw/cov_open_data/local-area-boundary.geojso
 artifacts = "data/derived/artifacts"
 # Raw NationBuilder export, gitignored (see data/raw/nationbuilder/).
 vtu_raw = "data/raw/nationbuilder/membership_full.csv"
-sica_core_db = "data/derived/sica_core.db"
+tc_core_db = "data/derived/tc_core.db"
 pid_address_map = "data/derived/pid_address_map.csv"
 sro_housing = "data/raw/cov_foi/sra_housing_combined.csv"
 rezoning_applications = "data/raw/cov_foi/rezoning_applications.csv"

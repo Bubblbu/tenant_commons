@@ -1,9 +1,9 @@
-"""Config loading for sica_core ingest.
+"""Config loading for tc_core ingest.
 
 Forked from `src/sica_mapping/cli.py`'s `_load_config`/`_merge_config` (retired; see
 normalize.py's provenance note) and trimmed to what ingest actually needs:
 the same four source CSV paths already used by `config.toml`, plus the
-sica_core database path.
+tc_core database path.
 """
 
 from __future__ import annotations
@@ -17,7 +17,7 @@ try:
 except ModuleNotFoundError:  # pragma: no cover - only for <3.11
     tomllib = None
 
-DEFAULT_DB_PATH = "data/derived/sica_core.db"
+DEFAULT_DB_PATH = "data/derived/tc_core.db"
 DEFAULT_BBOX = "-123.18,49.265,-123.10,49.295"
 DEFAULT_BOUNDARY_GEOJSON = "data/raw/cov_open_data/local-area-boundary.geojson"
 DEFAULT_ARTIFACTS_DIR = "data/derived/artifacts"
@@ -63,7 +63,7 @@ class IngestConfig:
     # point-in-polygon local_area lookup on records with no building match.
     local_area_boundary_geojson: str = DEFAULT_BOUNDARY_GEOJSON
     # Where export_artifacts() writes the frontend's input (the artifact
-    # directory, spec §3/§6). frontend/ reads it via SICA_ARTIFACTS_DIR.
+    # directory, spec §3/§6). frontend/ reads it via TC_ARTIFACTS_DIR.
     artifacts: str = DEFAULT_ARTIFACTS_DIR
 
 
@@ -104,7 +104,7 @@ def load_ingest_config(path: str) -> IngestConfig:
         blocks=str(flat["blocks"]),
         block_numbers=str(flat["block_numbers"]),
         vtu_raw=str(flat["vtu_raw"]),
-        db_path=str(flat.get("sica_core_db", DEFAULT_DB_PATH)),
+        db_path=str(flat.get("tc_core_db", DEFAULT_DB_PATH)),
         bbox=bbox,
         ownership_claims=(
             str(flat["ownership_claims"]) if flat.get("ownership_claims") else None

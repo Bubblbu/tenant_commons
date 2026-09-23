@@ -83,5 +83,5 @@ export function renderPopup(r: BuildingRecord): string {
   const sections = [head, ownership, facts, housing]
     .filter((s) => s.length)
     .map((s) => div('popup-section', s.join('')));
-  return div('sica-popup', sections.join(''));
+  return div('tc-popup', sections.join(''));
 }

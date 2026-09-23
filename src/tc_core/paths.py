@@ -55,7 +55,7 @@ class DataPaths:
         self.buildings = self.derived / "buildings.csv"
         self.ct_properties = self.derived / "ct_properties.csv"
         self.pid_address_map = self.derived / "pid_address_map.csv"
-        self.db = self.derived / "sica_core.db"
+        self.db = self.derived / "tc_core.db"
         self.artifacts = self.derived / "artifacts"
 
     def cov(self, dataset: str, fmt: str) -> Path:

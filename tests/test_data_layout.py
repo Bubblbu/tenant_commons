@@ -5,8 +5,8 @@ import ast
 import tomllib
 from pathlib import Path
 
-from sica_core.config import DEFAULT_ARTIFACTS_DIR, DEFAULT_DB_PATH
-from sica_core.paths import DataPaths
+from tc_core.config import DEFAULT_ARTIFACTS_DIR, DEFAULT_DB_PATH
+from tc_core.paths import DataPaths
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
@@ -18,7 +18,7 @@ CONFIG_KEYS = {
     "block_numbers": "block_numbers_csv",
     "local_area_boundary": "local_area_boundary_csv",
     "vtu_raw": "membership_full",
-    "sica_core_db": "db",
+    "tc_core_db": "db",
     "pid_address_map": "pid_address_map",
     "sro_housing": "sro_housing",
     "rezoning_applications": "rezoning_applications",
@@ -40,7 +40,7 @@ def test_layout_stages():
     assert p.landlord_mapping == Path("data/curated/landlord_mapping.toml")
     assert p.all_rentals == Path("data/derived/interim/all_rentals.csv")
     assert p.buildings == Path("data/derived/buildings.csv")
-    assert p.db == Path("data/derived/sica_core.db")
+    assert p.db == Path("data/derived/tc_core.db")
 
 
 def test_root_is_configurable(tmp_path):
@@ -56,12 +56,12 @@ def test_config_toml_matches_layout():
 
 
 def test_default_db_path_matches_datapaths():
-    """Guard against sica_core.config.DEFAULT_DB_PATH and DataPaths drifting apart."""
+    """Guard against tc_core.config.DEFAULT_DB_PATH and DataPaths drifting apart."""
     assert Path(DEFAULT_DB_PATH) == DataPaths("data").db
 
 
 def test_default_artifacts_dir_matches_datapaths():
-    """Guard against sica_core.config.DEFAULT_ARTIFACTS_DIR and DataPaths drifting apart."""
+    """Guard against tc_core.config.DEFAULT_ARTIFACTS_DIR and DataPaths drifting apart."""
     assert Path(DEFAULT_ARTIFACTS_DIR) == DataPaths("data").artifacts
 
 

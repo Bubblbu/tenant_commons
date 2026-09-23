@@ -18,7 +18,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT / "src"))
 
-from sica_core.paths import DataPaths  # noqa: E402
+from tc_core.paths import DataPaths  # noqa: E402
 
 
 def main() -> int:
@@ -32,15 +32,15 @@ def main() -> int:
     stage = args.stage
 
     if stage in ("foi", "all"):
-        from sica_core.prepare.foi import merge_foi_releases
+        from tc_core.prepare.foi import merge_foi_releases
 
         merge_foi_releases(paths.foi_2023_extract, paths.foi_2024_extract, paths.all_rentals)
     if stage in ("properties", "all"):
-        from sica_core.prepare import properties
+        from tc_core.prepare import properties
 
         properties.run(paths)
     if stage in ("buildings", "all"):
-        from sica_core.prepare import buildings
+        from tc_core.prepare import buildings
 
         buildings.run(paths)
     return 0

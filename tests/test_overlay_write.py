@@ -1,8 +1,8 @@
 import json
 import sqlite3
 
-from sica_core.db import init_db
-from sica_core.ingest.overlay_write import ingest_overlays
+from tc_core.db import init_db
+from tc_core.ingest.overlay_write import ingest_overlays
 
 
 def _boundary(tmp_path):
@@ -175,8 +175,8 @@ def test_overlay_housing_records_its_source_rows(tmp_path):
 def test_building_overlay_columns_match_what_the_matcher_produces(tmp_path):
     """The 18 columns are listed once, in BUILDING_OVERLAY_COLUMNS; the matcher
     and the buildings schema must agree with it, or matcher output is lost."""
-    from sica_core.ingest.overlay_write import BUILDING_OVERLAY_COLUMNS
-    from sica_core.ingest.overlays import match_overlays
+    from tc_core.ingest.overlay_write import BUILDING_OVERLAY_COLUMNS
+    from tc_core.ingest.overlays import match_overlays
     import pandas as pd
 
     conn = sqlite3.connect(":memory:")

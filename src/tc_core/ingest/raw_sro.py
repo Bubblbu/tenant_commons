@@ -3,7 +3,7 @@
 Raw storage only — no address-key matching against buildings happens here.
 Matching runs later in the same ingest, in `ingest/overlays.py`
 (`match_overlays()`, persisted by `overlay_write.py`), reading this table.
-Keeping the source verbatim also makes it browsable from sica_core's SQLite
+Keeping the source verbatim also makes it browsable from tc_core's SQLite
 store (CLAUDE.md Q8b), same as raw_buildings/raw_addresses.
 """
 

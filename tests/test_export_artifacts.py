@@ -1,8 +1,8 @@
 import json
 import sqlite3
 
-from sica_core.db import init_db
-from sica_core.export import export_artifacts
+from tc_core.db import init_db
+from tc_core.export import export_artifacts
 
 
 def _seed(conn):
@@ -114,7 +114,7 @@ def test_building_records_columns_are_the_public_list(tmp_path):
     """The `columns` array drives the user-facing CSV export, so it is an
     explicit list: no lineage/ingest internals, no per-member payloads, and
     (spec §11/§12) no VTU membership fields — this is a public artifact."""
-    from sica_core.export import BUILDING_RECORD_COLUMNS
+    from tc_core.export import BUILDING_RECORD_COLUMNS
 
     conn = sqlite3.connect(":memory:")
     init_db(conn)

@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 """Bulk-import ownership_claims from a CSV, without re-running the full
-sica_core pipeline (buildings/addresses/blocks/membership stay untouched).
+tc_core pipeline (buildings/addresses/blocks/membership stay untouched).
 
 Upserts by claim_key — safe to re-run repeatedly as the claims CSV evolves
 (existing claim_key -> updates that row in place; new claim_key -> inserts).
 See CLAUDE.md Section 3 ("Claims ingestion & entity resolution") and
-src/sica_core/claims.py for the underlying semantics.
+src/tc_core/claims.py for the underlying semantics.
 
 Assumes the database has already been initialized at least once (via
-scripts/rebuild_map.py or `python -m sica_core.ingest`) — this script
+scripts/rebuild_map.py or `python -m tc_core.ingest`) — this script
 deliberately does NOT call init_db(), since that drops and recreates every
 REBUILDABLE table (buildings, addresses, blocks, membership); doing that
 here would silently wipe them for a script whose whole point is touching
@@ -30,11 +30,11 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT / "src"))
 
-from sica_core.config import load_ingest_config  # noqa: E402
-from sica_core.db import get_connection  # noqa: E402
-from sica_core.ingest import run_source  # noqa: E402
-from sica_core.ingest.ownership_claims import ingest_ownership_claims  # noqa: E402
-from sica_core.ingest.tracking import new_run_id  # noqa: E402
+from tc_core.config import load_ingest_config  # noqa: E402
+from tc_core.db import get_connection  # noqa: E402
+from tc_core.ingest import run_source  # noqa: E402
+from tc_core.ingest.ownership_claims import ingest_ownership_claims  # noqa: E402
+from tc_core.ingest.tracking import new_run_id  # noqa: E402
 
 
 def main() -> int:
@@ -67,7 +67,7 @@ def main() -> int:
         if "no such table" in str(exc):
             parser.error(
                 f"{exc} — run `uv run python scripts/rebuild_map.py` (or "
-                "`python -m sica_core.ingest --config ...`) at least once first "
+                "`python -m tc_core.ingest --config ...`) at least once first "
                 "to initialize the database."
             )
         raise

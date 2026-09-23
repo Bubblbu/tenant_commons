@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Rebuilds sica_core's SQLite store and exports the frontend artifact set.
+"""Rebuilds tc_core's SQLite store and exports the frontend artifact set.
 
 Backend only: ingests the sources into SQLite, then writes the artifact
 directory (config.toml's `artifacts` path) that frontend/ reads. It renders
@@ -21,10 +21,10 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT / "src"))
 
-from sica_core.config import load_ingest_config  # noqa: E402
-from sica_core.db import get_connection, init_db  # noqa: E402
-from sica_core.export import export_artifacts  # noqa: E402
-from sica_core.ingest import run_ingest  # noqa: E402
+from tc_core.config import load_ingest_config  # noqa: E402
+from tc_core.db import get_connection, init_db  # noqa: E402
+from tc_core.export import export_artifacts  # noqa: E402
+from tc_core.ingest import run_ingest  # noqa: E402
 
 
 def main() -> int:

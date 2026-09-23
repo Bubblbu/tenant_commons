@@ -2,8 +2,8 @@ import sqlite3
 
 import pandas as pd
 
-from sica_core.db import init_db
-from sica_core.export import reconstruct_blocks, reconstruct_filter_config, reconstruct_points
+from tc_core.db import init_db
+from tc_core.export import reconstruct_blocks, reconstruct_filter_config, reconstruct_points
 
 
 def _seed(conn):

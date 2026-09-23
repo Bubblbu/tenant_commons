@@ -82,7 +82,7 @@ CREATE TABLE raw_block_numbers (
 
 -- SRO/SRA, co-op, and rezoning-application sources: raw storage only, for
 -- browsability (CLAUDE.md Q8b). Address/name-key matching against buildings
--- runs at ingest time, in src/sica_core/ingest/overlays.py (see
+-- runs at ingest time, in src/tc_core/ingest/overlays.py (see
 -- ingest/overlay_write.py), writing flags onto `buildings` and unmatched
 -- records to `overlay_housing`. See docs/DATA_SOURCES.md for each source's
 -- (partially unverified) origin.

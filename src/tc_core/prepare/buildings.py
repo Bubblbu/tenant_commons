@@ -57,7 +57,7 @@ def run(paths: DataPaths) -> None:
     ).write_csv(ct_properties_f)
     print(f"ct_properties.csv: {ct_props.height} rows")
 
-    # --- Rentals (merged FOI 2023+2024, see sica_core.prepare.foi) ---
+    # --- Rentals (merged FOI 2023+2024, see tc_core.prepare.foi) ---
     rentals = pl.read_csv(all_rentals_f)
     rentals = rentals.rename(
         {

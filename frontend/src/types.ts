@@ -31,7 +31,7 @@ export interface FilterConfig {
 }
 
 /**
- * One row of building_records.json: the 41 columns of sica_core's
+ * One row of building_records.json: the 41 columns of tc_core's
  * export.BUILDING_RECORD_COLUMNS, read defensively. Overlay text fields are ''
  * on building rows and null on overlay rows; treat both as empty.
  */

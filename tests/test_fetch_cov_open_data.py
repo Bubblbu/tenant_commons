@@ -1,7 +1,7 @@
 import pytest
 import requests
 
-from sica_core.fetch.cov_open_data import download, fetch_all, plan_downloads
+from tc_core.fetch.cov_open_data import download, fetch_all, plan_downloads
 
 
 class FakeResponse:

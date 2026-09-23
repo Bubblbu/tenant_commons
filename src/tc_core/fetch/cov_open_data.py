@@ -1,4 +1,4 @@
-"""Download the Vancouver Open Data exports sica_core needs.
+"""Download the Vancouver Open Data exports tc_core needs.
 
 Replaces `scripts/sync_from_vhd.py` and vhd's download_data.py. Each dataset
 is fetched in the formats its consumers read: CSV for the ingest

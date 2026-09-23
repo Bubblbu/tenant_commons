@@ -23,8 +23,8 @@ import re
 import sqlite3
 from dataclasses import dataclass, field
 
-from .claims import resolve_owner_groups
-from .normalize import sanitize_owner
+from ..claims import resolve_owner_groups
+from ..normalize import sanitize_owner
 
 
 def _normalize_pid(pid: str) -> str:

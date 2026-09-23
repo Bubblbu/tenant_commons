@@ -19,7 +19,7 @@ those, `pid` is left null rather than emitting a non-PID value under that
 name. `address_point_id` (p_parcel_id) is always present so every row
 still has a stable join key even when no real PID exists.
 
-Reads from data/derived/sica_core.db's `raw_addresses` table (already ingested from
+Reads from data/derived/tc_core.db's `raw_addresses` table (already ingested from
 config's `addresses` path) rather than re-parsing the source CSV, so this
 stays consistent with whatever's actually loaded.
 
@@ -45,8 +45,8 @@ import pandas as pd
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT / "src"))
 
-from sica_core.db import get_connection  # noqa: E402
-from sica_core.normalize import addr_key_from_freeform  # noqa: E402
+from tc_core.db import get_connection  # noqa: E402
+from tc_core.normalize import addr_key_from_freeform  # noqa: E402
 
 
 def _load_paths(config_path: Path) -> tuple[Path, Path]:
@@ -55,7 +55,7 @@ def _load_paths(config_path: Path) -> tuple[Path, Path]:
     raw = tomllib.loads(config_path.read_text())
     paths = raw.get("paths", {})
     try:
-        db_path = paths["sica_core_db"]
+        db_path = paths["tc_core_db"]
         out_path = paths["pid_address_map"]
     except KeyError as exc:
         raise ValueError(f"{config_path} is missing paths.{exc.args[0]}") from exc
@@ -117,8 +117,8 @@ def main() -> int:
 
     if not db_path.exists():
         print(
-            f"{db_path} not found. Run the sica_core ingest first "
-            "(python -m sica_core.ingest) to populate raw_addresses.",
+            f"{db_path} not found. Run the tc_core ingest first "
+            "(python -m tc_core.ingest) to populate raw_addresses.",
             file=sys.stderr,
         )
         return 1
