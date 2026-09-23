@@ -28,9 +28,9 @@ def test_committed_fixtures_match_the_generator(tmp_path):
 
 def test_fixtures_hold_no_membership():
     markers = json.loads((FIXTURES / "marker_metadata.json").read_text())["markers"]
-    assert markers and all(m["member_count"] == 0 and m["is_vtu"] is False for m in markers)
+    assert markers and all("member_count" not in m and "is_vtu" not in m for m in markers)
     totals = json.loads((FIXTURES / "filter_config.json").read_text())["dataset_totals"]
-    assert totals["members"] == 0 and totals["vtu_buildings"] == 0
+    assert "members" not in totals and "vtu_buildings" not in totals
 
 
 def test_fixtures_cover_every_source_and_carry_the_contract_version():

@@ -75,7 +75,6 @@ def test_blocks_geojson_is_a_feature_collection(tmp_path):
     feature = gj["features"][0]
     assert feature["geometry"]["type"] == "Polygon"
     assert "block_label" in feature["properties"]
-    assert "member_share" in feature["properties"]
 
 
 def test_matched_building_carries_overlay_data(tmp_path):
@@ -113,7 +112,8 @@ def _seed_with_overlay(conn):
 
 def test_building_records_columns_are_the_public_list(tmp_path):
     """The `columns` array drives the user-facing CSV export, so it is an
-    explicit list: no lineage/ingest internals, no per-member payloads."""
+    explicit list: no lineage/ingest internals, no per-member payloads, and
+    (spec §11/§12) no VTU membership fields — this is a public artifact."""
     from sica_core.export import BUILDING_RECORD_COLUMNS
 
     conn = sqlite3.connect(":memory:")
@@ -126,10 +126,39 @@ def test_building_records_columns_are_the_public_list(tmp_path):
     assert data["columns"] == BUILDING_RECORD_COLUMNS
     for rec in data["records"].values():
         assert list(rec) == BUILDING_RECORD_COLUMNS
-    for internal in ("members_payload", "_overlay_id", "source_row_ids",
-                     "ingested_at", "created_at", "updated_at", "member_share_building"):
+    for internal in (
+        "members_payload", "_overlay_id", "source_row_ids",
+        "ingested_at", "created_at", "updated_at", "member_share_building",
+        "member_count", "member_count_all", "has_vtu_member",
+        "latest_membership_year", "member_share_pct",
+    ):
         assert internal not in data["columns"]
-    assert data["records"]["1"]["member_share_pct"] == 0
+
+
+def test_no_membership_data_reaches_any_public_artifact(tmp_path):
+    """Spec §11: VTU membership counts/IDs are sensitive and must never reach
+    a public artifact — checked across every file the frontend fetches, not
+    just building_records.json, since marker_metadata.json and
+    filter_config.json each independently derive membership aggregates."""
+    conn = sqlite3.connect(":memory:")
+    init_db(conn)
+    _seed(conn)
+
+    export_artifacts(conn, tmp_path)
+
+    marker = json.loads((tmp_path / "marker_metadata.json").read_text())["markers"][0]
+    for field in ("is_vtu", "member_count"):
+        assert field not in marker
+
+    block_props = json.loads((tmp_path / "blocks.geojson").read_text())["features"][0]["properties"]
+    for field in ("member_buildings", "total_members", "member_share"):
+        assert field not in block_props
+
+    cfg = json.loads((tmp_path / "filter_config.json").read_text())
+    for field in ("membership_year_metric", "membership_years", "top_tags"):
+        assert field not in cfg
+    for field in ("members", "vtu_buildings"):
+        assert field not in cfg["dataset_totals"]
 
 
 def test_overlay_rows_reach_the_artifacts_with_their_source(tmp_path):

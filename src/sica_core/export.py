@@ -5,10 +5,13 @@ marker_metadata.json, building_records.json, blocks.geojson and the local-area
 boundary), each with a `schema_version`. That directory is the only interface
 between sica_core and the frontend.
 
-This reproduces the same full data the current map already shows (including
-VTU membership counts) — no public/sensitive field redaction here. That's a
-separate, later piece of work for whenever an actual public-facing map
-exists to feed; see CLAUDE.md's sensitivity-model notes.
+VTU membership data (per-building/per-block member counts, membership-year
+history, the VTU/non-VTU marker split) is deliberately excluded from every
+artifact here — it's sensitive per CLAUDE.md's sensitivity model (§11) and
+this is a public-facing export. `reconstruct_points()` still computes it
+internally (member_count, has_vtu_member, etc. stay on the DataFrame) since
+other internal-only consumers may need it, but none of that reaches
+`export_artifacts()`'s output files. See CLAUDE.md's sensitivity-model notes.
 
 Known, deliberate simplification (not a bug): `reconstruct_blocks` emits
 every block, citywide, rather than v1's dynamic buffered bbox, so block counts
@@ -26,10 +29,10 @@ import numpy as np
 import pandas as pd
 from shapely.strtree import STRtree
 
-from .building_metrics import BUILDING_METRICS, _summarize_metric, build_building_metrics
+from .building_metrics import BUILDING_METRICS, build_building_metrics
 from .geometry import parse_geom
 from .ingest.overlay_write import BUILDING_OVERLAY_COLUMNS
-from .membership_metrics import compute_building_member_metrics, membership_filter_config
+from .membership_metrics import compute_building_member_metrics
 from .portfolios import build_landlord_portfolios
 
 
@@ -303,10 +306,7 @@ def reconstruct_filter_config(
     blocks_df: pd.DataFrame,
     now: pd.Timestamp,
 ) -> dict[str, object]:
-    members = pd.read_sql_query(
-        "SELECT * FROM vtu_membership WHERE building_id IS NOT NULL", conn
-    )
-    cfg = dict(membership_filter_config(members, now))
+    cfg: dict[str, object] = {}
 
     pts = points_df.copy()
     pts["local_area"] = pts["local_area"].fillna("(Unknown)")
@@ -348,9 +348,7 @@ def reconstruct_filter_config(
     cfg["bounds"] = bounds
     cfg["dataset_totals"] = {
         "buildings": int(len(buildings_only)),
-        "members": int(buildings_only["member_count"].sum()),
         "units": int(pd.to_numeric(buildings_only["units"], errors="coerce").fillna(0).sum()),
-        "vtu_buildings": int(buildings_only["has_vtu_member"].sum()),
     }
 
     building_metrics = build_building_metrics(buildings_only)
@@ -358,21 +356,6 @@ def reconstruct_filter_config(
     cfg["building_metric_order"] = [
         key for key in BUILDING_METRICS if key in building_metrics
     ]
-
-    # Rendered with the same dual-slider component as building_metrics, but kept
-    # out of that dict so it doesn't also show up under the "Buildings" filter
-    # section — it's rendered into its own container under "Membership" instead.
-    cfg["membership_year_metric"] = _summarize_metric(
-        pts["latest_membership_year"],
-        meta={
-            "label": "Membership year",
-            "format": "number",
-            "type": "int",
-            "step": 1,
-            "attr": "latest-membership-year",
-            "bins": 12,
-        },
-    )
 
     cfg["blocks_total_units_max"] = (
         int(blocks_df["total_units"].max()) if not blocks_df.empty else 0
@@ -472,9 +455,6 @@ def _blocks_feature_collection(blocks_df: pd.DataFrame) -> dict:
         "buildings",
         "total_units",
         "median_year_built",
-        "member_buildings",
-        "total_members",
-        "member_share",
         "local_area",
         "block_label",
     ]
@@ -511,7 +491,6 @@ def _marker_records(points_df: pd.DataFrame) -> list[dict]:
     """
     records = []
     for _, r in points_df.iterrows():
-        has_member = bool(r.get("has_vtu_member"))
         records.append(
             {
                 "b_id": int(r["b_id"]),
@@ -524,8 +503,6 @@ def _marker_records(points_df: pd.DataFrame) -> list[dict]:
                 if pd.isna(r.get("year_built"))
                 else int(r["year_built"]),
                 "local_area": r.get("local_area"),
-                "is_vtu": has_member,
-                "member_count": int(r.get("member_count") or 0),
                 "housing_type": r.get("housing_type") or "",
                 "source": r.get("source", "building"),
             }
@@ -535,15 +512,15 @@ def _marker_records(points_df: pd.DataFrame) -> list[dict]:
 
 # building_records.json's columns, in order. An explicit list, not "every
 # column of points_df": the frontend's CSV export writes these verbatim, so
-# lineage/ingest internals and per-member payloads must never reach it. The
-# first 18 are the Folium map's table columns, in its order; the rest are the
-# popup's and the overlay detail. This is also where the public/sensitive
-# filter (spec §12) will go.
+# lineage/ingest internals and — per the public/sensitive filter (spec
+# §12) — VTU membership data must never reach it, same as per-member
+# payloads. The first 13 are the Folium map's table columns, in its order;
+# the rest are the popup's and the overlay detail.
 BUILDING_RECORD_COLUMNS = [
-    "b_id", "address", "local_area", "block_id", "units", "member_count",
-    "year_built", "owner_group", "owner_key", "member_count_all", "value_land",
-    "value_bldg", "bldg_land_ratio", "has_vtu_member", "latest_membership_year",
-    "housing_type", "member_share_pct", "source",
+    "b_id", "address", "local_area", "block_id", "units",
+    "year_built", "owner_group", "owner_key", "value_land",
+    "value_bldg", "bldg_land_ratio",
+    "housing_type", "source",
     "lat", "lon",
     "portfolio_name", "portfolio_building_count", "portfolio_entities",
     *BUILDING_OVERLAY_COLUMNS,
@@ -553,11 +530,6 @@ BUILDING_RECORD_COLUMNS = [
 def _building_records(points_df: pd.DataFrame) -> dict:
     """Full per-building record set — the popup and the table both read this."""
     df = points_df.copy()
-    # Whole percent, rounded half-to-even like the Folium table's pandas round.
-    df["member_share_pct"] = [
-        int(round(float(v) * 100)) if pd.notna(v) else 0
-        for v in df["member_share_building"]
-    ]
     records = {}
     for _, r in df.iterrows():
         rec = {
