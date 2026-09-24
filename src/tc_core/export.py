@@ -35,6 +35,8 @@ from .ingest.overlay_write import BUILDING_OVERLAY_COLUMNS
 from .metrics.building_metrics import BUILDING_METRICS, build_building_metrics
 from .metrics.membership_metrics import compute_building_member_metrics
 from .metrics.portfolios import build_landlord_portfolios
+from .metrics.registry_owners import build_registry_owners
+from .normalize import sanitize_owner
 
 
 def reconstruct_points(
@@ -48,7 +50,7 @@ def reconstruct_points(
     buildings["display_name"] = buildings["display_name"].fillna("(Unknown)")
     buildings["owner_key"] = buildings["owner_key"].fillna("unknown")
     buildings = buildings.rename(
-        columns={"building_id": "b_id", "display_name": "owner_group"}
+        columns={"building_id": "b_id", "display_name": "licence_holder", "owner_key": "licence_key"}
     )
     buildings["source"] = "building"
 
@@ -72,43 +74,27 @@ def reconstruct_points(
         0.0,
     )
 
-    # Claims-derived landlord portfolios (CLAUDE.md Phase 1: "wire in claims-
-    # derived landlord clustering"), joined onto buildings via PID rather than
-    # the vhd-derived owner_group label — see portfolios.py's module docstring
-    # for why. Only buildings reached by a confirmed common_owner cluster get
-    # a non-null portfolio_name; where present it becomes the displayed/
-    # grouped owner_group/owner_key outright (for now — see portfolios.py),
-    # so search, the Landlords tab, and hover-highlight all pick it up with
-    # no separate code path. portfolio_building_count/portfolio_entities are
-    # kept alongside for the popup's "N buildings, M linked entities" detail.
+    # Two ownership layers (docs/superpowers/specs/2026-09-23-ownership-layers-design.md):
+    # the building's own owner — its primary LOTR reporting body, else the
+    # licence holder — and its network — the confirmed common_owner cluster
+    # its PIDs reach, else the licence holder's group.
+    registry = build_registry_owners(conn, pid_address_map_path) if pid_address_map_path else {}
     portfolios = (
-        build_landlord_portfolios(conn, pid_address_map_path)
-        if pid_address_map_path
-        else {}
+        build_landlord_portfolios(conn, pid_address_map_path) if pid_address_map_path else {}
     )
-    merged["portfolio_name"] = merged["addr_key"].map(
-        lambda k: portfolios[k].portfolio_name if k in portfolios else None
-    )
-    merged["portfolio_building_count"] = merged["addr_key"].map(
-        lambda k: len(portfolios[k].addr_keys) if k in portfolios else None
-    )
-    merged["portfolio_entities"] = merged["addr_key"].map(
-        lambda k: portfolios[k].entities if k in portfolios else None
-    )
-    portfolio_key = merged["addr_key"].map(
-        lambda k: portfolios[k].portfolio_key if k in portfolios else None
-    )
-    merged["owner_group"] = merged["portfolio_name"].fillna(merged["owner_group"])
-    merged["owner_key"] = portfolio_key.fillna(merged["owner_key"])
+    _assign_ownership(merged, registry, portfolios)
 
     merged = merged[
         [
             "addr_key", "address", "lat", "lon", "units", "year_built", "n_issues", "issues_details",
-            "member_count", "has_vtu_member", "member_share_building", "owner_group",
-            "owner_key", "member_count_all", "members_payload", "value_land",
+            "member_count", "has_vtu_member", "member_share_building",
+            "owner_name", "owner_key", "owner_source", "registered_owners", "registry_pids",
+            "registry_retrieved", "licence_holder", "network_key", "network_name",
+            "network_source", "network_name_source", "network_entities",
+            "network_properties_on_title", "network_evidence",
+            "member_count_all", "members_payload", "value_land",
             "value_bldg", "bldg_land_ratio", "local_area", "b_id", "block_id",
-            "latest_membership_year", "portfolio_name", "portfolio_building_count",
-            "portfolio_entities", "source",
+            "latest_membership_year", "source",
             *BUILDING_OVERLAY_COLUMNS,
         ]
     ]
@@ -122,7 +108,37 @@ def reconstruct_points(
         "co-op, sro",
         np.where(merged["is_coop"], "co-op", np.where(merged["is_sro"], "sro", "")),
     )
+    on_map = merged.groupby("network_key")["b_id"].transform("count")
+    merged["network_buildings_on_map"] = [
+        None if key == "unknown" else int(count)
+        for key, count in zip(merged["network_key"], on_map)
+    ]
     return merged
+
+
+def _assign_ownership(df: pd.DataFrame, registry: dict, portfolios: dict) -> None:
+    """Adds the owner_* and network_* columns in place (see the ownership-layers spec)."""
+    reg = [registry.get(key) for key in df["addr_key"]]
+    port = [portfolios.get(key) for key in df["addr_key"]]
+    df["registered_owners"] = [r.owners if r else [] for r in reg]
+    df["registry_pids"] = [r.pids if r else [] for r in reg]
+    df["registry_retrieved"] = [r.retrieved if r else None for r in reg]
+    df["owner_name"] = [r.owners[0] if r else lic for r, lic in zip(reg, df["licence_holder"])]
+    df["owner_key"] = df["owner_name"].map(sanitize_owner)
+    df["owner_source"] = [
+        "registry" if r else ("licence" if key != "unknown" else None)
+        for r, key in zip(reg, df["owner_key"])
+    ]
+    df["network_key"] = [p.portfolio_key if p else key for p, key in zip(port, df["licence_key"])]
+    df["network_name"] = [p.portfolio_name if p else lic for p, lic in zip(port, df["licence_holder"])]
+    df["network_source"] = [
+        "claims" if p else ("licence" if key != "unknown" else None)
+        for p, key in zip(port, df["network_key"])
+    ]
+    df["network_name_source"] = [p.name_source if p else None for p in port]
+    df["network_entities"] = [list(p.entities) if p else None for p in port]
+    df["network_properties_on_title"] = [len(p.addr_keys) if p else None for p in port]
+    df["network_evidence"] = [dict(p.evidence) if p else None for p in port]
 
 
 def _append_overlay_housing(
@@ -161,8 +177,13 @@ def _append_overlay_housing(
         "overlay_coop" if bool(c) else "overlay_sro"
         for c in overlay["is_coop"]
     ]
-    overlay["owner_group"] = "(Unknown)"
+    overlay["owner_name"] = "(Unknown)"
     overlay["owner_key"] = "unknown"
+    overlay["licence_holder"] = "(Unknown)"
+    overlay["network_key"] = "unknown"
+    overlay["network_name"] = "(Unknown)"
+    overlay["registered_owners"] = [[] for _ in range(len(overlay))]
+    overlay["registry_pids"] = [[] for _ in range(len(overlay))]
     overlay["member_count"] = 0
     overlay["member_count_all"] = 0
     overlay["has_vtu_member"] = False
@@ -445,7 +466,14 @@ def reconstruct_filter_config(
     cfg["blocks_total_units_max"] = (
         int(blocks_df["total_units"].max()) if not blocks_df.empty else 0
     )
+    cfg["licence_year"] = _licence_year(conn)
     return cfg
+
+
+def _licence_year(conn: sqlite3.Connection) -> int | None:
+    """Business-licence data year of this build (raw_buildings.bsns_year)."""
+    row = conn.execute("SELECT MAX(bsns_year) FROM raw_buildings").fetchone()
+    return int(row[0]) if row and row[0] is not None else None
 
 
 SCHEMA_VERSION = 1
@@ -614,6 +642,7 @@ def _marker_records(points_df: pd.DataFrame) -> list[dict]:
                 "lat": _round_coord(r["lat"]),
                 "lon": _round_coord(r["lon"]),
                 "owner_key": r.get("owner_key"),
+                "network_key": r.get("network_key"),
                 "block_id": None if pd.isna(r.get("block_id")) else int(r["block_id"]),
                 "units": None if pd.isna(r.get("units")) else int(r["units"]),
                 "year_built": None
@@ -631,16 +660,19 @@ def _marker_records(points_df: pd.DataFrame) -> list[dict]:
 # building_records.json's columns, in order. An explicit list, not "every
 # column of points_df": the frontend's CSV export writes these verbatim, so
 # lineage/ingest internals and — per the public/sensitive filter (spec
-# §12) — VTU membership data must never reach it, same as per-member
-# payloads. The first 13 are the Folium map's table columns, in its order;
-# the rest are the popup's and the overlay detail.
+# §12) — VTU membership data must never reach it. Ownership is two layers:
+# owner_* (the building's own owner) and network_* (its landlord network);
+# claim provenance is public only as source-type counts, never notes.
 BUILDING_RECORD_COLUMNS = [
     "b_id", "address", "local_area", "block_id", "units",
-    "year_built", "owner_group", "owner_key", "value_land",
-    "value_bldg", "bldg_land_ratio",
+    "year_built", "owner_name", "owner_key", "owner_source",
+    "registered_owners", "registry_pids", "registry_retrieved", "licence_holder",
+    "network_key", "network_name", "network_source", "network_name_source",
+    "network_entities", "network_buildings_on_map", "network_properties_on_title",
+    "network_evidence",
+    "value_land", "value_bldg", "bldg_land_ratio",
     "housing_type", "n_issues", "issues_details", "source",
     "lat", "lon",
-    "portfolio_name", "portfolio_building_count", "portfolio_entities",
     "in_chinatown", "in_village_plan",
     *BUILDING_OVERLAY_COLUMNS,
 ]

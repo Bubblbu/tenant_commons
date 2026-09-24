@@ -58,7 +58,7 @@ def test_overlay_rows_have_no_units_or_owner():
     overlay = pts[pts["source"] != "building"]
 
     assert overlay["units"].isna().all()
-    assert (overlay["owner_group"] == "(Unknown)").all()
+    assert (overlay["owner_name"] == "(Unknown)").all()
     assert (overlay["member_count"] == 0).all()
 
 

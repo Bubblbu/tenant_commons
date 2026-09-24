@@ -130,7 +130,7 @@ def test_building_records_columns_are_the_public_list(tmp_path):
         "members_payload", "_overlay_id", "source_row_ids",
         "ingested_at", "created_at", "updated_at", "member_share_building",
         "member_count", "member_count_all", "has_vtu_member",
-        "latest_membership_year", "member_share_pct",
+        "latest_membership_year", "member_share_pct", "licence_key",
     ):
         assert internal not in data["columns"]
 
@@ -256,14 +256,17 @@ def test_boundary_passthrough_is_byte_identical(tmp_path):
 
 
 POPUP_FIELDS = [
-    "housing_name", "portfolio_name", "portfolio_building_count", "portfolio_entities",
+    "housing_name", "owner_name", "owner_source", "registered_owners", "registry_pids",
+    "registry_retrieved", "licence_holder", "network_name", "network_source",
+    "network_name_source", "network_entities", "network_buildings_on_map",
+    "network_properties_on_title", "network_evidence",
     "coop_status", "coop_ownership_model", "coop_url",
     "sro_owner", "sro_operator", "sro_occupancy_status", "sro_registered_rooms",
 ]
 
 
 def test_building_records_carry_the_popup_fields(tmp_path):
-    """Spec §7: the redesigned popup reads these 11 fields from building_records.json."""
+    """Spec §7 plus the ownership-layers spec: the popup reads these fields."""
     conn = sqlite3.connect(":memory:")
     init_db(conn)
     _seed(conn)
