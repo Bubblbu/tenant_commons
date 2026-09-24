@@ -18,7 +18,7 @@ import polars.selectors as cs
 from tomlkit import parse
 
 from ..paths import DataPaths
-from .address import clean_address
+from ..normalize import addr_key_from_freeform
 from .io import load_polars
 
 BC_versions = {
@@ -38,7 +38,7 @@ def run(paths: DataPaths) -> None:
     ct_properties_f = paths.ct_properties
     buildings_f.parent.mkdir(parents=True, exist_ok=True)
 
-    CLEAN = lambda col: pl.col(col).map_elements(clean_address, return_dtype=pl.Utf8)
+    CLEAN = lambda col: pl.col(col).map_elements(addr_key_from_freeform, return_dtype=pl.Utf8)
 
     pl.Config.set_tbl_rows(10)
 
@@ -124,7 +124,7 @@ def run(paths: DataPaths) -> None:
     issues = issues.with_columns(
         address=pl.concat_str(
             pl.col("streetnumber"), pl.lit(" "), pl.col("street")
-        ).map_elements(clean_address, return_dtype=pl.Utf8)
+        ).map_elements(addr_key_from_freeform, return_dtype=pl.Utf8)
     )
     housing = housing.join(
         issues.select(
@@ -151,7 +151,7 @@ def run(paths: DataPaths) -> None:
 
     businesses = businesses.with_columns(
         address=pl.concat_str(pl.col("house"), pl.lit(" "), pl.col("street")).map_elements(
-            clean_address, return_dtype=pl.Utf8
+            addr_key_from_freeform, return_dtype=pl.Utf8
         ),
     )
     businesses = businesses.with_columns(

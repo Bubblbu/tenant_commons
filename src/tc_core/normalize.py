@@ -40,11 +40,69 @@ def normalize_street(s: str) -> str:
 
 
 def addr_key_from_freeform(addr: str) -> str:
-    addr = str(addr).strip().lower()
+    # Trailing "*" is a footnote marker the City's FOI rental list uses on
+    # some addresses (e.g. "1155 Thurlow St*") -- strip it before keying,
+    # same as address_key_variants already does, so it doesn't silently
+    # split a real address from its own key.
+    addr = str(addr).strip().lower().rstrip("*").strip()
     m = re.match(r"^(\d+)\s+(.+)$", addr)
     return (
         f"{m.group(1)} {normalize_street(m.group(2))}" if m else normalize_street(addr)
     )
+
+
+_DIRECTIONS = {"e", "w", "n", "nw", "ne", "s", "sw", "se"}
+
+
+def move_trailing_direction(street_name: str | None) -> str | None:
+    """'Georgia W' -> 'w georgia': moves a trailing direction abbreviation
+    (as used in the City's property-tax-report `street_name` field) to the
+    front, matching the leading-direction convention used elsewhere.
+    Passes the input through unchanged if it doesn't end in one."""
+    if street_name is None:
+        return None
+    parts = street_name.lower().split(" ")
+    if parts and parts[-1] in _DIRECTIONS:
+        return " ".join(parts[-1:] + parts[:-1])
+    return street_name
+
+
+_DIRECTION_RE = re.compile(r"^(\d+)\s+(east|west|north|south)\b")
+_DIRECTION_ABBR = {"east": "e", "west": "w", "north": "n", "south": "s"}
+# "#800 - 1047 Barclay St", "100-2950 Heather St": a unit number in front of
+# the civic number, not a civic-number range like "2165-2195 W 45th Av".
+_UNIT_PREFIX_RE = re.compile(r"^#?\s*\w+\s*-\s*(\d+\s.+)$")
+# "7401 - 7469 Talon Square", "500 & 502 Alexander St": a range of civic
+# numbers; keyed by the first.
+_RANGE_RE = re.compile(r"^(\d+)\s*(?:-|&|and)\s*\d+\s+(.+)$")
+
+
+def address_key_variants(street: str) -> list[str]:
+    """Candidate addr_keys for a source address, most literal first.
+
+    addr_key_from_freeform takes exactly one leading civic number and one
+    street string, so it can't handle spelled-out directions ("1865 East
+    10th Avenue" vs the abbreviated "1865 e 10th ave" convention buildings
+    are keyed with), a unit-number prefix ("#800 - 1047 Barclay St"), or a
+    civic-number range ("7401 - 7469 Talon Square") on its own. This
+    generates every variant worth trying against a known-keys index, most
+    literal first; callers pick the first hit.
+    """
+    base = re.sub(r"\s+", " ", str(street)).strip().lower().rstrip("*").strip()
+    raw = [base]
+    m = _UNIT_PREFIX_RE.match(base)
+    if m:
+        raw.append(m.group(1))
+    m = _RANGE_RE.match(base)
+    if m:
+        raw.append(f"{m.group(1)} {m.group(2)}")
+    keys: list[str] = []
+    for text in raw:
+        text = _DIRECTION_RE.sub(lambda d: f"{d.group(1)} {_DIRECTION_ABBR[d.group(2)]}", text)
+        key = addr_key_from_freeform(text)
+        if key not in keys:
+            keys.append(key)
+    return keys
 
 
 def parse_lat_lon(s: Any) -> Tuple[float, float]:

@@ -14,7 +14,7 @@ from pathlib import Path
 
 import polars as pl
 
-from .address import clean_address
+from ..normalize import addr_key_from_freeform
 
 COMBINED_COLS = [
     "_norm_address",
@@ -32,7 +32,7 @@ COMBINED_COLS = [
 def merge_foi_releases(extract_2023: Path, extract_2024: Path, out: Path) -> int:
     # --- 2023 release (already in the pipeline schema) ---
     old = pl.read_csv(extract_2023).with_columns(
-        _norm_address=pl.col("Address").map_elements(clean_address, return_dtype=pl.Utf8),
+        _norm_address=pl.col("Address").map_elements(addr_key_from_freeform, return_dtype=pl.Utf8),
         foi_release=pl.lit("2023-186"),
     ).drop("id")
 
@@ -45,7 +45,7 @@ def merge_foi_releases(extract_2023: Path, extract_2024: Path, out: Path) -> int
             "Year Built": "Year built",
         }
     ).with_columns(
-        _norm_address=pl.col("Address").map_elements(clean_address, return_dtype=pl.Utf8),
+        _norm_address=pl.col("Address").map_elements(addr_key_from_freeform, return_dtype=pl.Utf8),
         foi_release=pl.lit("2024-698"),
         **{
             "Local_Area": pl.lit(None, dtype=pl.Utf8),
