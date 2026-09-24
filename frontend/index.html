@@ -282,6 +282,24 @@
     display: none;
   }
 
+  #table-search-bar {
+    padding: 8px 12px;
+    background: #fff;
+    border-bottom: 1px solid #e3e7f0;
+  }
+
+  #table-search {
+    width: 100%;
+    padding: 5px 28px 5px 8px;
+    border: 1px solid #cdd1dd;
+    border-radius: 4px;
+    font-size: 12px;
+  }
+
+  #table-search-bar .search-clear {
+    right: 16px;
+  }
+
   .sidebar-hint {
     margin: 0;
     padding: 8px 14px;
@@ -367,7 +385,8 @@
     background: #ffe5c2;
   }
 
-  table.data tbody tr.hidden {
+  table.data tbody tr.hidden,
+  table.data tbody tr.search-hidden {
     display: none;
   }
 
@@ -403,6 +422,10 @@
     <button id="tab-blocks">Blocks</button>
     <button id="tab-buildings">Buildings</button>
     <button id="tab-landlords">Landlords</button>
+  </div>
+  <div id="table-search-bar" class="search-field">
+    <input type="text" id="table-search" placeholder="Search table rows…" aria-label="Search table rows">
+    <button type="button" id="table-search-clear" class="search-clear" aria-label="Clear table search" hidden>&times;</button>
   </div>
   <p class="sidebar-hint">Select rows below to highlight them on the map.</p>
   <div id="sidebar-content">

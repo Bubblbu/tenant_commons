@@ -25,6 +25,7 @@ import { markerStyle } from './markers';
 import { renderPopup } from './popup';
 import { initClearButton } from './search-clear';
 import { renderTables } from './tables';
+import { initTableSearch } from './table-search';
 import { startWiring } from './wiring.js';
 
 function showLoadError(err: unknown): void {
@@ -77,6 +78,14 @@ async function main(): Promise<void> {
   const ownerSearch = document.getElementById('owner-search');
   const ownerSearchClear = document.getElementById('owner-search-clear');
   if (ownerSearch instanceof HTMLInputElement && ownerSearchClear) initClearButton(ownerSearch, ownerSearchClear);
+
+  const tableSearch = document.getElementById('table-search');
+  const tableSearchClear = document.getElementById('table-search-clear');
+  if (tableSearch instanceof HTMLInputElement) {
+    const tables = Array.from(document.querySelectorAll<HTMLTableElement>('#sidebar-content table.data'));
+    initTableSearch(tableSearch, tables);
+    if (tableSearchClear) initClearButton(tableSearch, tableSearchClear);
+  }
 }
 
 main().catch(showLoadError);
