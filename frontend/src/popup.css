@@ -4,8 +4,10 @@
 .tc-popup .popup-name { color: #555; }
 .tc-popup .popup-owner { font-weight: 600; }
 .tc-popup .popup-muted { color: #666; font-weight: 400; }
+/* A provenance tooltip spans its whole popup line rather than centring on its
+   icon, so an icon near the popup's right edge can't push it off a phone screen. */
+.tc-popup .popup-section > div { position: relative; }
 .tc-popup .prov {
-  position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -23,11 +25,9 @@
 .tc-popup .prov::after {
   content: attr(data-tip);
   position: absolute;
-  bottom: calc(100% + 6px);
-  left: 50%;
-  transform: translateX(-50%);
-  width: max-content;
-  max-width: 220px;
+  bottom: calc(100% + 4px);
+  left: 0;
+  right: 0;
   padding: 5px 7px;
   border-radius: 4px;
   background: #1f2330;
