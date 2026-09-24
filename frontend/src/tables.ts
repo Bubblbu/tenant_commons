@@ -36,6 +36,7 @@ export function buildingRow(r: BuildingRecord): string {
   const block = intStr(r.block_id);
   const units = intStr(r.units);
   const year = intStr(r.year_built);
+  const nIssues = intStr(r.n_issues);
   const land = num(r.value_land);
   const bldg = num(r.value_bldg);
   const ratio = num(r.bldg_land_ratio);
@@ -57,7 +58,7 @@ export function buildingRow(r: BuildingRecord): string {
     `data-value-land="${valLand}" data-value-bldg="${valBldg}" ` +
     `data-value-ratio="${ratioVal}" data-units="${units}" ` +
     `data-year-built="${year}" data-search="${escapeHtml(search)}" ` +
-    `data-housing-type="${h}">` +
+    `data-housing-type="${h}" data-n-issues="${nIssues}">` +
     `<td class="select-cell"><input type="checkbox" class="row-select" ` +
     `data-type="building" data-target="${bid}"></td>` +
     `<td>${escapeHtml(text(r.address))}</td>` +

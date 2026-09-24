@@ -523,6 +523,7 @@ def _marker_records(points_df: pd.DataFrame) -> list[dict]:
                 else int(r["year_built"]),
                 "local_area": r.get("local_area"),
                 "housing_type": r.get("housing_type") or "",
+                "n_issues": None if pd.isna(r.get("n_issues")) else int(r["n_issues"]),
                 "source": r.get("source", "building"),
             }
         )
@@ -539,7 +540,7 @@ BUILDING_RECORD_COLUMNS = [
     "b_id", "address", "local_area", "block_id", "units",
     "year_built", "owner_group", "owner_key", "value_land",
     "value_bldg", "bldg_land_ratio",
-    "housing_type", "source",
+    "housing_type", "n_issues", "source",
     "lat", "lon",
     "portfolio_name", "portfolio_building_count", "portfolio_entities",
     *BUILDING_OVERLAY_COLUMNS,

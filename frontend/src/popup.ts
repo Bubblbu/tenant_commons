@@ -60,6 +60,10 @@ export function renderPopup(r: BuildingRecord): string {
     bldg === null ? '' : `${formatCurrencyCompact(bldg)} building`,
   ].filter(Boolean).join(' · ');
   if (assessed) facts.push(div('', escapeHtml(`Assessed ${assessed}`)));
+  const issues = num(r.n_issues);
+  if (issues !== null && issues > 0) {
+    facts.push(div('popup-issues', escapeHtml(plural(Math.trunc(issues), 'outstanding issue', 'outstanding issues'))));
+  }
 
   const housing: string[] = [];
   if (r.is_coop === true) {

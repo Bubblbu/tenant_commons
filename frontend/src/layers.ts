@@ -3,7 +3,7 @@ import type { PathOptions } from 'leaflet';
 import * as L from 'leaflet';
 import { blockPopupHtml, blockStyle, maxTotalUnits } from './blocks';
 import { CHINATOWN_LABEL, CHINATOWN_STYLE, chinatownLabelHtml } from './chinatown';
-import { RING_OPACITY, RING_SPACING, RING_WEIGHT, ringColor, type StyledMarker } from './markers';
+import { RING_OPACITY, RING_SPACING, RING_WEIGHT, ringColor, type RingType, type StyledMarker } from './markers';
 import { NEIGHBOURHOOD_STYLE, labelPosition, neighbourhoodLabelHtml } from './neighbourhoods';
 import type { BlocksCollection, BoundaryCollection, BoundaryProperties, VillagesCollection } from './types';
 import { VILLAGE_STYLE, villageLabelHtml } from './villages';
@@ -62,7 +62,7 @@ export function createChinatownLayer(fc: BoundaryCollection): L.FeatureGroup {
 export interface BuildingLayers {
   buildings: L.FeatureGroup;
   markersById: Record<string, L.CircleMarker>;
-  ringsById: Record<string, { housing_type: string; marker: L.CircleMarker }[]>;
+  ringsById: Record<string, { housing_type: RingType; marker: L.CircleMarker }[]>;
 }
 
 /**

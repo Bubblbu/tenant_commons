@@ -50,6 +50,7 @@ export function startWiring(ctx) {
       let blockColorMax = 0;
       let showSroChecked = false;
       let showCoopChecked = false;
+      let showIssuesChecked = false;
       // Declared here (not down with the other filter-panel DOM refs) because
       // syncMarkerAnnotations()/effectiveStrokeColor() — both called from
       // applyZoomScaling(), which runs early during wireUp() — read these.
@@ -59,6 +60,7 @@ export function startWiring(ctx) {
       // filters and tab-switching never finished wiring up as a result.
       const vizShowSroChk = document.getElementById('viz-show-sro');
       const vizShowCoopChk = document.getElementById('viz-show-coop');
+      const vizShowIssuesChk = document.getElementById('viz-show-issues');
 
       function computeZoomScale(zoom) {
         if (!Number.isFinite(zoom)) return currentZoomScale;
@@ -252,13 +254,14 @@ export function startWiring(ctx) {
         return marker._strokeWeight || MARKER_STROKE_WEIGHT;
       }
 
-      // Extra housing-type rings (a building that is both SRO and co-op) are
-      // separate child CircleMarkers, so — unlike the single-type stroke override
-      // above — they're shown/hidden by resizing to/from radius 0, mirroring
-      // how setMarkerVisibility treats a fully-filtered building marker.
-      // Called whenever a building's own visibility changes (from within
-      // setMarkerVisibility/applyZoomScaling) AND whenever the Housing
-      // Data checkboxes change (from applyHousingTypeFilter) — a no-op
+      // Extra rings (a building that is both SRO and co-op, or has a housing
+      // type plus outstanding issues) are separate child CircleMarkers, so —
+      // unlike the single-type stroke override above — they're shown/hidden
+      // by resizing to/from radius 0, mirroring how setMarkerVisibility
+      // treats a fully-filtered building marker. Called whenever a
+      // building's own visibility changes (from within
+      // setMarkerVisibility/applyZoomScaling) AND whenever the Building
+      // Details checkboxes change (from applyHousingTypeFilter) — a no-op
       // (single property check) for the ~5,000 markers without extra rings.
       function syncMarkerAnnotations(marker) {
         if (!marker) return;
@@ -266,7 +269,8 @@ export function startWiring(ctx) {
         if (marker._extraRings) {
           marker._extraRings.forEach(function(r) {
             if (!r || !r.marker) return;
-            var typeShown = r.housingType === 'coop' ? showCoopChecked : showSroChecked;
+            var typeShown = r.housingType === 'coop' ? showCoopChecked :
+              (r.housingType === 'sro' ? showSroChecked : showIssuesChecked);
             var visible = buildingVisible && typeShown;
             if (typeof r.marker.setStyle === 'function') {
               r.marker.setStyle({ opacity: visible ? 0.9 : 0 });
@@ -484,12 +488,15 @@ export function startWiring(ctx) {
         });
       }
 
-      // Housing type (SRO/co-op) toggles only restyle existing markers (stroke
-      // color, extra rings) — they never add, remove or hide a marker, since
-      // every SRO/co-op is a building.
+      // Housing type (SRO/co-op) and rental-issues toggles only restyle
+      // existing markers (stroke color, extra rings) — they never add,
+      // remove or hide a marker. (Only show buildings with issues, in the
+      // Filters panel, is the one that actually hides markers — see
+      // applyFilters().)
       function applyHousingTypeFilter() {
         showSroChecked = vizShowSroChk ? vizShowSroChk.checked !== false : false;
         showCoopChecked = vizShowCoopChk ? vizShowCoopChk.checked !== false : false;
+        showIssuesChecked = vizShowIssuesChk ? vizShowIssuesChk.checked !== false : false;
         applyFilters();
         updateLegendVisibility();
         Object.keys(window.buildingIndex).forEach(function(key) {
@@ -819,6 +826,7 @@ export function startWiring(ctx) {
       const vizVillagesChk = document.getElementById('viz-show-villages');
       const vizChinatownChk = document.getElementById('viz-show-chinatown');
       const tableSearchInput = document.getElementById('owner-search');
+      const onlyIssuesChk = document.getElementById('filter-only-issues');
       const statusCells = {
         total: {
           units: document.getElementById('status-total-units'),
@@ -834,7 +842,7 @@ export function startWiring(ctx) {
       const summaryRowsEl = document.getElementById('summary-buildings-rows');
       const legendContainerEl = document.getElementById('legend-map');
       const legendBlocksEl = document.getElementById('legend-blocks-section');
-      const legendHousingEl = document.getElementById('legend-housing-section');
+      const legendBuildingDetailsEl = document.getElementById('legend-building-details-section');
       const legendBoundariesEl = document.getElementById('legend-boundaries-section');
 
       const metricControls = {};
@@ -1048,17 +1056,18 @@ export function startWiring(ctx) {
           }
         }
         setLegendDisplay(legendBlocksEl, showBlocksLegend);
-        // Static reference info (housing-type ring colors) — only relevant
-        // once at least one housing-type toggle is actually on.
-        const showHousingLegend = showSroChecked || showCoopChecked;
-        setLegendDisplay(legendHousingEl, showHousingLegend);
+        // Static reference info (ring colors) — only relevant once at least
+        // one Building Details ring toggle is actually on.
+        const showBuildingDetailsLegend = showSroChecked || showCoopChecked || showIssuesChecked;
+        setLegendDisplay(legendBuildingDetailsEl, showBuildingDetailsLegend);
         const neighbourhoodsChecked = vizNeighbourhoodsChk ? vizNeighbourhoodsChk.checked !== false : true;
         const chinatownChecked = vizChinatownChk ? vizChinatownChk.checked !== false : true;
         const villagesChecked = vizVillagesChk ? vizVillagesChk.checked !== false : true;
         const showBoundariesLegend = neighbourhoodsChecked || chinatownChecked || villagesChecked;
         setLegendDisplay(legendBoundariesEl, showBoundariesLegend);
         if (legendContainerEl) {
-          const shouldShow = (showBlocksLegend && legendBlocksEl) || (showHousingLegend && legendHousingEl) ||
+          const shouldShow = (showBlocksLegend && legendBlocksEl) ||
+            (showBuildingDetailsLegend && legendBuildingDetailsEl) ||
             (showBoundariesLegend && legendBoundariesEl);
           legendContainerEl.style.display = shouldShow ? 'flex' : 'none';
         }
@@ -1563,6 +1572,12 @@ export function startWiring(ctx) {
             matches = haystack.indexOf(searchTerm) !== -1;
           }
 
+          if (matches && onlyIssuesChk && onlyIssuesChk.checked) {
+            const rawIssues = row.getAttribute('data-n-issues');
+            const nIssues = rawIssues === null || rawIssues === '' ? NaN : parseFloat(rawIssues);
+            matches = Number.isFinite(nIssues) && nIssues > 0;
+          }
+
           row.classList.toggle('hidden', !matches);
           const checkbox = row.__checkbox;
           if (!matches) {
@@ -1677,6 +1692,7 @@ export function startWiring(ctx) {
 
       if (hideEmptyBlocksChk) hideEmptyBlocksChk.addEventListener('change', applyFilters);
       if (tableSearchInput) tableSearchInput.addEventListener('input', scheduleApplyFilters);
+      if (onlyIssuesChk) onlyIssuesChk.addEventListener('change', applyFilters);
       hoodInputs.forEach(function(inp) { inp.addEventListener('change', applyFilters); });
 
       if (hoodSelectAllBtn) {
@@ -1755,6 +1771,7 @@ export function startWiring(ctx) {
       applyHousingTypeFilter();
       if (vizShowSroChk) vizShowSroChk.addEventListener('change', applyHousingTypeFilter);
       if (vizShowCoopChk) vizShowCoopChk.addEventListener('change', applyHousingTypeFilter);
+      if (vizShowIssuesChk) vizShowIssuesChk.addEventListener('change', applyHousingTypeFilter);
 
       if (resetBtn) {
         resetBtn.addEventListener('click', function() {
@@ -1788,9 +1805,13 @@ export function startWiring(ctx) {
           }
           if (vizShowSroChk) vizShowSroChk.checked = false;
           if (vizShowCoopChk) vizShowCoopChk.checked = false;
+          if (vizShowIssuesChk) vizShowIssuesChk.checked = false;
           applyHousingTypeFilter();
           if (tableSearchInput) {
             tableSearchInput.value = '';
+          }
+          if (onlyIssuesChk) {
+            onlyIssuesChk.checked = false;
           }
           document.querySelectorAll('.row-select').forEach(function(cb) {
             if (cb.checked) {

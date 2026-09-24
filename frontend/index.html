@@ -618,13 +618,14 @@
       </div>
       <div class="legend-note" id="block-legend-note"></div>
     </div>
-    <div class="legend-card" id="legend-housing-section">
-      <div class="legend-heading">Housing type</div>
+    <div class="legend-card" id="legend-building-details-section">
+      <div class="legend-heading">Building details</div>
       <div class="legend-key">
         <div class="legend-key-row"><span class="legend-swatch" style="background:transparent;border:2px solid #3182bd;"></span> SRO/SRA (ring)</div>
         <div class="legend-key-row"><span class="legend-swatch" style="background:transparent;border:2px solid #d97706;"></span> Co-op (ring)</div>
+        <div class="legend-key-row"><span class="legend-swatch" style="background:transparent;border:2px solid #dc2626;"></span> Rental issues (ring)</div>
       </div>
-      <div class="legend-note">Ring colors are toggled in Housing Data; the markers themselves always stay on the map.</div>
+      <div class="legend-note">Ring colors are toggled in Building Details; the markers themselves always stay on the map.</div>
     </div>
     <div class="legend-card" id="legend-boundaries-section">
       <div class="legend-heading">Boundaries</div>
@@ -1040,16 +1041,28 @@
       </div>
     </div>
     <div class="filter-section">
-      <h4>Housing Data</h4>
+      <h4>Building Details</h4>
       <div class="filter-visual">
-        <label><input type="checkbox" id="viz-show-sro"> Show SRO/SRA hotels</label>
-        <label><input type="checkbox" id="viz-show-coop"> Show co-ops</label>
+        <label><input type="checkbox" id="viz-show-issues"> Show rental issues</label>
+      </div>
+      <div class="filter-subsection">
+        <h5>Housing Type</h5>
+        <div class="filter-visual">
+          <label><input type="checkbox" id="viz-show-sro"> Show SRO/SRA hotels</label>
+          <label><input type="checkbox" id="viz-show-coop"> Show co-ops</label>
+        </div>
       </div>
     </div>
     <h3>Filters</h3>
     <div class="filter-section">
       <h4>Landlords</h4>
       <input type="text" id="owner-search" placeholder="Search landlord / owner name…">
+    </div>
+    <div class="filter-section">
+      <h4>Building Standards</h4>
+      <div class="filter-visual">
+        <label><input type="checkbox" id="filter-only-issues"> Only show buildings with issues</label>
+      </div>
     </div>
     <div class="filter-section">
       <h4>Neighbourhoods</h4>

@@ -39,6 +39,13 @@ describe('renderPopup', () => {
     expect(html).not.toMatch(/units|built|Assessed|Portfolio|null|undefined/);
   });
 
+  it('shows the outstanding-issues count only when there is one', () => {
+    expect(renderPopup(building)).not.toMatch(/issue/i);
+    expect(renderPopup({ ...building, n_issues: 0 })).not.toMatch(/issue/i);
+    expect(renderPopup({ ...building, n_issues: 1 })).toContain('1 outstanding issue<');
+    expect(renderPopup({ ...building, n_issues: 3 })).toContain('3 outstanding issues');
+  });
+
   it('escapes every value', () => {
     const html = renderPopup({ ...building, address: '<img src=x onerror=alert(1)>', owner_group: 'A & B' });
     expect(html).toContain('&lt;img src=x onerror=alert(1)&gt;');

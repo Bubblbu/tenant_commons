@@ -12,6 +12,8 @@ export interface MarkerRecord {
   local_area: string | null;
   /** "co-op, sro" | "co-op" | "sro" | "" */
   housing_type: string;
+  /** Outstanding rental-licence issues (City open data), null if unknown. */
+  n_issues: number | null;
   /** "building" | "overlay_sro" | "overlay_coop" */
   source: string;
 }
