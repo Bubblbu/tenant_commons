@@ -21,6 +21,10 @@ BUILDING_METRICS = {
         "step": 5000,
         "attr": "value-land",
         "bins": 24,
+        # A handful of $1 placeholder-looking values sit far below where
+        # real assessments start; without a floor they'd waste roughly half
+        # the bins on an empty gap (see _summarize_metric's log_floor).
+        "log_floor": 10000,
     },
     "value_bldg": {
         "label": "Assessed building value",
@@ -30,6 +34,7 @@ BUILDING_METRICS = {
         "step": 5000,
         "attr": "value-bldg",
         "bins": 24,
+        "log_floor": 10000,
     },
     "units": {
         "label": "Units",
@@ -88,17 +93,49 @@ def _summarize_metric(series: pd.Series, *, meta: dict) -> dict | None:
         safe_min = max(
             positive_min if positive_min and positive_min > 0 else max_val, 1e-6
         )
-        clipped = data.copy()
-        non_positive_mask = clipped <= 0
-        clipped[non_positive_mask] = safe_min
-        log_data = np.log(clipped)
-        counts, log_edges = np.histogram(log_data, bins=bins)
-        edges = np.exp(log_edges)
-        edges[0] = float(min_val if min_val < safe_min else safe_min)
-        edges[-1] = float(max_val)
-        if non_positive_mask.any():
-            counts[0] += int(non_positive_mask.sum())
-            edges[0] = float(min_val)
+        # log_floor (BUILDING_METRICS, e.g. value_land/value_bldg's $10k): a
+        # handful of placeholder-looking values (a literal $1 assessed land
+        # value, mixed with genuine variation down near $0 for value_bldg)
+        # sit far below where real data starts, so an unfloored log range
+        # wastes roughly half its bins on an empty gap. Values at or below
+        # the floor collapse into one explicit bin instead of being spread
+        # (thinly, near-emptily) across the low end of the log range.
+        log_floor = meta.get("log_floor")
+        if log_floor is not None:
+            safe_min = max(safe_min, float(log_floor))
+        # The frontend's slider reads min_positive as its own log-scale
+        # floor (see wiring.js's renderMetricControl) — keeping it in sync
+        # with safe_min here is what keeps the slider's positions aligned
+        # with the histogram bars/ticks under it, floor bucket included.
+        positive_min = safe_min
+        below_mask = data <= safe_min
+        below_count = int(below_mask.sum())
+        above = data[~below_mask]
+        if below_count and not above.empty:
+            log_data = np.log(above)
+            above_bins = max(1, bins - 1)
+            # Explicit range (rather than np.histogram's default of the
+            # data's own min/max) so the log-spaced bins start exactly at
+            # the floor — tiling contiguously against the floor bucket
+            # below, with no unlabelled gap between them.
+            above_counts, log_edges = np.histogram(
+                log_data, bins=above_bins, range=(np.log(safe_min), np.log(max_val))
+            )
+            above_edges = np.exp(log_edges)
+            above_edges[0] = float(safe_min)
+            above_edges[-1] = float(max_val)
+            counts = np.concatenate(([below_count], above_counts))
+            edges = np.concatenate(([float(min_val)], above_edges))
+        else:
+            # Nothing below the floor (or everything is): behaves exactly as
+            # before — one continuous log range over the whole series.
+            clipped = data.copy()
+            clipped[below_mask] = safe_min
+            log_data = np.log(clipped)
+            counts, log_edges = np.histogram(log_data, bins=bins)
+            edges = np.exp(log_edges)
+            edges[0] = float(min_val if min_val < safe_min else safe_min)
+            edges[-1] = float(max_val)
     else:
         counts, edges = np.histogram(data, bins=bins)
     max_count = int(counts.max()) if counts.size else 0

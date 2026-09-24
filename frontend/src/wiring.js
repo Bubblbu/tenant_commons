@@ -1380,6 +1380,37 @@ export function startWiring(ctx) {
           }
           useLog = useLog && positiveMin !== null && hasSpread;
 
+          // Moved up from beside the sliders (their original position) so the
+          // axis ticks below can share the exact same value<->position
+          // transform the sliders use — the only way to guarantee a tick
+          // lines up with where the slider actually is at that value.
+          const logMin = useLog ? Math.log(positiveMin) : 0;
+          const logMax = useLog ? Math.log(Math.max(summary.max, positiveMin)) : 1;
+          const toSlider = useLog && logMax !== logMin
+            ? function(value) {
+                if (!Number.isFinite(value)) return 0;
+                if (value <= 0) return 0;
+                const clamped = Math.max(positiveMin, Math.min(Number(value), summary.max));
+                return ((Math.log(clamped) - logMin) / (logMax - logMin)) * 100;
+              }
+            : function(value) { return Number(value); };
+          const fromSlider = useLog && logMax !== logMin
+            ? function(pos) {
+                const ratio = Math.min(1, Math.max(0, Number(pos) / 100));
+                // The slider's log floor (positiveMin, from summary.min_positive)
+                // is the *effective* histogram floor — value_land/value_bldg's
+                // log_floor collapses everything at/below it into one bucket
+                // (see building_metrics.py) — which sits above the true
+                // summary.min whenever that floor did any collapsing. Position 0
+                // must still mean "no lower bound", so it always reports the
+                // true min, not the floor.
+                if (ratio === 0) {
+                  return summary.min;
+                }
+                return Math.exp(logMin + ratio * (logMax - logMin));
+              }
+            : function(pos) { return Number(pos); };
+
           const header = document.createElement('div');
           header.className = 'metric-header';
           header.textContent = summary.label || metric;
@@ -1410,16 +1441,19 @@ export function startWiring(ctx) {
           // log-scaled histogram (equal ratio steps = equal distance) — but
           // with no visible value anywhere except a per-bar hover tooltip,
           // there's no way to tell what a bar's position actually means.
-          // Five evenly-spaced ticks (by bin index, so they land under the
-          // bars they describe) fixes that without changing the bars.
+          // Five ticks at evenly-spaced *screen* positions, computed with
+          // fromSlider (the exact same transform the slider itself uses),
+          // fixes that and guarantees a tick and the slider agree on what
+          // value a given position means — reading bin edges directly (the
+          // previous approach) could drift from the slider's own mapping,
+          // e.g. around the log_floor bucket boundary.
           if (bins.length) {
             const axis = document.createElement('div');
             axis.className = 'metric-axis';
-            const tickCount = Math.min(5, bins.length + 1);
+            const tickCount = 5;
             for (let t = 0; t < tickCount; t += 1) {
-              const frac = tickCount === 1 ? 0 : t / (tickCount - 1);
-              const idx = Math.round(frac * bins.length);
-              const value = idx >= bins.length ? bins[bins.length - 1].end : bins[idx].start;
+              const frac = t / (tickCount - 1);
+              const value = useLog ? fromSlider(frac * 100) : summary.min + frac * (summary.max - summary.min);
               const tick = document.createElement('span');
               tick.textContent = formatWithSummary(summary, value);
               axis.appendChild(tick);
@@ -1433,26 +1467,6 @@ export function startWiring(ctx) {
           minSlider.type = 'range';
           const maxSlider = document.createElement('input');
           maxSlider.type = 'range';
-
-          const logMin = useLog ? Math.log(positiveMin) : 0;
-          const logMax = useLog ? Math.log(Math.max(summary.max, positiveMin)) : 1;
-          const toSlider = useLog && logMax !== logMin
-            ? function(value) {
-                if (!Number.isFinite(value)) return 0;
-                if (value <= 0) return 0;
-                const clamped = Math.max(positiveMin, Math.min(Number(value), summary.max));
-                return ((Math.log(clamped) - logMin) / (logMax - logMin)) * 100;
-              }
-            : function(value) { return Number(value); };
-          const fromSlider = useLog && logMax !== logMin
-            ? function(pos) {
-                const ratio = Math.min(1, Math.max(0, Number(pos) / 100));
-                if (ratio === 0 && summary.min <= 0) {
-                  return summary.min;
-                }
-                return Math.exp(logMin + ratio * (logMax - logMin));
-              }
-            : function(pos) { return Number(pos); };
 
           const sliderStep = useLog ? 0.5 : (summary.step || ((summary.max - summary.min) / 200) || 1);
 
