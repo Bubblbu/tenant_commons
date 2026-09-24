@@ -1405,6 +1405,28 @@ export function startWiring(ctx) {
           });
           control.appendChild(hist);
 
+          // Reference ticks under the histogram: the bars themselves are
+          // equal SCREEN width per bin, which is the correct way to draw a
+          // log-scaled histogram (equal ratio steps = equal distance) — but
+          // with no visible value anywhere except a per-bar hover tooltip,
+          // there's no way to tell what a bar's position actually means.
+          // Five evenly-spaced ticks (by bin index, so they land under the
+          // bars they describe) fixes that without changing the bars.
+          if (bins.length) {
+            const axis = document.createElement('div');
+            axis.className = 'metric-axis';
+            const tickCount = Math.min(5, bins.length + 1);
+            for (let t = 0; t < tickCount; t += 1) {
+              const frac = tickCount === 1 ? 0 : t / (tickCount - 1);
+              const idx = Math.round(frac * bins.length);
+              const value = idx >= bins.length ? bins[bins.length - 1].end : bins[idx].start;
+              const tick = document.createElement('span');
+              tick.textContent = formatWithSummary(summary, value);
+              axis.appendChild(tick);
+            }
+            control.appendChild(axis);
+          }
+
           const sliders = document.createElement('div');
           sliders.className = 'metric-sliders';
           const minSlider = document.createElement('input');
