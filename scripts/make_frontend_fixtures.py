@@ -58,6 +58,25 @@ BUILDINGS = [
 ]
 
 
+# Invented registry filings: building 1's PID is reported by Example Holdings,
+# building 2's by a nominee company; one invented person links both, so the
+# fixtures carry a claims network and a registry owner that differs from the
+# licence holder.
+LOTR = [
+    ("000-000-001", "EXAMPLE HOLDINGS LTD."),
+    ("000-000-002", "INVENTED NOMINEE LTD."),
+]
+CLAIMS = [
+    ("fixture-1", "EXAMPLE HOLDINGS LTD.", "INVENTED, PERSON"),
+    ("fixture-2", "INVENTED NOMINEE LTD.", "INVENTED, PERSON"),
+]
+PID_ADDRESS_MAP = (
+    "pid,address_point_id,address,addr_key,local_area,lat_lon\n"
+    '000000001,1,100 Example St,100 example st,Northside,"49.281,-123.129"\n'
+    '000000002,2,110 Example St,110 example st,Northside,"49.2812,-123.1288"\n'
+)
+
+
 def _seed(conn: sqlite3.Connection) -> None:
     conn.executemany(
         "INSERT INTO landlords (landlord_id, display_name, owner_key, created_at, updated_at) "
@@ -93,6 +112,21 @@ def _seed(conn: sqlite3.Connection) -> None:
           0, 1, "Invented Owner", "Invented Operator", "Open", "10", None, TS),
          ("400 madeup way", "400 Madeup Way", "Madeup Co-op", "Northside", 49.285, -123.135,
           1, 0, None, None, None, None, "Active", TS)],
+    )
+    conn.executemany(
+        "INSERT INTO raw_lotr_ownership (pid, reporting_body_name, order_created_date, "
+        "data_fetch_status, ingested_at) VALUES (?, ?, '2026-01-01 00:00:00.000', 'SUCCESS', ?)",
+        [(pid, name, TS) for pid, name in LOTR],
+    )
+    conn.executemany(
+        "INSERT INTO ownership_claims (claim_key, entity_a, entity_b, relationship, source_type, "
+        "confidence, status, created_at, updated_at) "
+        "VALUES (?, ?, ?, 'common_owner', 'public_registry', 'confirmed', 'active', ?, ?)",
+        [(key, a, b, TS, TS) for key, a, b in CLAIMS],
+    )
+    conn.execute(
+        "INSERT INTO raw_buildings (address, bsns_year, ingested_at) VALUES ('100 example st', 2026, ?)",
+        (TS,),
     )
     conn.commit()
 
@@ -139,9 +173,12 @@ def build(out_dir: Path) -> None:
         villages.write_text(json.dumps(VILLAGES), encoding="utf-8")
         chinatown = Path(tmp) / "chinatown_boundary.geojson"
         chinatown.write_text(json.dumps(CHINATOWN), encoding="utf-8")
+        pid_map = Path(tmp) / "pid_address_map.csv"
+        pid_map.write_text(PID_ADDRESS_MAP, encoding="utf-8")
         export_artifacts(
             conn,
             out_dir,
+            pid_address_map_path=str(pid_map),
             boundary_geojson_path=str(boundary),
             villages_geojson_path=str(villages),
             chinatown_geojson_path=str(chinatown),

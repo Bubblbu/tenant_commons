@@ -38,3 +38,10 @@ def test_fixtures_cover_every_source_and_carry_the_contract_version():
     assert {m["source"] for m in markers} == {"building", "overlay_sro", "overlay_coop"}
     for name in FILES[:4]:
         assert json.loads((FIXTURES / name).read_text())["schema_version"] == 1, name
+
+
+def test_fixtures_exercise_registry_owners_and_a_claims_network():
+    records = json.loads((FIXTURES / "building_records.json").read_text())["records"].values()
+    assert any(r["owner_source"] == "registry" for r in records)
+    assert any(r["network_source"] == "claims" for r in records)
+    assert json.loads((FIXTURES / "filter_config.json").read_text())["licence_year"] == 2026
