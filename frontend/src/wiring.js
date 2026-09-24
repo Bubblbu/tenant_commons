@@ -1261,6 +1261,9 @@ export function startWiring(ctx) {
         if (summary.format === 'currency') {
           return '$' + Math.round(value).toLocaleString();
         }
+        if (summary.format === 'year') {
+          return String(Math.round(value));
+        }
         if (summary.format === 'ratio') {
           const decimals = summary.decimals ?? 2;
           return Number(value).toLocaleString(undefined, {minimumFractionDigits: decimals, maximumFractionDigits: decimals});

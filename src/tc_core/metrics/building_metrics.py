@@ -47,7 +47,7 @@ BUILDING_METRICS = {
     },
     "year_built": {
         "label": "Year built",
-        "format": "number",
+        "format": "year",
         "type": "int",
         "step": 1,
         "attr": "year-built",

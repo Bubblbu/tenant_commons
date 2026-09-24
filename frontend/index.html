@@ -856,12 +856,23 @@
     margin-bottom: 4px;
   }
 
+  /* Padded to match the slider thumb's own travel inset (half its 14px
+     width on each side, set below): a native range input's thumb center
+     only reaches the container's true edges at its min/max value if the
+     track were exactly as wide as the thumb is tall, which it isn't — the
+     thumb stays fully inside the track, so its center travels from
+     thumb-radius to (width - thumb-radius), not 0 to width. Bars and ticks
+     spanned the full width with no such inset, so a bar/tick's screen
+     position for a given value silently drifted from the slider's own for
+     that same value, worse near the ends. */
   #filters-panel .metric-histogram {
     display: flex;
     align-items: flex-end;
     height: 36px;
     gap: 1px;
     margin-bottom: 2px;
+    padding: 0 7px;
+    box-sizing: border-box;
   }
 
   #filters-panel .metric-hist-bar {
@@ -881,6 +892,8 @@
     font-size: 10px;
     color: #6b7280;
     margin-bottom: 6px;
+    padding: 0 7px;
+    box-sizing: border-box;
   }
 
   /* Two overlapping range inputs sharing one visual track. Chrome/Firefox
