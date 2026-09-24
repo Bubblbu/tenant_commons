@@ -52,7 +52,7 @@ import numpy as np
 import pandas as pd
 from shapely.geometry import Point, shape
 
-from ..normalize import addr_key_from_freeform
+from ..normalize import addr_key_from_freeform, address_key_variants
 from .overlay_sources import (
     load_boundary_feature_collection,
     load_coops_frame,
@@ -117,15 +117,6 @@ def _resolve_local_area(lat, lon, boundary_polys: list[tuple[str, object]]) -> s
     return ""
 
 
-_DIRECTION_RE = re.compile(r"^(\d+)\s+(east|west|north|south)\b")
-_DIRECTION_ABBR = {"east": "e", "west": "w", "north": "n", "south": "s"}
-# "#800 - 1047 Barclay St", "100-2950 Heather St": a unit number in front of
-# the civic number. (Not a range like "2165-2195 W 45th Av" — see
-# `_match_key`, which only falls back to this when the full address misses.)
-_UNIT_PREFIX_RE = re.compile(r"^#?\s*\w+\s*-\s*(\d+\s.+)$")
-# "7401 - 7469 Talon Square", "500 & 502 Alexander St": a range of civic
-# numbers; the building is keyed by the first.
-_RANGE_RE = re.compile(r"^(\d+)\s*(?:-|&|and)\s*\d+\s+(.+)$")
 _STREET_TYPE_RE = re.compile(r"^(\d+ .+?)(?: (?:st|ave|rd|dr|blvd|pl|ct|hwy))?$")
 
 
@@ -143,32 +134,6 @@ def _build_loose_index(known_keys: set[str]) -> dict[str, str]:
     return {loose: next(iter(keys)) for loose, keys in seen.items() if len(keys) == 1}
 
 
-def _address_key_variants(street: str) -> list[str]:
-    """Candidate addr_keys for a source address, most literal first.
-
-    buildings.csv keys use "e"/"w" for directions ("1865 e 10th ave") where
-    co-op sources spell them out ("1865 East 10th Avenue"), and co-op units
-    are often listed with their unit number in front. Neither is handled by
-    the shared `addr_key_from_freeform` (its output is baked into the cached
-    building keys, so it can't change), so the variants are built here.
-    """
-    base = re.sub(r"\s+", " ", str(street)).strip().lower().rstrip("*").strip()
-    raw = [base]
-    m = _UNIT_PREFIX_RE.match(base)
-    if m:
-        raw.append(m.group(1))
-    m = _RANGE_RE.match(base)
-    if m:
-        raw.append(f"{m.group(1)} {m.group(2)}")
-    keys: list[str] = []
-    for text in raw:
-        text = _DIRECTION_RE.sub(lambda d: f"{d.group(1)} {_DIRECTION_ABBR[d.group(2)]}", text)
-        key = addr_key_from_freeform(text)
-        if key not in keys:
-            keys.append(key)
-    return keys
-
-
 def _match_key(
     street: str,
     known_keys: set[str],
@@ -181,7 +146,7 @@ def _match_key(
     most-stripped variant, so unmatched records for different units of one
     building end up sharing a key (and one marker).
     """
-    variants = _address_key_variants(street)
+    variants = address_key_variants(street)
     for key in variants:
         if key in known_keys:
             return key
