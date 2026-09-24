@@ -887,13 +887,31 @@
   }
 
   #filters-panel .metric-axis {
-    display: flex;
-    justify-content: space-between;
+    position: relative;
+    height: 12px;
     font-size: 10px;
     color: #6b7280;
     margin-bottom: 6px;
-    padding: 0 7px;
-    box-sizing: border-box;
+  }
+
+  /* Ticks are placed with an explicit px+calc offset (see wiring.js), not
+     percentage-in-a-padded-box like the histogram bars above — percentages
+     on an absolutely positioned child resolve against the parent's full
+     padding-box width regardless of the parent's own padding, so the same
+     7px thumb-inset has to be baked into each tick's `left` instead. */
+  #filters-panel .metric-axis-tick {
+    position: absolute;
+    top: 0;
+    transform: translateX(-50%);
+    white-space: nowrap;
+  }
+
+  #filters-panel .metric-axis-tick:first-child {
+    transform: translateX(0);
+  }
+
+  #filters-panel .metric-axis-tick:last-child {
+    transform: translateX(-100%);
   }
 
   /* Two overlapping range inputs sharing one visual track. Chrome/Firefox

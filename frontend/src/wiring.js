@@ -1256,6 +1256,34 @@ export function startWiring(ctx) {
         });
       }
 
+      // Round tick values for a log-scaled axis: powers of ten spanning
+      // [minV, maxV], always anchored at minV itself (the slider/histogram
+      // floor) even when minV isn't an exact power of ten, so the leftmost
+      // tick always matches what the floor bucket actually starts at.
+      function niceLogTicks(minV, maxV) {
+        if (!(minV > 0) || !(maxV > minV)) return [minV];
+        const minExp = Math.ceil(Math.log10(minV) - 1e-9);
+        const maxExp = Math.floor(Math.log10(maxV) + 1e-9);
+        const ticks = [];
+        for (let e = minExp; e <= maxExp; e += 1) {
+          ticks.push(Math.pow(10, e));
+        }
+        if (!ticks.length || Math.abs(ticks[0] - minV) > minV * 1e-6) {
+          ticks.unshift(minV);
+        }
+        const maxTicks = 6;
+        if (ticks.length > maxTicks) {
+          const stride = Math.ceil((ticks.length - 1) / (maxTicks - 1));
+          const kept = [ticks[0]];
+          for (let i = stride; i < ticks.length - 1; i += stride) {
+            kept.push(ticks[i]);
+          }
+          kept.push(ticks[ticks.length - 1]);
+          return kept;
+        }
+        return ticks;
+      }
+
       function formatWithSummary(summary, value) {
         if (value === null || value === undefined || Number.isNaN(value)) return '–';
         if (summary.format === 'currency') {
@@ -1273,6 +1301,21 @@ export function startWiring(ctx) {
         }
         const decimals = summary.decimals ?? 2;
         return Number(value).toLocaleString(undefined, {maximumFractionDigits: decimals});
+      }
+
+      // Axis ticks specifically use compact currency notation ($10K, $1M) —
+      // formatWithSummary's full "$10,000,000" is right for the min/max
+      // readouts next to the sliders (only two numbers, plenty of room) but
+      // collides with its neighbours in a dense row of up to 5 axis ticks.
+      function formatTickValue(summary, value) {
+        if (summary.format === 'currency') {
+          const v = Math.round(value);
+          const abs = Math.abs(v);
+          if (abs >= 1e6) return '$' + (v / 1e6).toFixed(v % 1e6 === 0 ? 0 : 1) + 'M';
+          if (abs >= 1e3) return '$' + (v % 1e3 === 0 ? Math.round(v / 1e3) : (v / 1e3).toFixed(1)) + 'K';
+          return '$' + v.toLocaleString();
+        }
+        return formatWithSummary(summary, value);
       }
 
       function formatMetricValue(metric, value) {
@@ -1444,23 +1487,44 @@ export function startWiring(ctx) {
           // log-scaled histogram (equal ratio steps = equal distance) — but
           // with no visible value anywhere except a per-bar hover tooltip,
           // there's no way to tell what a bar's position actually means.
-          // Five ticks at evenly-spaced *screen* positions, computed with
-          // fromSlider (the exact same transform the slider itself uses),
-          // fixes that and guarantees a tick and the slider agree on what
-          // value a given position means — reading bin edges directly (the
-          // previous approach) could drift from the slider's own mapping,
-          // e.g. around the log_floor bucket boundary.
+          // Ticks are placed at their exact value's slider position (not
+          // evenly-spaced fractions), so a tick and the slider always agree
+          // on what a given screen position means. For a log axis the tick
+          // *values* are also snapped to round numbers (powers of ten) —
+          // an evenly-spaced-fraction tick lands on whatever raw value falls
+          // out of the interpolation ($9,847, say), which reads as noise;
+          // decade boundaries ($10K, $100K, $1M...) read as an axis. Note
+          // this intentionally does NOT reuse fromSlider(0)'s special case
+          // (which reports the true min, i.e. "no lower bound", for the
+          // slider's own filter semantics) — the floor bucket is drawn as
+          // one collapsed bar starting at positiveMin, so the leftmost tick
+          // must label that same value, not the tail below it.
           if (bins.length) {
             const axis = document.createElement('div');
             axis.className = 'metric-axis';
-            const tickCount = 5;
-            for (let t = 0; t < tickCount; t += 1) {
-              const frac = t / (tickCount - 1);
-              const value = useLog ? fromSlider(frac * 100) : summary.min + frac * (summary.max - summary.min);
-              const tick = document.createElement('span');
-              tick.textContent = formatWithSummary(summary, value);
-              axis.appendChild(tick);
+            let tickValues;
+            if (useLog) {
+              tickValues = niceLogTicks(positiveMin, summary.max);
+            } else {
+              tickValues = [];
+              const tickCount = 5;
+              for (let t = 0; t < tickCount; t += 1) {
+                const frac = t / (tickCount - 1);
+                tickValues.push(summary.min + frac * (summary.max - summary.min));
+              }
             }
+            tickValues.forEach(function(value) {
+              const frac = useLog
+                ? (logMax !== logMin
+                    ? (Math.log(Math.max(positiveMin, Math.min(value, summary.max))) - logMin) / (logMax - logMin)
+                    : 0)
+                : ((value - summary.min) / ((summary.max - summary.min) || 1));
+              const tick = document.createElement('span');
+              tick.className = 'metric-axis-tick';
+              tick.style.left = 'calc(7px + (100% - 14px) * ' + frac + ')';
+              tick.textContent = formatTickValue(summary, value);
+              axis.appendChild(tick);
+            });
             control.appendChild(axis);
           }
 
