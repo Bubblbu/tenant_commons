@@ -39,6 +39,25 @@ describe('renderPopup', () => {
     expect(html).not.toMatch(/units|built|Assessed|Portfolio|null|undefined/);
   });
 
+  it('shows the outstanding-issues count only when there is one', () => {
+    expect(renderPopup(building)).not.toMatch(/issue/i);
+    expect(renderPopup({ ...building, n_issues: 0 })).not.toMatch(/issue/i);
+    expect(renderPopup({ ...building, n_issues: 1 })).toContain('1 outstanding issue<');
+    expect(renderPopup({ ...building, n_issues: 3 })).toContain('3 outstanding issues');
+  });
+
+  it('links to the City details page for an issue, only when a safe URL is present', () => {
+    const withUrl = renderPopup({
+      ...building, n_issues: 2,
+      issues_details: 'http://app.vancouver.ca/RPS_Net/Default.aspx?num=1234&street=DAVIE%20ST',
+    });
+    expect(withUrl).toContain(
+      '<a href="http://app.vancouver.ca/RPS_Net/Default.aspx?num=1234&amp;street=DAVIE%20ST" target="_blank" rel="noopener">City details</a>',
+    );
+    expect(renderPopup({ ...building, n_issues: 2 })).not.toContain('<a');
+    expect(renderPopup({ ...building, n_issues: 2, issues_details: 'javascript:alert(1)' })).not.toContain('<a');
+  });
+
   it('escapes every value', () => {
     const html = renderPopup({ ...building, address: '<img src=x onerror=alert(1)>', owner_group: 'A & B' });
     expect(html).toContain('&lt;img src=x onerror=alert(1)&gt;');

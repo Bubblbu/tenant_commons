@@ -5,22 +5,51 @@
  */
 import { LEGEND_LEFT_OFFSET, MOBILE_BREAKPOINT_PX } from './config';
 import { escapeHtml, groupThousands } from './html';
-import type { FilterConfig, NeighbourhoodSummary } from './types';
+import type { FilterConfig, NeighbourhoodSummary, SpecialAreaSummary } from './types';
 
-export function hoodTagsHtml(hoods: NeighbourhoodSummary[] | undefined): string {
-  if (!hoods || hoods.length === 0) return '<em class="filter-none">No neighbourhood data</em>';
-  return hoods
-    .map((n) => {
-      const name = String(n.name ?? '');
-      const count = groupThousands(Math.trunc(Number(n.count) || 0));
-      const units = groupThousands(Math.trunc(Number(n.units) || 0));
+/**
+ * Chinatown / Villages Plan Areas: rendered after a separator, in the same
+ * checkbox list and with the same `.filter-neighbourhood-option` class as
+ * the real neighbourhoods above (so wiring.js's Select all/Clear all and its
+ * hoodInputs query pick them up for free) — they're additional area flags a
+ * building can carry alongside its local_area, not alternative values of it.
+ */
+export function specialAreaTagsHtml(areas: SpecialAreaSummary[] | undefined): string {
+  if (!areas || areas.length === 0) return '';
+  const tags = areas
+    .map((a) => {
+      const name = String(a.name ?? '');
+      const count = groupThousands(Math.trunc(Number(a.count) || 0));
+      const units = groupThousands(Math.trunc(Number(a.units) || 0));
       return (
         `<label class="filter-tag"><input type="checkbox" class="filter-neighbourhood-option" ` +
-        `value="${escapeHtml(name.toLowerCase())}" checked> ${escapeHtml(name)} ` +
+        `value="${escapeHtml(String(a.key ?? '').toLowerCase())}" checked> ${escapeHtml(name)} ` +
         `<span class="filter-tag-count">(${count} bldgs · ${units} units)</span></label>`
       );
     })
     .join('');
+  return '<hr class="filter-tag-separator">' + tags;
+}
+
+export function hoodTagsHtml(
+  hoods: NeighbourhoodSummary[] | undefined,
+  specialAreas?: SpecialAreaSummary[],
+): string {
+  const base = !hoods || hoods.length === 0
+    ? '<em class="filter-none">No neighbourhood data</em>'
+    : hoods
+        .map((n) => {
+          const name = String(n.name ?? '');
+          const count = groupThousands(Math.trunc(Number(n.count) || 0));
+          const units = groupThousands(Math.trunc(Number(n.units) || 0));
+          return (
+            `<label class="filter-tag"><input type="checkbox" class="filter-neighbourhood-option" ` +
+            `value="${escapeHtml(name.toLowerCase())}" checked> ${escapeHtml(name)} ` +
+            `<span class="filter-tag-count">(${count} bldgs · ${units} units)</span></label>`
+          );
+        })
+        .join('');
+  return base + specialAreaTagsHtml(specialAreas);
 }
 
 export function blockLegendMax(fc: FilterConfig): number {
@@ -36,7 +65,7 @@ export function blockTicks(max: number): string[] {
 
 export function renderLegend(fc: FilterConfig, doc: Document = document): void {
   const hoods = doc.getElementById('filter-neighbourhoods');
-  if (hoods) hoods.innerHTML = hoodTagsHtml(fc.neighbourhoods);
+  if (hoods) hoods.innerHTML = hoodTagsHtml(fc.neighbourhoods, fc.special_areas);
   const max = blockLegendMax(fc);
   const scale = doc.getElementById('block-legend-scale');
   if (scale) scale.innerHTML = blockTicks(max).map((t) => `<span>${escapeHtml(t)}</span>`).join('');

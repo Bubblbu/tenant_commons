@@ -3,7 +3,7 @@ import type { PathOptions } from 'leaflet';
 import * as L from 'leaflet';
 import { blockPopupHtml, blockStyle, maxTotalUnits } from './blocks';
 import { CHINATOWN_LABEL, CHINATOWN_STYLE, chinatownLabelHtml } from './chinatown';
-import { RING_OPACITY, RING_SPACING, RING_WEIGHT, ringColor, type StyledMarker } from './markers';
+import { RING_OPACITY, RING_SPACING, RING_WEIGHT, ringColor, type RingType, type StyledMarker } from './markers';
 import { NEIGHBOURHOOD_STYLE, labelPosition, neighbourhoodLabelHtml } from './neighbourhoods';
 import type { BlocksCollection, BoundaryCollection, BoundaryProperties, VillagesCollection } from './types';
 import { VILLAGE_STYLE, villageLabelHtml } from './villages';
@@ -62,12 +62,21 @@ export function createChinatownLayer(fc: BoundaryCollection): L.FeatureGroup {
 export interface BuildingLayers {
   buildings: L.FeatureGroup;
   markersById: Record<string, L.CircleMarker>;
-  ringsById: Record<string, { housing_type: string; marker: L.CircleMarker }[]>;
+  ringsById: Record<string, { housing_type: RingType; marker: L.CircleMarker }[]>;
 }
 
 /**
  * One group for every building marker. Markers go into the group first; the
  * caller adds it to the map afterwards.
+ *
+ * Two passes, not one: every base marker is added before any ring. A ring's
+ * radius is always larger than its own building's base marker, so draw
+ * order never affects a building's marker relative to its own ring — what
+ * it does affect is *other* buildings' markers, which (with preferCanvas)
+ * paint in insertion order. Interleaving them (as one pass does per
+ * building) lets a later building's opaque base marker paint over an
+ * earlier building's ring in dense areas; two passes keeps every ring above
+ * every base marker, globally.
  */
 export function createBuildingLayers(
   markers: StyledMarker[],
@@ -76,22 +85,10 @@ export function createBuildingLayers(
   const buildings = L.featureGroup();
   const markersById: BuildingLayers['markersById'] = {};
   const ringsById: BuildingLayers['ringsById'] = {};
+  const pending: { key: string; lat: number; lon: number; rings: StyledMarker['extra_rings']; baseRadius: number }[] = [];
   for (const m of markers) {
     if (m.lat === null || m.lon === null) continue;
     const key = String(m.b_id);
-    // Extra rings first, so they paint underneath the building as a halo.
-    const rings = m.extra_rings.map((ring, i) => {
-      const marker = L.circleMarker([m.lat as number, m.lon as number], {
-        radius: m.base_radius + RING_SPACING * (i + 1),
-        fill: false,
-        color: ringColor(ring.housing_type),
-        weight: RING_WEIGHT,
-        opacity: RING_OPACITY,
-      });
-      buildings.addLayer(marker);
-      return { housing_type: ring.housing_type, marker };
-    });
-    if (rings.length) ringsById[key] = rings;
     const marker = L.circleMarker([m.lat, m.lon], {
       radius: m.base_radius,
       fill: true,
@@ -103,6 +100,23 @@ export function createBuildingLayers(
     bindPopup?.(marker, m);
     buildings.addLayer(marker);
     markersById[key] = marker;
+    if (m.extra_rings.length) {
+      pending.push({ key, lat: m.lat, lon: m.lon, rings: m.extra_rings, baseRadius: m.base_radius });
+    }
+  }
+  for (const p of pending) {
+    const rings = p.rings.map((ring, i) => {
+      const marker = L.circleMarker([p.lat, p.lon], {
+        radius: p.baseRadius + RING_SPACING * (i + 1),
+        fill: false,
+        color: ringColor(ring.housing_type),
+        weight: RING_WEIGHT,
+        opacity: RING_OPACITY,
+      });
+      buildings.addLayer(marker);
+      return { housing_type: ring.housing_type, marker };
+    });
+    ringsById[p.key] = rings;
   }
   return { buildings, markersById, ringsById };
 }

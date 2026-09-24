@@ -48,8 +48,8 @@ export function startWiring(ctx) {
       let blockColorScalingEnabled = true;
       let blockColorMin = 0;
       let blockColorMax = 0;
-      let showSroChecked = false;
-      let showCoopChecked = false;
+      let showHousingTypeChecked = false;
+      let showIssuesChecked = false;
       // Declared here (not down with the other filter-panel DOM refs) because
       // syncMarkerAnnotations()/effectiveStrokeColor() — both called from
       // applyZoomScaling(), which runs early during wireUp() — read these.
@@ -57,8 +57,8 @@ export function startWiring(ctx) {
       // dead zone), and since that throw happened inside wireUp()'s top-level
       // try/catch, it was being silently swallowed and retried forever —
       // filters and tab-switching never finished wiring up as a result.
-      const vizShowSroChk = document.getElementById('viz-show-sro');
-      const vizShowCoopChk = document.getElementById('viz-show-coop');
+      const vizShowHousingTypeChk = document.getElementById('viz-show-housing-type');
+      const vizShowIssuesChk = document.getElementById('viz-show-issues');
 
       function computeZoomScale(zoom) {
         if (!Number.isFinite(zoom)) return currentZoomScale;
@@ -226,9 +226,9 @@ export function startWiring(ctx) {
 
       // A building matching exactly one housing type has its OWN stroke
       // overridden to that type's ring color (see add_buildings_layers in
-      // layout.py) — no separate marker. So unchecking "Show co-ops"/"Show
-      // SRO/SRA hotels" for that case means reverting the marker's own
-      // stroke back to the plain default, not hiding/showing a child object.
+      // layout.py) — no separate marker. So unchecking "Show housing type"
+      // for that case means reverting the marker's own stroke back to the
+      // plain default, not hiding/showing a child object.
       // marker._primaryHousingType (set in applyMarkerMetadata) records which
       // type currently owns the stroke, so these two helpers are the single
       // source of truth for what color/weight a marker's stroke should
@@ -236,8 +236,7 @@ export function startWiring(ctx) {
       // of reading marker._strokeColor/_strokeWeight directly.
       function effectiveStrokeColor(marker) {
         if (!marker) return MARKER_STROKE_COLOR;
-        if ((marker._primaryHousingType === 'coop' && !showCoopChecked) ||
-            (marker._primaryHousingType === 'sro' && !showSroChecked)) {
+        if (marker._primaryHousingType && !showHousingTypeChecked) {
           return MARKER_STROKE_COLOR;
         }
         return marker._strokeColor || MARKER_STROKE_COLOR;
@@ -245,20 +244,20 @@ export function startWiring(ctx) {
 
       function effectiveStrokeWeight(marker) {
         if (!marker) return MARKER_STROKE_WEIGHT;
-        if ((marker._primaryHousingType === 'coop' && !showCoopChecked) ||
-            (marker._primaryHousingType === 'sro' && !showSroChecked)) {
+        if (marker._primaryHousingType && !showHousingTypeChecked) {
           return MARKER_STROKE_WEIGHT;
         }
         return marker._strokeWeight || MARKER_STROKE_WEIGHT;
       }
 
-      // Extra housing-type rings (a building that is both SRO and co-op) are
-      // separate child CircleMarkers, so — unlike the single-type stroke override
-      // above — they're shown/hidden by resizing to/from radius 0, mirroring
-      // how setMarkerVisibility treats a fully-filtered building marker.
-      // Called whenever a building's own visibility changes (from within
-      // setMarkerVisibility/applyZoomScaling) AND whenever the Housing
-      // Data checkboxes change (from applyHousingTypeFilter) — a no-op
+      // Extra rings (a building that is both SRO and co-op, or has a housing
+      // type plus outstanding issues) are separate child CircleMarkers, so —
+      // unlike the single-type stroke override above — they're shown/hidden
+      // by resizing to/from radius 0, mirroring how setMarkerVisibility
+      // treats a fully-filtered building marker. Called whenever a
+      // building's own visibility changes (from within
+      // setMarkerVisibility/applyZoomScaling) AND whenever the Building
+      // Details checkboxes change (from applyHousingTypeFilter) — a no-op
       // (single property check) for the ~5,000 markers without extra rings.
       function syncMarkerAnnotations(marker) {
         if (!marker) return;
@@ -266,7 +265,7 @@ export function startWiring(ctx) {
         if (marker._extraRings) {
           marker._extraRings.forEach(function(r) {
             if (!r || !r.marker) return;
-            var typeShown = r.housingType === 'coop' ? showCoopChecked : showSroChecked;
+            var typeShown = r.housingType === 'issues' ? showIssuesChecked : showHousingTypeChecked;
             var visible = buildingVisible && typeShown;
             if (typeof r.marker.setStyle === 'function') {
               r.marker.setStyle({ opacity: visible ? 0.9 : 0 });
@@ -484,12 +483,14 @@ export function startWiring(ctx) {
         });
       }
 
-      // Housing type (SRO/co-op) toggles only restyle existing markers (stroke
-      // color, extra rings) — they never add, remove or hide a marker, since
-      // every SRO/co-op is a building.
+      // Housing type (SRO/co-op) and rental-issues toggles only restyle
+      // existing markers (stroke color, extra rings) — they never add,
+      // remove or hide a marker. (Only show buildings with issues, in the
+      // Filters panel, is the one that actually hides markers — see
+      // applyFilters().)
       function applyHousingTypeFilter() {
-        showSroChecked = vizShowSroChk ? vizShowSroChk.checked !== false : false;
-        showCoopChecked = vizShowCoopChk ? vizShowCoopChk.checked !== false : false;
+        showHousingTypeChecked = vizShowHousingTypeChk ? vizShowHousingTypeChk.checked !== false : false;
+        showIssuesChecked = vizShowIssuesChk ? vizShowIssuesChk.checked !== false : false;
         applyFilters();
         updateLegendVisibility();
         Object.keys(window.buildingIndex).forEach(function(key) {
@@ -819,6 +820,7 @@ export function startWiring(ctx) {
       const vizVillagesChk = document.getElementById('viz-show-villages');
       const vizChinatownChk = document.getElementById('viz-show-chinatown');
       const tableSearchInput = document.getElementById('owner-search');
+      const onlyIssuesChk = document.getElementById('filter-only-issues');
       const statusCells = {
         total: {
           units: document.getElementById('status-total-units'),
@@ -834,7 +836,7 @@ export function startWiring(ctx) {
       const summaryRowsEl = document.getElementById('summary-buildings-rows');
       const legendContainerEl = document.getElementById('legend-map');
       const legendBlocksEl = document.getElementById('legend-blocks-section');
-      const legendHousingEl = document.getElementById('legend-housing-section');
+      const legendBuildingDetailsEl = document.getElementById('legend-building-details-section');
       const legendBoundariesEl = document.getElementById('legend-boundaries-section');
 
       const metricControls = {};
@@ -1048,17 +1050,18 @@ export function startWiring(ctx) {
           }
         }
         setLegendDisplay(legendBlocksEl, showBlocksLegend);
-        // Static reference info (housing-type ring colors) — only relevant
-        // once at least one housing-type toggle is actually on.
-        const showHousingLegend = showSroChecked || showCoopChecked;
-        setLegendDisplay(legendHousingEl, showHousingLegend);
+        // Static reference info (ring colors) — only relevant once at least
+        // one Building Details ring toggle is actually on.
+        const showBuildingDetailsLegend = showHousingTypeChecked || showIssuesChecked;
+        setLegendDisplay(legendBuildingDetailsEl, showBuildingDetailsLegend);
         const neighbourhoodsChecked = vizNeighbourhoodsChk ? vizNeighbourhoodsChk.checked !== false : true;
         const chinatownChecked = vizChinatownChk ? vizChinatownChk.checked !== false : true;
         const villagesChecked = vizVillagesChk ? vizVillagesChk.checked !== false : true;
         const showBoundariesLegend = neighbourhoodsChecked || chinatownChecked || villagesChecked;
         setLegendDisplay(legendBoundariesEl, showBoundariesLegend);
         if (legendContainerEl) {
-          const shouldShow = (showBlocksLegend && legendBlocksEl) || (showHousingLegend && legendHousingEl) ||
+          const shouldShow = (showBlocksLegend && legendBlocksEl) ||
+            (showBuildingDetailsLegend && legendBuildingDetailsEl) ||
             (showBoundariesLegend && legendBoundariesEl);
           legendContainerEl.style.display = shouldShow ? 'flex' : 'none';
         }
@@ -1253,10 +1256,41 @@ export function startWiring(ctx) {
         });
       }
 
+      // Round tick values for a log-scaled axis: powers of ten spanning
+      // [minV, maxV], always anchored at minV itself (the slider/histogram
+      // floor) even when minV isn't an exact power of ten, so the leftmost
+      // tick always matches what the floor bucket actually starts at.
+      function niceLogTicks(minV, maxV) {
+        if (!(minV > 0) || !(maxV > minV)) return [minV];
+        const minExp = Math.ceil(Math.log10(minV) - 1e-9);
+        const maxExp = Math.floor(Math.log10(maxV) + 1e-9);
+        const ticks = [];
+        for (let e = minExp; e <= maxExp; e += 1) {
+          ticks.push(Math.pow(10, e));
+        }
+        if (!ticks.length || Math.abs(ticks[0] - minV) > minV * 1e-6) {
+          ticks.unshift(minV);
+        }
+        const maxTicks = 6;
+        if (ticks.length > maxTicks) {
+          const stride = Math.ceil((ticks.length - 1) / (maxTicks - 1));
+          const kept = [ticks[0]];
+          for (let i = stride; i < ticks.length - 1; i += stride) {
+            kept.push(ticks[i]);
+          }
+          kept.push(ticks[ticks.length - 1]);
+          return kept;
+        }
+        return ticks;
+      }
+
       function formatWithSummary(summary, value) {
         if (value === null || value === undefined || Number.isNaN(value)) return '–';
         if (summary.format === 'currency') {
           return '$' + Math.round(value).toLocaleString();
+        }
+        if (summary.format === 'year') {
+          return String(Math.round(value));
         }
         if (summary.format === 'ratio') {
           const decimals = summary.decimals ?? 2;
@@ -1267,6 +1301,21 @@ export function startWiring(ctx) {
         }
         const decimals = summary.decimals ?? 2;
         return Number(value).toLocaleString(undefined, {maximumFractionDigits: decimals});
+      }
+
+      // Axis ticks specifically use compact currency notation ($10K, $1M) —
+      // formatWithSummary's full "$10,000,000" is right for the min/max
+      // readouts next to the sliders (only two numbers, plenty of room) but
+      // collides with its neighbours in a dense row of up to 5 axis ticks.
+      function formatTickValue(summary, value) {
+        if (summary.format === 'currency') {
+          const v = Math.round(value);
+          const abs = Math.abs(v);
+          if (abs >= 1e6) return '$' + (v / 1e6).toFixed(v % 1e6 === 0 ? 0 : 1) + 'M';
+          if (abs >= 1e3) return '$' + (v % 1e3 === 0 ? Math.round(v / 1e3) : (v / 1e3).toFixed(1)) + 'K';
+          return '$' + v.toLocaleString();
+        }
+        return formatWithSummary(summary, value);
       }
 
       function formatMetricValue(metric, value) {
@@ -1377,6 +1426,37 @@ export function startWiring(ctx) {
           }
           useLog = useLog && positiveMin !== null && hasSpread;
 
+          // Moved up from beside the sliders (their original position) so the
+          // axis ticks below can share the exact same value<->position
+          // transform the sliders use — the only way to guarantee a tick
+          // lines up with where the slider actually is at that value.
+          const logMin = useLog ? Math.log(positiveMin) : 0;
+          const logMax = useLog ? Math.log(Math.max(summary.max, positiveMin)) : 1;
+          const toSlider = useLog && logMax !== logMin
+            ? function(value) {
+                if (!Number.isFinite(value)) return 0;
+                if (value <= 0) return 0;
+                const clamped = Math.max(positiveMin, Math.min(Number(value), summary.max));
+                return ((Math.log(clamped) - logMin) / (logMax - logMin)) * 100;
+              }
+            : function(value) { return Number(value); };
+          const fromSlider = useLog && logMax !== logMin
+            ? function(pos) {
+                const ratio = Math.min(1, Math.max(0, Number(pos) / 100));
+                // The slider's log floor (positiveMin, from summary.min_positive)
+                // is the *effective* histogram floor — value_land/value_bldg's
+                // log_floor collapses everything at/below it into one bucket
+                // (see building_metrics.py) — which sits above the true
+                // summary.min whenever that floor did any collapsing. Position 0
+                // must still mean "no lower bound", so it always reports the
+                // true min, not the floor.
+                if (ratio === 0) {
+                  return summary.min;
+                }
+                return Math.exp(logMin + ratio * (logMax - logMin));
+              }
+            : function(pos) { return Number(pos); };
+
           const header = document.createElement('div');
           header.className = 'metric-header';
           header.textContent = summary.label || metric;
@@ -1402,32 +1482,58 @@ export function startWiring(ctx) {
           });
           control.appendChild(hist);
 
+          // Reference ticks under the histogram: the bars themselves are
+          // equal SCREEN width per bin, which is the correct way to draw a
+          // log-scaled histogram (equal ratio steps = equal distance) — but
+          // with no visible value anywhere except a per-bar hover tooltip,
+          // there's no way to tell what a bar's position actually means.
+          // Ticks are placed at their exact value's slider position (not
+          // evenly-spaced fractions), so a tick and the slider always agree
+          // on what a given screen position means. For a log axis the tick
+          // *values* are also snapped to round numbers (powers of ten) —
+          // an evenly-spaced-fraction tick lands on whatever raw value falls
+          // out of the interpolation ($9,847, say), which reads as noise;
+          // decade boundaries ($10K, $100K, $1M...) read as an axis. Note
+          // this intentionally does NOT reuse fromSlider(0)'s special case
+          // (which reports the true min, i.e. "no lower bound", for the
+          // slider's own filter semantics) — the floor bucket is drawn as
+          // one collapsed bar starting at positiveMin, so the leftmost tick
+          // must label that same value, not the tail below it.
+          if (bins.length) {
+            const axis = document.createElement('div');
+            axis.className = 'metric-axis';
+            let tickValues;
+            if (useLog) {
+              tickValues = niceLogTicks(positiveMin, summary.max);
+            } else {
+              tickValues = [];
+              const tickCount = 5;
+              for (let t = 0; t < tickCount; t += 1) {
+                const frac = t / (tickCount - 1);
+                tickValues.push(summary.min + frac * (summary.max - summary.min));
+              }
+            }
+            tickValues.forEach(function(value) {
+              const frac = useLog
+                ? (logMax !== logMin
+                    ? (Math.log(Math.max(positiveMin, Math.min(value, summary.max))) - logMin) / (logMax - logMin)
+                    : 0)
+                : ((value - summary.min) / ((summary.max - summary.min) || 1));
+              const tick = document.createElement('span');
+              tick.className = 'metric-axis-tick';
+              tick.style.left = 'calc(7px + (100% - 14px) * ' + frac + ')';
+              tick.textContent = formatTickValue(summary, value);
+              axis.appendChild(tick);
+            });
+            control.appendChild(axis);
+          }
+
           const sliders = document.createElement('div');
           sliders.className = 'metric-sliders';
           const minSlider = document.createElement('input');
           minSlider.type = 'range';
           const maxSlider = document.createElement('input');
           maxSlider.type = 'range';
-
-          const logMin = useLog ? Math.log(positiveMin) : 0;
-          const logMax = useLog ? Math.log(Math.max(summary.max, positiveMin)) : 1;
-          const toSlider = useLog && logMax !== logMin
-            ? function(value) {
-                if (!Number.isFinite(value)) return 0;
-                if (value <= 0) return 0;
-                const clamped = Math.max(positiveMin, Math.min(Number(value), summary.max));
-                return ((Math.log(clamped) - logMin) / (logMax - logMin)) * 100;
-              }
-            : function(value) { return Number(value); };
-          const fromSlider = useLog && logMax !== logMin
-            ? function(pos) {
-                const ratio = Math.min(1, Math.max(0, Number(pos) / 100));
-                if (ratio === 0 && summary.min <= 0) {
-                  return summary.min;
-                }
-                return Math.exp(logMin + ratio * (logMax - logMin));
-              }
-            : function(pos) { return Number(pos); };
 
           const sliderStep = useLog ? 0.5 : (summary.step || ((summary.max - summary.min) / 200) || 1);
 
@@ -1514,6 +1620,17 @@ export function startWiring(ctx) {
         const hasHoodFilter = hoodInputs.length > 0;
         const restrictHoods = hasHoodFilter && selectedHoods.length > 0;
         const hideWhenNone = hasHoodFilter && selectedHoods.length === 0;
+        // Chinatown/Villages Plan are two more checkboxes in the same list
+        // (see legend.ts's specialAreaTagsHtml) but aren't a row's own
+        // local_area — a building/block can be in a real neighbourhood *and*
+        // one of these overlays at once — so a row matches the selection if
+        // its area is selected OR it's flagged for a selected special area.
+        function areaSelectionMatches(area, inChinatown, inVillage) {
+          if (selectedHoods.includes(area)) return true;
+          if (inChinatown && selectedHoods.includes('chinatown')) return true;
+          if (inVillage && selectedHoods.includes('village-plan')) return true;
+          return false;
+        }
         const thresholds = {};
         metricKeys.forEach(function(metric) {
           const ctrl = metricControls[metric];
@@ -1527,40 +1644,94 @@ export function startWiring(ctx) {
             summary: summary,
           };
         });
+        // Live histograms (see renderMetricControl): each metric's bars are
+        // recomputed below from the rows that pass every OTHER active
+        // filter — neighbourhood, search, issues-only, and every other
+        // metric's own slider — but not this metric's own threshold. That
+        // answers "how many more would I get if I loosened just this
+        // slider" (the usual faceted-search convention) rather than a
+        // metric's own bars shrinking toward whatever range it's already
+        // dragged to. Bin edges and the slider's min/max range stay fixed;
+        // only bar heights (counts) are live.
+        const binCounts = {};
+        metricKeys.forEach(function(metric) {
+          binCounts[metric] = metricControls[metric].bars.map(function() { return 0; });
+        });
+
         const visibleBids = new Set();
         buildingRows.forEach(function(row) {
           const bid = row.getAttribute('data-bid');
           const marker = window.buildingIndex[bid];
 
-          let matches = true;
+          // Every filter except the per-metric thresholds — shared by the
+          // final `matches` below and by each metric's "exclude own filter"
+          // histogram recount.
+          let baseMatches = true;
           const rowArea = (row.getAttribute('data-area') || '').toLowerCase().trim();
           if (restrictHoods) {
-            matches = matches && selectedHoods.includes(rowArea);
+            baseMatches = areaSelectionMatches(
+              rowArea,
+              row.getAttribute('data-chinatown') === '1',
+              row.getAttribute('data-village') === '1',
+            );
           } else if (hideWhenNone) {
-            matches = false;
+            baseMatches = false;
+          }
+          if (baseMatches && searchTerm) {
+            const haystack = row.getAttribute('data-search') || '';
+            baseMatches = haystack.indexOf(searchTerm) !== -1;
+          }
+          if (baseMatches && onlyIssuesChk && onlyIssuesChk.checked) {
+            const rawIssues = row.getAttribute('data-n-issues');
+            const nIssues = rawIssues === null || rawIssues === '' ? NaN : parseFloat(rawIssues);
+            baseMatches = Number.isFinite(nIssues) && nIssues > 0;
           }
 
           // Rows with no value for a metric (e.g. SRO/co-op records with no
           // building match have no units/year built) are skipped per-metric
-          // below rather than hidden by a NaN comparison.
-          if (matches && metricKeys.length) {
+          // — treated as passing that one threshold — rather than hidden by
+          // a NaN comparison.
+          let matches = baseMatches;
+          const metricPass = {};
+          const metricValue = {};
+          if (baseMatches && metricKeys.length) {
             for (let i = 0; i < metricKeys.length; i += 1) {
               const metric = metricKeys[i];
               const threshold = thresholds[metric];
               const attrName = 'data-' + threshold.summary.attr;
               const rawValue = row.getAttribute(attrName);
               const value = rawValue === null || rawValue === '' ? NaN : parseFloat(rawValue);
+              metricValue[metric] = value;
               if (Number.isNaN(value)) {
+                metricPass[metric] = true;
                 continue;
               }
-              if (threshold.min !== null && value < threshold.min) { matches = false; break; }
-              if (threshold.max !== null && value > threshold.max) { matches = false; break; }
+              const pass = !((threshold.min !== null && value < threshold.min) ||
+                (threshold.max !== null && value > threshold.max));
+              metricPass[metric] = pass;
+              if (!pass) matches = false;
             }
           }
 
-          if (matches && searchTerm) {
-            const haystack = row.getAttribute('data-search') || '';
-            matches = haystack.indexOf(searchTerm) !== -1;
+          if (baseMatches) {
+            for (let i = 0; i < metricKeys.length; i += 1) {
+              const metric = metricKeys[i];
+              const value = metricValue[metric];
+              if (value === undefined || Number.isNaN(value)) continue;
+              let othersPass = true;
+              for (let j = 0; j < metricKeys.length; j += 1) {
+                if (j !== i && !metricPass[metricKeys[j]]) { othersPass = false; break; }
+              }
+              if (!othersPass) continue;
+              const bins = thresholds[metric].summary.bins || [];
+              for (let b = 0; b < bins.length; b += 1) {
+                const isLast = b === bins.length - 1;
+                if (value >= bins[b].start && (isLast ? value <= bins[b].end : value < bins[b].end)) {
+                  binCounts[metric][b] += 1;
+                  break;
+                }
+              }
+            }
           }
 
           row.classList.toggle('hidden', !matches);
@@ -1587,6 +1758,25 @@ export function startWiring(ctx) {
           }
         });
 
+        metricKeys.forEach(function(metric) {
+          const ctrl = metricControls[metric];
+          const counts = binCounts[metric];
+          // Rescale to the current view's own tallest bar, not the original
+          // full-dataset one — otherwise every bar reads near-flat once a
+          // filter has narrowed the set well below the original max.
+          const maxCount = Math.max(1, counts.reduce(function(m, c) { return c > m ? c : m; }, 0));
+          ctrl.bars.forEach(function(bar, i) {
+            const count = counts[i] || 0;
+            const height = maxCount ? Math.max(2, (count / maxCount) * 100) : 2;
+            bar.style.height = height + '%';
+            const start = parseFloat(bar.dataset.start);
+            const end = parseFloat(bar.dataset.end);
+            const rangeLabel = formatWithSummary(ctrl.summary, start) + ' – ' + formatWithSummary(ctrl.summary, end);
+            const countLabel = ' (' + count.toLocaleString() + ')';
+            bar.title = ctrl.useLog ? rangeLabel + countLabel + ' [log bin]' : rangeLabel + countLabel;
+          });
+        });
+
         const hideEmptyBlocks = hideEmptyBlocksChk ? hideEmptyBlocksChk.checked : true;
         Object.keys(window.blocksIndex).forEach(function(blockId) {
           var ids = window.blockBuildingIndex[blockId] || [];
@@ -1606,7 +1796,11 @@ export function startWiring(ctx) {
           var blockArea = row ? (row.getAttribute('data-area') || '').toLowerCase().trim() : '';
           var hoodMatch = true;
           if (restrictHoods) {
-            hoodMatch = selectedHoods.includes(blockArea);
+            hoodMatch = areaSelectionMatches(
+              blockArea,
+              row ? row.getAttribute('data-chinatown') === '1' : false,
+              row ? row.getAttribute('data-village') === '1' : false,
+            );
           } else if (hideWhenNone) {
             hoodMatch = false;
           }
@@ -1677,6 +1871,7 @@ export function startWiring(ctx) {
 
       if (hideEmptyBlocksChk) hideEmptyBlocksChk.addEventListener('change', applyFilters);
       if (tableSearchInput) tableSearchInput.addEventListener('input', scheduleApplyFilters);
+      if (onlyIssuesChk) onlyIssuesChk.addEventListener('change', applyFilters);
       hoodInputs.forEach(function(inp) { inp.addEventListener('change', applyFilters); });
 
       if (hoodSelectAllBtn) {
@@ -1753,8 +1948,8 @@ export function startWiring(ctx) {
         toggleLayerVisibility(layerChinatown, true);
       }
       applyHousingTypeFilter();
-      if (vizShowSroChk) vizShowSroChk.addEventListener('change', applyHousingTypeFilter);
-      if (vizShowCoopChk) vizShowCoopChk.addEventListener('change', applyHousingTypeFilter);
+      if (vizShowHousingTypeChk) vizShowHousingTypeChk.addEventListener('change', applyHousingTypeFilter);
+      if (vizShowIssuesChk) vizShowIssuesChk.addEventListener('change', applyHousingTypeFilter);
 
       if (resetBtn) {
         resetBtn.addEventListener('click', function() {
@@ -1786,11 +1981,14 @@ export function startWiring(ctx) {
             vizChinatownChk.checked = true;
             toggleLayerVisibility(layerChinatown, true);
           }
-          if (vizShowSroChk) vizShowSroChk.checked = false;
-          if (vizShowCoopChk) vizShowCoopChk.checked = false;
+          if (vizShowHousingTypeChk) vizShowHousingTypeChk.checked = false;
+          if (vizShowIssuesChk) vizShowIssuesChk.checked = false;
           applyHousingTypeFilter();
           if (tableSearchInput) {
             tableSearchInput.value = '';
+          }
+          if (onlyIssuesChk) {
+            onlyIssuesChk.checked = false;
           }
           document.querySelectorAll('.row-select').forEach(function(cb) {
             if (cb.checked) {

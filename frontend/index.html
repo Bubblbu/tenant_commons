@@ -618,13 +618,14 @@
       </div>
       <div class="legend-note" id="block-legend-note"></div>
     </div>
-    <div class="legend-card" id="legend-housing-section">
-      <div class="legend-heading">Housing type</div>
+    <div class="legend-card" id="legend-building-details-section">
+      <div class="legend-heading">Building details</div>
       <div class="legend-key">
         <div class="legend-key-row"><span class="legend-swatch" style="background:transparent;border:2px solid #3182bd;"></span> SRO/SRA (ring)</div>
         <div class="legend-key-row"><span class="legend-swatch" style="background:transparent;border:2px solid #d97706;"></span> Co-op (ring)</div>
+        <div class="legend-key-row"><span class="legend-swatch" style="background:transparent;border:2px solid #dc2626;"></span> Rental issues (ring)</div>
       </div>
-      <div class="legend-note">Ring colors are toggled in Housing Data; the markers themselves always stay on the map.</div>
+      <div class="legend-note">Ring colors are toggled in Building Details; the markers themselves always stay on the map.</div>
     </div>
     <div class="legend-card" id="legend-boundaries-section">
       <div class="legend-heading">Boundaries</div>
@@ -810,6 +811,16 @@
     color: #777;
   }
 
+  /* Separates Chinatown/Villages Plan (boundary overlays) from the real
+     neighbourhoods above them in the same checkbox list — same list/class
+     (so Select all/Clear all still cover them), visually set apart since
+     they're a different kind of "area" a building can belong to. */
+  #filters-panel .filter-tag-separator {
+    border: none;
+    border-top: 1px solid #e6e9f0;
+    margin: 6px 0;
+  }
+
   #filters-panel .filter-visual {
     display: flex;
     flex-direction: column;
@@ -855,12 +866,23 @@
     margin-bottom: 4px;
   }
 
+  /* Padded to match the slider thumb's own travel inset (half its 14px
+     width on each side, set below): a native range input's thumb center
+     only reaches the container's true edges at its min/max value if the
+     track were exactly as wide as the thumb is tall, which it isn't — the
+     thumb stays fully inside the track, so its center travels from
+     thumb-radius to (width - thumb-radius), not 0 to width. Bars and ticks
+     spanned the full width with no such inset, so a bar/tick's screen
+     position for a given value silently drifted from the slider's own for
+     that same value, worse near the ends. */
   #filters-panel .metric-histogram {
     display: flex;
     align-items: flex-end;
     height: 36px;
     gap: 1px;
     margin-bottom: 2px;
+    padding: 0 7px;
+    box-sizing: border-box;
   }
 
   #filters-panel .metric-hist-bar {
@@ -872,6 +894,34 @@
 
   #filters-panel .metric-hist-bar:hover {
     background: #5b7fbd;
+  }
+
+  #filters-panel .metric-axis {
+    position: relative;
+    height: 12px;
+    font-size: 10px;
+    color: #6b7280;
+    margin-bottom: 6px;
+  }
+
+  /* Ticks are placed with an explicit px+calc offset (see wiring.js), not
+     percentage-in-a-padded-box like the histogram bars above — percentages
+     on an absolutely positioned child resolve against the parent's full
+     padding-box width regardless of the parent's own padding, so the same
+     7px thumb-inset has to be baked into each tick's `left` instead. */
+  #filters-panel .metric-axis-tick {
+    position: absolute;
+    top: 0;
+    transform: translateX(-50%);
+    white-space: nowrap;
+  }
+
+  #filters-panel .metric-axis-tick:first-child {
+    transform: translateX(0);
+  }
+
+  #filters-panel .metric-axis-tick:last-child {
+    transform: translateX(-100%);
   }
 
   /* Two overlapping range inputs sharing one visual track. Chrome/Firefox
@@ -1040,10 +1090,10 @@
       </div>
     </div>
     <div class="filter-section">
-      <h4>Housing Data</h4>
+      <h4>Building Details</h4>
       <div class="filter-visual">
-        <label><input type="checkbox" id="viz-show-sro"> Show SRO/SRA hotels</label>
-        <label><input type="checkbox" id="viz-show-coop"> Show co-ops</label>
+        <label><input type="checkbox" id="viz-show-housing-type"> Show housing type</label>
+        <label><input type="checkbox" id="viz-show-issues"> Show rental issues</label>
       </div>
     </div>
     <h3>Filters</h3>
@@ -1062,6 +1112,9 @@
     </div>
     <div class="filter-section">
       <h4>Buildings</h4>
+      <div class="filter-visual">
+        <label><input type="checkbox" id="filter-only-issues"> Only show buildings with issues</label>
+      </div>
       <div id="filter-building-section" class="filter-building"></div>
     </div>
   </div>

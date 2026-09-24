@@ -4,7 +4,7 @@ import type { MarkerRecord } from './types';
 
 const base: MarkerRecord = {
   b_id: 1, lat: 49.28, lon: -123.1, owner_key: 'x', block_id: 1, units: 40, year_built: 1970,
-  local_area: 'West End', housing_type: '', source: 'building',
+  local_area: 'West End', housing_type: '', n_issues: null, source: 'building',
 };
 
 describe('markerRadius', () => {
@@ -51,5 +51,24 @@ describe('markerStyle', () => {
     expect(markerStyle(base)).toMatchObject({
       stroke_color: '#ffffff', stroke_weight: 0.6, primary_housing_type: '', extra_rings: [],
     });
+  });
+
+  it('gives a building with outstanding issues an extra red ring, never the primary stroke', () => {
+    expect(markerStyle({ ...base, n_issues: 3 })).toMatchObject({
+      stroke_color: '#ffffff', primary_housing_type: '', extra_rings: [{ housing_type: 'issues' }],
+    });
+  });
+
+  it('stacks the issues ring on top of housing-type rings', () => {
+    expect(markerStyle({ ...base, housing_type: 'co-op, sro', n_issues: 1 })).toMatchObject({
+      stroke_color: '#d97706',
+      primary_housing_type: 'coop',
+      extra_rings: [{ housing_type: 'sro' }, { housing_type: 'issues' }],
+    });
+  });
+
+  it('ignores a zero or null issue count', () => {
+    expect(markerStyle({ ...base, n_issues: 0 }).extra_rings).toEqual([]);
+    expect(markerStyle({ ...base, n_issues: null }).extra_rings).toEqual([]);
   });
 });

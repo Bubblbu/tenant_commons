@@ -46,14 +46,15 @@ def _square(lon: float, lat: float, size: float = 0.002) -> dict:
 #  issues, landlord, block, is_coop, is_sro, coop_status, coop_model, coop_url, housing_name)
 BUILDINGS = [
     (1, "100 example st", "100 Example St", "Northside", 49.281, -123.129, 40, 1965,
-     5000000, 800000, 0.16, 0, 1, 1, 0, 0, None, None, None, None),
+     5000000, 800000, 0.16, 0, None, 1, 1, 0, 0, None, None, None, None),
     (2, "110 example st", "110 Example St", "Northside", 49.2812, -123.1288, 12, 1978,
-     2500000, 400000, 0.16, 1, 1, 1, 1, 0, "Active", "Leasehold", "https://example.org/coop",
+     2500000, 400000, 0.16, 1, "http://app.vancouver.ca/RPS_Net/Default.aspx?num=110&street=EXAMPLE%20ST",
+     1, 1, 1, 0, "Active", "Leasehold", "https://example.org/coop",
      "Example Co-op"),
     (3, "200 sample ave", "200 Sample Ave", "Southside", 49.271, -123.119, 80, 1972,
-     9000000, 1500000, 0.17, 0, 2, 2, 0, 1, None, None, None, "Sample Rooms"),
+     9000000, 1500000, 0.17, 0, None, 2, 2, 0, 1, None, None, None, "Sample Rooms"),
     (4, "210 sample ave", "210 Sample Ave", "Southside", 49.2712, -123.1188, None, None,
-     None, None, None, 0, 2, 2, 0, 0, None, None, None, None),
+     None, None, None, 0, None, 2, 2, 0, 0, None, None, None, None),
 ]
 
 
@@ -70,16 +71,17 @@ def _seed(conn: sqlite3.Connection) -> None:
          (2, json.dumps(_square(-123.120, 49.270)), TS),
          (3, json.dumps(_square(-123.110, 49.260)), TS)],  # empty block
     )
-    for (bid, key, addr, area, lat, lon, units, year, land, bldg, ratio, issues, landlord,
-         block, coop, sro, cstatus, cmodel, curl, hname) in BUILDINGS:
+    for (bid, key, addr, area, lat, lon, units, year, land, bldg, ratio, issues, issues_url,
+         landlord, block, coop, sro, cstatus, cmodel, curl, hname) in BUILDINGS:
         conn.execute(
             "INSERT INTO buildings (building_id, addr_key, address, local_area, lat, lon, units, "
-            "year_built, value_land, value_bldg, bldg_land_ratio, n_issues, landlord_id, block_id, "
+            "year_built, value_land, value_bldg, bldg_land_ratio, n_issues, issues_details, "
+            "landlord_id, block_id, "
             "is_coop, is_sro, coop_status, coop_ownership_model, coop_url, housing_name, sro_owner, "
             "sro_operator, sro_occupancy_status, sro_registered_rooms, created_at, updated_at) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            (bid, key, addr, area, lat, lon, units, year, land, bldg, ratio, issues, landlord,
-             block, coop, sro, cstatus, cmodel, curl, hname,
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (bid, key, addr, area, lat, lon, units, year, land, bldg, ratio, issues, issues_url,
+             landlord, block, coop, sro, cstatus, cmodel, curl, hname,
              "Sample Owner" if sro else None, "Sample Operator" if sro else None,
              "Open" if sro else None, "24" if sro else None, TS, TS),
         )
