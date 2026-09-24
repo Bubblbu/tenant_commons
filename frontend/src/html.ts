@@ -31,6 +31,12 @@ export function groupThousands(n: number): string {
   return new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(n);
 }
 
+/** Same name once case, spacing and punctuation are ignored ("GLR PROPERTIES LTD." ~ "Glr Properties Ltd"). */
+export function sameName(a: string, b: string): boolean {
+  const key = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
+  return key(a) === key(b);
+}
+
 /** null, undefined or NaN — pandas' notion of missing. */
 export function isMissing(v: unknown): boolean {
   return v === null || v === undefined || (typeof v === 'number' && Number.isNaN(v));

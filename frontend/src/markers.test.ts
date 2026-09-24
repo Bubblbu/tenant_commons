@@ -3,7 +3,7 @@ import { housingTypes, markerRadius, markerStyle } from './markers';
 import type { MarkerRecord } from './types';
 
 const base: MarkerRecord = {
-  b_id: 1, lat: 49.28, lon: -123.1, owner_key: 'x', block_id: 1, units: 40, year_built: 1970,
+  b_id: 1, lat: 49.28, lon: -123.1, owner_key: 'x', network_key: 'x', block_id: 1, units: 40, year_built: 1970,
   local_area: 'West End', housing_type: '', n_issues: null, source: 'building',
 };
 

@@ -5,7 +5,7 @@
  * exported to the public artifacts at all (spec §11/§12 — see export.py),
  * so there is nothing for the popup to read here even by omission.
  */
-import { escapeHtml, isMissing } from './html';
+import { escapeHtml, isMissing, sameName } from './html';
 import type { BuildingRecord } from './types';
 
 const str = (v: unknown): string => (isMissing(v) ? '' : String(v).trim());
@@ -30,19 +30,84 @@ export function safeUrl(v: unknown): string | null {
 
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 const div = (cls: string, html: string) => `<div${cls ? ` class="${cls}"` : ''}>${html}</div>`;
+const strList = (v: unknown): string[] => (Array.isArray(v) ? v.map(str).filter(Boolean) : []);
 
-export function renderPopup(r: BuildingRecord): string {
+export interface PopupContext {
+  /** Business-licence data year (filter_config.licence_year). */
+  licenceYear?: number | null;
+}
+
+export function registryProvenance(pids: string[], retrieved: string): string {
+  const shown = pids.slice(0, 3).join(', ');
+  const more = pids.length > 3 ? ` (+${pids.length - 3} more)` : '';
+  const pidText = pids.length ? `: ${pids.length === 1 ? 'PID' : 'PIDs'} ${shown}${more}` : '';
+  const when = retrieved ? `, record retrieved ${retrieved}` : '';
+  return `BC Land Owner Transparency Registry${pidText}${when}`;
+}
+
+export function licenceProvenance(year: number | null | undefined): string {
+  return year ? `City of Vancouver business licence, ${year}` : 'City of Vancouver business licence';
+}
+
+export function networkProvenance(r: BuildingRecord): string {
+  if (str(r.network_source) !== 'claims') return 'Grouped by business licence name';
+  const ev = (r.network_evidence ?? {}) as Record<string, unknown>;
+  const registry = num(ev.registry) ?? 0;
+  const research = num(ev.vtu_research) ?? 0;
+  const parts = [
+    registry ? plural(registry, 'provincial registry filing', 'provincial registry filings') : '',
+    research ? plural(research, 'VTU research claim', 'VTU research claims') : '',
+  ].filter(Boolean);
+  const grouped = parts.length ? `Grouped from ${parts.join(' and ')}.` : 'Grouped from ownership claims.';
+  const name = str(r.network_name_source) === 'claim'
+    ? 'Name: set by claim.'
+    : 'Name: default (entity with the most properties).';
+  return `${grouped} ${name}`;
+}
+
+/** Small "i" marker; its source text shows on hover or on focus (a tap on touch screens). */
+function provenance(text: string): string {
+  const t = escapeHtml(text);
+  return `<span class="prov" tabindex="0" role="note" aria-label="Source: ${t}" data-tip="${t}">i</span>`;
+}
+
+function ownershipLines(r: BuildingRecord, ctx: PopupContext): string[] {
+  const lines: string[] = [];
+  const owner = str(r.owner_name);
+  const ownerSource = str(r.owner_source);
+  if (owner) {
+    let html = escapeHtml(owner);
+    if (ownerSource === 'registry') html += provenance(registryProvenance(strList(r.registry_pids), str(r.registry_retrieved)));
+    else if (ownerSource === 'licence') html += provenance(licenceProvenance(ctx.licenceYear));
+    const coOwners = strList(r.registered_owners).length - 1;
+    if (coOwners > 0) html += ` <span class="popup-muted">${escapeHtml(`+${plural(coOwners, 'co-owner', 'co-owners')}`)}</span>`;
+    lines.push(div('popup-owner', html));
+  }
+  const licence = str(r.licence_holder);
+  if (ownerSource === 'registry' && licence && licence !== '(Unknown)' && !sameName(licence, owner)) {
+    lines.push(div('', escapeHtml(`Licensed as ${licence}`) + provenance(licenceProvenance(ctx.licenceYear))));
+  }
+  const netSource = str(r.network_source);
+  const onMap = num(r.network_buildings_on_map);
+  if (netSource === 'claims' || (netSource === 'licence' && onMap !== null && onMap > 1)) {
+    lines.push(div('', `Part of the <strong>${escapeHtml(str(r.network_name))}</strong> network${provenance(networkProvenance(r))}`));
+    const onTitle = num(r.network_properties_on_title);
+    const entities = strList(r.network_entities).length;
+    const counts = [
+      onMap === null ? '' : `${plural(Math.trunc(onMap), 'building', 'buildings')} on map`,
+      onTitle === null ? '' : `${plural(Math.trunc(onTitle), 'property', 'properties')} on title`,
+      entities ? plural(entities, 'linked entity', 'linked entities') : '',
+    ].filter(Boolean).join(' · ');
+    if (counts) lines.push(div('popup-muted', escapeHtml(counts)));
+  }
+  return lines;
+}
+
+export function renderPopup(r: BuildingRecord, ctx: PopupContext = {}): string {
   const head = [div('popup-address', escapeHtml(str(r.address)))];
   if (str(r.housing_name)) head.push(div('popup-name', escapeHtml(str(r.housing_name))));
 
-  const ownership: string[] = [];
-  if (str(r.owner_group)) ownership.push(div('popup-owner', escapeHtml(str(r.owner_group))));
-  if (str(r.portfolio_name)) {
-    const count = num(r.portfolio_building_count);
-    const entities = Array.isArray(r.portfolio_entities) ? r.portfolio_entities.length : 0;
-    const size = count === null ? 'Portfolio' : `Portfolio: ${plural(Math.trunc(count), 'building', 'buildings')}`;
-    ownership.push(div('', escapeHtml(`${size}, ${plural(entities, 'linked entity', 'linked entities')}`)));
-  }
+  const ownership = ownershipLines(r, ctx);
 
   const facts: string[] = [];
   const units = num(r.units);

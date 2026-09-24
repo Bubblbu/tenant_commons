@@ -3,3 +3,42 @@
 .tc-popup .popup-address { font-weight: 700; }
 .tc-popup .popup-name { color: #555; }
 .tc-popup .popup-owner { font-weight: 600; }
+.tc-popup .popup-muted { color: #666; font-weight: 400; }
+.tc-popup .prov {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 13px;
+  height: 13px;
+  margin-left: 4px;
+  border: 1px solid #8a8f9c;
+  border-radius: 50%;
+  font: italic 700 9px/1 Georgia, serif;
+  color: #5b6070;
+  vertical-align: 1px;
+  cursor: help;
+}
+.tc-popup .prov:focus { outline: 2px solid #6b8fd6; outline-offset: 1px; }
+.tc-popup .prov::after {
+  content: attr(data-tip);
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  width: max-content;
+  max-width: 220px;
+  padding: 5px 7px;
+  border-radius: 4px;
+  background: #1f2330;
+  color: #fff;
+  font: 400 11px/1.35 system-ui, sans-serif;
+  white-space: normal;
+  text-align: left;
+  z-index: 10;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.1s;
+}
+.tc-popup .prov:hover::after,
+.tc-popup .prov:focus::after { opacity: 1; }

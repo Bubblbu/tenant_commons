@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { escapeHtml, groupThousands, isMissing, roundHalfEven } from './html';
+import { escapeHtml, groupThousands, isMissing, roundHalfEven, sameName } from './html';
+
+describe('sameName', () => {
+  it('ignores case, spacing and punctuation', () => {
+    expect(sameName('GLR PROPERTIES LTD.', 'Glr Properties Ltd')).toBe(true);
+    expect(sameName('GLR PROPERTIES LTD.', 'GLR Holdings Ltd')).toBe(false);
+  });
+});
 
 describe('escapeHtml', () => {
   it("matches Python's html.escape(quote=True)", () => {

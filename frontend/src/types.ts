@@ -6,6 +6,7 @@ export interface MarkerRecord {
   lat: number | null;
   lon: number | null;
   owner_key: string | null;
+  network_key: string | null;
   block_id: number | null;
   units: number | null;
   year_built: number | null;
@@ -40,11 +41,13 @@ export interface FilterConfig {
   neighbourhoods?: NeighbourhoodSummary[];
   special_areas?: SpecialAreaSummary[];
   blocks_total_units_max?: number | null;
+  /** Business-licence data year of this build. */
+  licence_year?: number | null;
   [key: string]: unknown;
 }
 
 /**
- * One row of building_records.json: the 41 columns of tc_core's
+ * One row of building_records.json: the columns of tc_core's
  * export.BUILDING_RECORD_COLUMNS, read defensively. Overlay text fields are ''
  * on building rows and null on overlay rows; treat both as empty.
  */

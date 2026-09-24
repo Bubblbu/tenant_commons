@@ -52,7 +52,10 @@ async function main(): Promise<void> {
   const records = artifacts.buildingData.records;
   // Lazy: the markup is built on first open, from the one record the table and filters also read.
   const buildings = createBuildingLayers(styled, (marker, m) => {
-    marker.bindPopup(() => renderPopup(records[String(m.b_id)] ?? { b_id: m.b_id }), { maxWidth: 320 });
+    marker.bindPopup(
+      () => renderPopup(records[String(m.b_id)] ?? { b_id: m.b_id }, { licenceYear: artifacts.filterConfig.licence_year ?? null }),
+      { maxWidth: 320 },
+    );
   });
   buildings.buildings.addTo(map);
 
