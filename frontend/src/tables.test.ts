@@ -19,6 +19,7 @@ describe('buildingRow', () => {
     }));
     expect(row).toBe(
       '<tr data-bid="7" data-owner="example-holdings" data-block="3" data-area="West End" ' +
+        'data-chinatown="" data-village="" ' +
         'data-value-land="5000000" data-value-bldg="800000" data-value-ratio="0.16" data-units="40" ' +
         'data-year-built="1965" data-search="12 oak &amp; elm st west end 3 40 example &quot;holdings&quot; sro" ' +
         'data-housing-type="sro" data-n-issues="">' +
@@ -41,6 +42,12 @@ describe('buildingRow', () => {
     expect(buildingRow(rec({ b_id: 10, n_issues: 3 }))).toContain('data-n-issues="3"');
     expect(buildingRow(rec({ b_id: 11, n_issues: 0 }))).toContain('data-n-issues="0"');
     expect(buildingRow(rec({ b_id: 12 }))).toContain('data-n-issues=""');
+  });
+
+  it('carries the Chinatown/Villages Plan boundary flags for the neighbourhood filter', () => {
+    expect(buildingRow(rec({ b_id: 13, in_chinatown: true }))).toContain('data-chinatown="1" data-village=""');
+    expect(buildingRow(rec({ b_id: 14, in_village_plan: true }))).toContain('data-chinatown="" data-village="1"');
+    expect(buildingRow(rec({ b_id: 15 }))).toContain('data-chinatown="" data-village=""');
   });
 });
 
@@ -66,6 +73,13 @@ describe('blockRowsHtml', () => {
     expect([...html.matchAll(/data-block="(\d+)"/g)].map((m) => m[1])).toEqual(['6', '5']);
     expect(html).toContain('<td data-sort-value="12.5">12.5</td>'); // avg units
     expect(html).toContain('<td data-sort-value="1966">1966</td>'); // 1966.5 -> 1966 (half to even)
+  });
+
+  it('carries the Chinatown/Villages Plan boundary flags', () => {
+    const fc = { type: 'FeatureCollection', schema_version: 1, features: [
+      { type: 'Feature', geometry: null, properties: { block_id: 1, block_label: 'B-01', local_area: null, buildings: 0, total_units: 0, median_year_built: null, in_chinatown: true, in_village_plan: false } },
+    ] } as unknown as BlocksCollection;
+    expect(blockRowsHtml(fc)).toContain('data-chinatown="1" data-village=""');
   });
 });
 

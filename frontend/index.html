@@ -811,6 +811,16 @@
     color: #777;
   }
 
+  /* Separates Chinatown/Villages Plan (boundary overlays) from the real
+     neighbourhoods above them in the same checkbox list — same list/class
+     (so Select all/Clear all still cover them), visually set apart since
+     they're a different kind of "area" a building can belong to. */
+  #filters-panel .filter-tag-separator {
+    border: none;
+    border-top: 1px solid #e6e9f0;
+    margin: 6px 0;
+  }
+
   #filters-panel .filter-visual {
     display: flex;
     flex-direction: column;

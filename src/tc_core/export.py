@@ -27,6 +27,7 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+from shapely.geometry import Point, shape
 from shapely.strtree import STRtree
 
 from .geometry import parse_geom
@@ -236,6 +237,64 @@ def resolve_local_area_from_block_numbers(
     return local_area
 
 
+def load_boundary_polygons(geojson_path: str | None) -> list:
+    """Every feature's geometry from a boundary GeoJSON (Chinatown, Villages
+    Plan Areas), as shapely objects. Missing/empty path -> no polygons, so
+    callers get an all-False flag rather than needing their own guard.
+    """
+    if not geojson_path or not Path(geojson_path).exists():
+        return []
+    data = json.loads(Path(geojson_path).read_text())
+    return [shape(f["geometry"]) for f in data.get("features", []) if f.get("geometry")]
+
+
+def flag_points_in_polygons(points_df: pd.DataFrame, polygons: list) -> pd.Series:
+    """True where a building's point falls inside (or right on the edge of)
+    any of `polygons` — the same STRtree point-in-polygon technique as
+    resolve_local_area_from_block_numbers above, used here to flag buildings
+    within a boundary overlay (e.g. Chinatown) rather than to resolve a
+    neighbourhood label.
+    """
+    flags = pd.Series(False, index=points_df.index)
+    if not polygons:
+        return flags
+    tree = STRtree(polygons)
+    for idx, lat, lon in zip(points_df.index, points_df["lat"], points_df["lon"]):
+        if pd.isna(lat) or pd.isna(lon):
+            continue
+        point = Point(lon, lat)
+        for gi in np.atleast_1d(tree.query(point)):
+            geom = polygons[int(gi)]
+            if geom.contains(point) or geom.touches(point):
+                flags.at[idx] = True
+                break
+    return flags
+
+
+def flag_geoms_intersecting_polygons(geoms: pd.Series, polygons: list) -> pd.Series:
+    """True where a block's own polygon overlaps any of `polygons` at all.
+
+    Deliberately derived from the block's own geometry, not from whether any
+    of its member buildings are flagged — resolve_local_area_from_block_numbers's
+    docstring notes the block<->building join itself has a known accuracy
+    bug for a handful of blocks, so inferring a boundary flag from building
+    membership would inherit that; testing the block polygon directly avoids
+    it and keeps the block layer consistent with the buildings drawn on it.
+    """
+    flags = pd.Series(False, index=geoms.index)
+    if not polygons:
+        return flags
+    tree = STRtree(polygons)
+    for idx, geom in geoms.items():
+        if geom is None:
+            continue
+        for gi in np.atleast_1d(tree.query(geom)):
+            if polygons[int(gi)].intersects(geom):
+                flags.at[idx] = True
+                break
+    return flags
+
+
 def assign_block_labels(blocks_merged: pd.DataFrame) -> pd.Series:
     """Fork of the retired src/sica_mapping/data/spatial.py::assign_block_labels — see its
     docstring. Human-readable "{local_area}-{NN}" labels, reading-order
@@ -341,6 +400,25 @@ def reconstruct_filter_config(
         for area, count in neighbourhood_counts.items()
     ]
 
+    # Chinatown/Villages Plan Areas: rendered as two more Filters >
+    # Neighbourhoods entries after a separator (see legend.ts), not folded
+    # into cfg["neighbourhoods"] above since they're boundary overlays a
+    # building can belong to *in addition to* its real local_area, not an
+    # alternative value of it.
+    def _special_area(key: str, name: str, flag_col: str) -> dict:
+        flagged = buildings_only[flag_col] if flag_col in buildings_only.columns else pd.Series(dtype=bool)
+        return {
+            "key": key,
+            "name": name,
+            "count": int(flagged.sum()),
+            "units": int(round(buildings_only.loc[flagged, "units"].sum())) if flagged.any() else 0,
+        }
+
+    cfg["special_areas"] = [
+        _special_area("chinatown", "Chinatown", "in_chinatown"),
+        _special_area("village-plan", "Villages Plan", "in_village_plan"),
+    ]
+
     valid_coords = pts.dropna(subset=["lat", "lon"])
     bounds = None
     if not valid_coords.empty:
@@ -420,7 +498,25 @@ def export_artifacts(
     out_dir.mkdir(parents=True, exist_ok=True)
 
     points_df = reconstruct_points(conn, now, pid_address_map_path)
+
+    # Chinatown/Villages Plan Areas double as filterable "special areas"
+    # (Filters > Neighbourhoods, after the separator) alongside local_area —
+    # a building/block can be in a real neighbourhood *and* one of these
+    # overlays at once, so they're flags of their own rather than folded
+    # into local_area.
+    chinatown_polygons = load_boundary_polygons(chinatown_geojson_path)
+    village_polygons = load_boundary_polygons(villages_geojson_path)
+    points_df["in_chinatown"] = flag_points_in_polygons(points_df, chinatown_polygons)
+    points_df["in_village_plan"] = flag_points_in_polygons(points_df, village_polygons)
+
     blocks_df = reconstruct_blocks(conn, points_df)
+    blocks_df["in_chinatown"] = flag_geoms_intersecting_polygons(
+        blocks_df["geom_parsed"], chinatown_polygons
+    )
+    blocks_df["in_village_plan"] = flag_geoms_intersecting_polygons(
+        blocks_df["geom_parsed"], village_polygons
+    )
+
     filter_cfg = reconstruct_filter_config(conn, points_df, blocks_df, now)
 
     _write_json(
@@ -476,6 +572,8 @@ def _blocks_feature_collection(blocks_df: pd.DataFrame) -> dict:
         "median_year_built",
         "local_area",
         "block_label",
+        "in_chinatown",
+        "in_village_plan",
     ]
     features = []
     for _, row in blocks_df.iterrows():
@@ -543,6 +641,7 @@ BUILDING_RECORD_COLUMNS = [
     "housing_type", "n_issues", "issues_details", "source",
     "lat", "lon",
     "portfolio_name", "portfolio_building_count", "portfolio_entities",
+    "in_chinatown", "in_village_plan",
     *BUILDING_OVERLAY_COLUMNS,
 ]
 

@@ -1620,6 +1620,17 @@ export function startWiring(ctx) {
         const hasHoodFilter = hoodInputs.length > 0;
         const restrictHoods = hasHoodFilter && selectedHoods.length > 0;
         const hideWhenNone = hasHoodFilter && selectedHoods.length === 0;
+        // Chinatown/Villages Plan are two more checkboxes in the same list
+        // (see legend.ts's specialAreaTagsHtml) but aren't a row's own
+        // local_area — a building/block can be in a real neighbourhood *and*
+        // one of these overlays at once — so a row matches the selection if
+        // its area is selected OR it's flagged for a selected special area.
+        function areaSelectionMatches(area, inChinatown, inVillage) {
+          if (selectedHoods.includes(area)) return true;
+          if (inChinatown && selectedHoods.includes('chinatown')) return true;
+          if (inVillage && selectedHoods.includes('village-plan')) return true;
+          return false;
+        }
         const thresholds = {};
         metricKeys.forEach(function(metric) {
           const ctrl = metricControls[metric];
@@ -1658,7 +1669,11 @@ export function startWiring(ctx) {
           let baseMatches = true;
           const rowArea = (row.getAttribute('data-area') || '').toLowerCase().trim();
           if (restrictHoods) {
-            baseMatches = selectedHoods.includes(rowArea);
+            baseMatches = areaSelectionMatches(
+              rowArea,
+              row.getAttribute('data-chinatown') === '1',
+              row.getAttribute('data-village') === '1',
+            );
           } else if (hideWhenNone) {
             baseMatches = false;
           }
@@ -1781,7 +1796,11 @@ export function startWiring(ctx) {
           var blockArea = row ? (row.getAttribute('data-area') || '').toLowerCase().trim() : '';
           var hoodMatch = true;
           if (restrictHoods) {
-            hoodMatch = selectedHoods.includes(blockArea);
+            hoodMatch = areaSelectionMatches(
+              blockArea,
+              row ? row.getAttribute('data-chinatown') === '1' : false,
+              row ? row.getAttribute('data-village') === '1' : false,
+            );
           } else if (hideWhenNone) {
             hoodMatch = false;
           }

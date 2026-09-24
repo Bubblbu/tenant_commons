@@ -52,9 +52,11 @@ export function buildingRow(r: BuildingRecord): string {
     .join(' ');
   const a = escapeHtml(area);
   const h = escapeHtml(housing);
+  const chinatown = r.in_chinatown === true ? '1' : '';
+  const village = r.in_village_plan === true ? '1' : '';
   return (
     `<tr data-bid="${bid}" data-owner="${escapeHtml(text(r.owner_key))}" data-block="${block}" ` +
-    `data-area="${a}" ` +
+    `data-area="${a}" data-chinatown="${chinatown}" data-village="${village}" ` +
     `data-value-land="${valLand}" data-value-bldg="${valBldg}" ` +
     `data-value-ratio="${ratioVal}" data-units="${units}" ` +
     `data-year-built="${year}" data-search="${escapeHtml(search)}" ` +
@@ -99,8 +101,11 @@ export function blockRowsHtml(fc: BlocksCollection): string {
       const median = num(p.median_year_built);
       const year = median === null ? '' : String(roundHalfEven(median));
       const l = escapeHtml(label);
+      const chinatown = p.in_chinatown === true ? '1' : '';
+      const village = p.in_village_plan === true ? '1' : '';
       return (
         `<tr data-block="${id}" data-area="${escapeHtml(text(p.local_area))}" ` +
+        `data-chinatown="${chinatown}" data-village="${village}" ` +
         `data-bldgs="${bldgs}" data-units="${total}">` +
         `<td class="select-cell"><input type="checkbox" class="row-select" ` +
         `data-type="block" data-target="${id}"></td>` +
