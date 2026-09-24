@@ -9,8 +9,9 @@ Note on the Chinatown boundary: only one boundary file survives, an
 `boundaries.shp` from a wider `ct_ext.shp`, so `chinatown=True` here may
 cover more addresses than the original ~161-row baseline did.
 
-Differences from the vhd script: paths come from DataPaths, clean_address and
-fix_street_names are imported, and the one-off `properties.pre-refresh.csv`
+Differences from the vhd script: paths come from DataPaths, addr_key_from_freeform
+and move_trailing_direction (tc_core.normalize) are imported in place of the
+retired prepare/address.py, and the one-off `properties.pre-refresh.csv`
 backup is gone (derived files are regenerable).
 """
 
@@ -20,7 +21,7 @@ import geopandas
 import polars as pl
 
 from ..paths import DataPaths
-from .address import clean_address, fix_street_names
+from ..normalize import addr_key_from_freeform, move_trailing_direction
 from .io import load_polars
 
 
@@ -38,7 +39,7 @@ def run(paths: DataPaths) -> None:
     addresses = addresses.with_columns(
         address=pl.concat_str(
             pl.col("civic_number"), pl.lit(" "), pl.col("std_street")
-        ).map_elements(clean_address, return_dtype=pl.Utf8),
+        ).map_elements(addr_key_from_freeform, return_dtype=pl.Utf8),
     ).with_columns(
         primary_address=pl.when(pl.col("address_type") == "Secondary")
         .then(
@@ -49,7 +50,7 @@ def run(paths: DataPaths) -> None:
             )
         )
         .otherwise(pl.col("address"))
-        .map_elements(clean_address, return_dtype=pl.Utf8)
+        .map_elements(addr_key_from_freeform, return_dtype=pl.Utf8)
     )
     addresses = addresses.select(
         "objectid",
@@ -69,7 +70,7 @@ def run(paths: DataPaths) -> None:
     properties = properties.with_columns(
         address=pl.concat_str(
             pl.col("civic_number"), pl.lit(" "), pl.col("std_street")
-        ).map_elements(clean_address, return_dtype=pl.Utf8),
+        ).map_elements(addr_key_from_freeform, return_dtype=pl.Utf8),
         pid=pl.col("site_id"),
     )
     properties = properties.drop_nulls(subset="address")
@@ -100,7 +101,7 @@ def run(paths: DataPaths) -> None:
     ct = ct.with_columns(
         address=pl.concat_str(
             pl.col("civic_number"), pl.lit(" "), pl.col("std_street")
-        ).map_elements(clean_address, return_dtype=pl.Utf8),
+        ).map_elements(addr_key_from_freeform, return_dtype=pl.Utf8),
     ).select("address", "chinatown")
     print("Addresses within Chinatown boundary:", ct.height)
 
@@ -122,12 +123,12 @@ def run(paths: DataPaths) -> None:
 
     prop_assess = load_polars(property_tax_f)
     prop_assess = prop_assess.with_columns(
-        pl.col("street_name").map_elements(fix_street_names, return_dtype=pl.Utf8),
+        pl.col("street_name").map_elements(move_trailing_direction, return_dtype=pl.Utf8),
         pl.col("pid").str.replace_all("-", ""),
     ).with_columns(
         address=pl.concat_str(
             pl.col("to_civic_number"), pl.lit(" "), pl.col("street_name")
-        ).map_elements(clean_address, return_dtype=pl.Utf8)
+        ).map_elements(addr_key_from_freeform, return_dtype=pl.Utf8)
     )
 
     prop_assess = prop_assess.filter(pl.col("legal_type") == "LAND")
