@@ -102,6 +102,17 @@ describe('group tables', () => {
     expect(html).toContain('data-type="owner" data-target="b"');
   });
 
+  it('merges spellings of one key into a single row, labelled by the commonest spelling', () => {
+    const html = ownerRowsHtml([
+      rec({ b_id: 1, owner_name: 'Chartwell Construction Ltd', owner_key: 'chartwell-construction-ltd', units: 10 }),
+      rec({ b_id: 2, owner_name: 'CHARTWELL CONSTRUCTION LTD.', owner_key: 'chartwell-construction-ltd', units: 20 }),
+      rec({ b_id: 3, owner_name: 'CHARTWELL CONSTRUCTION LTD.', owner_key: 'chartwell-construction-ltd', units: 5 }),
+    ]);
+    expect([...html.matchAll(/<tr /g)]).toHaveLength(1);
+    expect(html).toContain('data-bldgs="3" data-units="35"');
+    expect(html).toContain('<td>CHARTWELL CONSTRUCTION LTD.</td>');
+  });
+
   it('groups networks, sorted by total units', () => {
     const html = networkRowsHtml(records);
     expect([...html.matchAll(/data-network="([^"]+)"/g)].map((m) => m[1])).toEqual(['net', 'other']);

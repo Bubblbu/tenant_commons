@@ -87,7 +87,7 @@ def test_building_owner_is_its_registry_body_within_a_claims_network(tmp_path):
     assert rec["registry_retrieved"] == "2026-05-28"
     assert rec["licence_holder"] == "Willow Lane Apartments Inc"
     assert (rec["network_key"], rec["network_name"], rec["network_source"], rec["network_name_source"]) == (
-        "glr-properties-ltd", "GLR PROPERTIES LTD.", "claims", "default")
+        "net:glr-properties-ltd", "GLR PROPERTIES LTD.", "claims", "default")
     assert rec["network_entities"] == ["GLR PROPERTIES LTD.", "RENER, GEORGE", "ST. GEORGE ESTATES LTD."]
     assert rec["network_buildings_on_map"] == 2
     assert rec["network_properties_on_title"] == 3
@@ -124,18 +124,40 @@ def test_network_label_claim_renames_the_network_but_not_its_key(tmp_path):
 
     rec = _records(_export(tmp_path, label))["525 w 14th ave"]
     assert (rec["network_name"], rec["network_name_source"], rec["network_key"]) == (
-        "GLR Properties / Rener family", "claim", "glr-properties-ltd")
+        "GLR Properties / Rener family", "claim", "net:glr-properties-ltd")
 
 
 def test_marker_metadata_carries_both_keys(tmp_path):
     markers = json.loads((_export(tmp_path) / "marker_metadata.json").read_text())["markers"]
     by_owner = {m["owner_key"]: m for m in markers}
-    assert by_owner["st-george-estates-ltd"]["network_key"] == "glr-properties-ltd"
+    assert by_owner["st-george-estates-ltd"]["network_key"] == "net:glr-properties-ltd"
 
 
 def test_filter_config_carries_the_licence_year(tmp_path):
     cfg = json.loads((_export(tmp_path) / "filter_config.json").read_text())
     assert cfg["licence_year"] == 2026
+
+
+def test_licence_holder_named_like_a_claims_network_stays_a_separate_network(tmp_path):
+    """A licence-only landlord whose name sanitizes to a claims network's
+    default key must not merge into that network's key or inflate its count."""
+    def lookalike(conn):
+        conn.execute(
+            "INSERT INTO landlords (landlord_id, display_name, owner_key, created_at, updated_at) "
+            "VALUES (4, 'Glr Properties Ltd', 'glr-properties-ltd', 'now', 'now')"
+        )
+        conn.execute(
+            "INSERT INTO buildings (addr_key, address, lat, lon, local_area, units, landlord_id, "
+            "created_at, updated_at) VALUES ('7 lookalike st', '7 lookalike st', 49.28, -123.1, "
+            "'Mount Pleasant', 10, 4, 'now', 'now')"
+        )
+
+    recs = _records(_export(tmp_path, lookalike))
+    network = recs["522 e 8th ave"]
+    licence = recs["7 lookalike st"]
+    assert network["network_key"] != licence["network_key"]
+    assert network["network_buildings_on_map"] == 2
+    assert licence["network_buildings_on_map"] == 1
 
 
 def test_claim_source_notes_never_reach_any_artifact(tmp_path):

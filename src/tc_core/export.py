@@ -129,7 +129,11 @@ def _assign_ownership(df: pd.DataFrame, registry: dict, portfolios: dict) -> Non
         "registry" if r else ("licence" if key != "unknown" else None)
         for r, key in zip(reg, df["owner_key"])
     ]
-    df["network_key"] = [p.portfolio_key if p else key for p, key in zip(port, df["licence_key"])]
+    # "net:" namespaces claims-network keys: sanitize_owner() keys never contain
+    # ":", so a claims network can't collide with a same-named licence group.
+    df["network_key"] = [
+        f"net:{p.portfolio_key}" if p else key for p, key in zip(port, df["licence_key"])
+    ]
     df["network_name"] = [p.portfolio_name if p else lic for p, lic in zip(port, df["licence_holder"])]
     df["network_source"] = [
         "claims" if p else ("licence" if key != "unknown" else None)

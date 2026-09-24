@@ -130,20 +130,28 @@ interface Group {
   totalUnits: number;
 }
 
-/** pandas groupby(...).agg(count address, sum units), then sort by units, buildings desc. */
+/**
+ * Group by key (count address, sum units), then sort by units, buildings desc.
+ * One row per key: spellings of the same key ("Chartwell Construction Ltd" /
+ * "CHARTWELL CONSTRUCTION LTD.") merge, labelled by the commonest spelling
+ * (ties: code-point order), since wiring.js indexes markers by key alone.
+ */
 function aggregate(records: BuildingRecord[], labelOf: (r: BuildingRecord) => string, keyOf: (r: BuildingRecord) => string): Group[] {
-  const groups = new Map<string, Group>();
+  const groups = new Map<string, Group & { labels: Map<string, number> }>();
   for (const r of records) {
     const label = labelOf(r);
     const key = keyOf(r);
-    const id = `${label}\u0000${key}`;
-    let g = groups.get(id);
+    let g = groups.get(key);
     if (!g) {
-      g = { label, key, buildings: 0, totalUnits: 0 };
-      groups.set(id, g);
+      g = { label, key, buildings: 0, totalUnits: 0, labels: new Map() };
+      groups.set(key, g);
     }
+    g.labels.set(label, (g.labels.get(label) ?? 0) + 1);
     if (!isMissing(r.address)) g.buildings += 1;
     g.totalUnits += num(r.units) ?? 0;
+  }
+  for (const g of groups.values()) {
+    g.label = [...g.labels].sort((a, b) => b[1] - a[1] || byCodePoint(a[0], b[0]))[0][0];
   }
   return [...groups.values()]
     .sort((a, b) => byCodePoint(a.label, b.label) || byCodePoint(a.key, b.key)) // groupby's key order
@@ -190,7 +198,7 @@ export function neighbourhoodRowsHtml(records: BuildingRecord[]): string {
   return aggregate(
     records,
     (r) => (isMissing(r.local_area) ? '(Unknown)' : String(r.local_area)),
-    () => '',
+    (r) => (isMissing(r.local_area) ? '(Unknown)' : String(r.local_area)),
   )
     .map((g) => {
       const area = escapeHtml(g.label);
