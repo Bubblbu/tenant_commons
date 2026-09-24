@@ -21,11 +21,11 @@ describe('buildingRow', () => {
       '<tr data-bid="7" data-owner="example-holdings" data-block="3" data-area="West End" ' +
         'data-chinatown="" data-village="" ' +
         'data-value-land="5000000" data-value-bldg="800000" data-value-ratio="0.16" data-units="40" ' +
-        'data-year-built="1965" data-search="12 oak &amp; elm st west end 3 40 example &quot;holdings&quot; sro" ' +
+        'data-year-built="1965" data-search="12 oak &amp; elm st west end 40 example &quot;holdings&quot; sro" ' +
         'data-housing-type="sro" data-n-issues="">' +
         '<td class="select-cell"><input type="checkbox" class="row-select" data-type="building" data-target="7"></td>' +
         '<td>12 Oak &amp; Elm St</td><td data-sort-value="West End">West End</td>' +
-        '<td data-sort-value="3">3</td><td data-sort-value="40">40</td>' +
+        '<td data-sort-value="40">40</td>' +
         '<td>Example &quot;Holdings&quot;</td>' +
         '<td data-sort-value="1965">1965</td><td data-sort-value="sro">sro</td></tr>',
     );

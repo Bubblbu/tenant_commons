@@ -1986,6 +1986,8 @@ export function startWiring(ctx) {
           applyHousingTypeFilter();
           if (tableSearchInput) {
             tableSearchInput.value = '';
+            // Lets listeners such as the search field's clear button resync.
+            tableSearchInput.dispatchEvent(new Event('input'));
           }
           if (onlyIssuesChk) {
             onlyIssuesChk.checked = false;

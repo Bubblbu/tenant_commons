@@ -23,6 +23,7 @@ import {
 import { initLegendToggle, renderLegend } from './legend';
 import { markerStyle } from './markers';
 import { renderPopup } from './popup';
+import { initClearButton } from './search-clear';
 import { renderTables } from './tables';
 import { startWiring } from './wiring.js';
 
@@ -72,6 +73,10 @@ async function main(): Promise<void> {
     markers: styled,
     buildingData: artifacts.buildingData,
   });
+
+  const ownerSearch = document.getElementById('owner-search');
+  const ownerSearchClear = document.getElementById('owner-search-clear');
+  if (ownerSearch instanceof HTMLInputElement && ownerSearchClear) initClearButton(ownerSearch, ownerSearchClear);
 }
 
 main().catch(showLoadError);

@@ -46,7 +46,7 @@ export function buildingRow(r: BuildingRecord): string {
   const area = text(r.local_area);
   const housing = text(r.housing_type);
   const owner = text(r.owner_group);
-  const search = [text(r.address), area, block, units, owner, housing]
+  const search = [text(r.address), area, units, owner, housing]
     .filter((v) => v !== '')
     .map((v) => v.toLowerCase())
     .join(' ');
@@ -65,7 +65,6 @@ export function buildingRow(r: BuildingRecord): string {
     `data-type="building" data-target="${bid}"></td>` +
     `<td>${escapeHtml(text(r.address))}</td>` +
     `<td data-sort-value="${a}">${a}</td>` +
-    `<td data-sort-value="${block}">${block}</td>` +
     `<td data-sort-value="${units}">${units}</td>` +
     `<td>${escapeHtml(owner)}</td>` +
     `<td data-sort-value="${year}">${year}</td>` +

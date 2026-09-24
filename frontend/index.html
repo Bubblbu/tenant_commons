@@ -467,7 +467,6 @@
               <th class="select-head" data-sort="none">Select</th>
               <th data-sort="text">Address</th>
               <th data-sort="text">Neighbourhood</th>
-              <th data-sort="number">Block</th>
               <th data-sort="number">Units</th>
               <th data-sort="text">Landlord</th>
               <th data-sort="number">Year</th>
@@ -478,7 +477,7 @@
           <tfoot>
             <tr class="summary-row">
               <td></td>
-              <td colspan="3" id="summary-buildings-label">Totals (visible)</td>
+              <td colspan="2" id="summary-buildings-label">Totals (visible)</td>
               <td id="summary-buildings-units">0</td>
               <td colspan="3" id="summary-buildings-rows">0 rows</td>
             </tr>
@@ -737,6 +736,37 @@
     border: 1px solid #cdd1dd;
     border-radius: 4px;
     font-size: 13px;
+  }
+
+  .search-field {
+    position: relative;
+  }
+
+  #filters-panel .search-field input[type="text"] {
+    padding-right: 28px;
+  }
+
+  .search-clear {
+    position: absolute;
+    right: 4px;
+    top: 50%;
+    transform: translateY(-50%);
+    padding: 2px 6px;
+    border: 0;
+    background: none;
+    color: #6b7080;
+    font-size: 16px;
+    line-height: 1;
+    cursor: pointer;
+  }
+
+  .search-clear:hover,
+  .search-clear:focus-visible {
+    color: #1f2330;
+  }
+
+  .search-clear[hidden] {
+    display: none;
   }
 
   #filters-panel .filter-grid {
@@ -1099,7 +1129,10 @@
     <h3>Filters</h3>
     <div class="filter-section">
       <h4>Landlords</h4>
-      <input type="text" id="owner-search" placeholder="Search landlord / owner name…">
+      <div class="search-field">
+        <input type="text" id="owner-search" placeholder="Search landlord / owner name…">
+        <button type="button" id="owner-search-clear" class="search-clear" aria-label="Clear landlord search" hidden>&times;</button>
+      </div>
     </div>
     <div class="filter-section">
       <h4>Neighbourhoods</h4>
