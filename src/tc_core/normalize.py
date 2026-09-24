@@ -40,7 +40,11 @@ def normalize_street(s: str) -> str:
 
 
 def addr_key_from_freeform(addr: str) -> str:
-    addr = str(addr).strip().lower()
+    # Trailing "*" is a footnote marker the City's FOI rental list uses on
+    # some addresses (e.g. "1155 Thurlow St*") -- strip it before keying,
+    # same as address_key_variants already does, so it doesn't silently
+    # split a real address from its own key.
+    addr = str(addr).strip().lower().rstrip("*").strip()
     m = re.match(r"^(\d+)\s+(.+)$", addr)
     return (
         f"{m.group(1)} {normalize_street(m.group(2))}" if m else normalize_street(addr)

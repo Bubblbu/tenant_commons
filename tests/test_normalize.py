@@ -22,6 +22,15 @@ def test_addr_key_from_freeform_extracts_civic_number():
     assert addr_key_from_freeform("1234 Burrard Street") == "1234 burrard st"
 
 
+def test_addr_key_from_freeform_strips_a_trailing_footnote_marker():
+    # The City's FOI rental list marks some addresses with a trailing "*"
+    # footnote (e.g. "1155 Thurlow St*"). clean_address used to strip all
+    # non-alphanumeric characters, so this always keyed cleanly; unifying on
+    # addr_key_from_freeform (which only stripped periods) silently dropped
+    # this row from the props join, losing a real 162-unit building.
+    assert addr_key_from_freeform("1155 Thurlow St*") == "1155 thurlow st"
+
+
 def test_move_trailing_direction_moves_direction_to_front():
     assert move_trailing_direction("Georgia W") == "w georgia"
 
