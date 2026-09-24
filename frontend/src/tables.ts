@@ -7,7 +7,7 @@
  * render as JS numbers (15, not Python's 15.0), and tied rows may order
  * differently. Must render before wiring.js starts; it queries the rows once.
  */
-import { escapeHtml, isMissing, roundHalfEven } from './html';
+import { escapeHtml, isMissing, roundHalfEven, sameName } from './html';
 import type { BlocksCollection, BuildingData, BuildingRecord } from './types';
 
 const num = (v: unknown): number | null => (typeof v === 'number' && Number.isFinite(v) ? v : null);
@@ -45,8 +45,10 @@ export function buildingRow(r: BuildingRecord): string {
   const ratioVal = ratio === null ? '' : String(roundHalfEven(ratio, 3));
   const area = text(r.local_area);
   const housing = text(r.housing_type);
-  const owner = text(r.owner_group);
-  const search = [text(r.address), area, units, owner, housing]
+  const owner = text(r.owner_name);
+  const networkName = text(r.network_name);
+  const network = sameName(networkName, owner) ? '' : networkName;
+  const search = [text(r.address), area, units, owner, network, housing]
     .filter((v) => v !== '')
     .map((v) => v.toLowerCase())
     .join(' ');
@@ -55,7 +57,8 @@ export function buildingRow(r: BuildingRecord): string {
   const chinatown = r.in_chinatown === true ? '1' : '';
   const village = r.in_village_plan === true ? '1' : '';
   return (
-    `<tr data-bid="${bid}" data-owner="${escapeHtml(text(r.owner_key))}" data-block="${block}" ` +
+    `<tr data-bid="${bid}" data-owner="${escapeHtml(text(r.owner_key))}" ` +
+    `data-network="${escapeHtml(text(r.network_key))}" data-block="${block}" ` +
     `data-area="${a}" data-chinatown="${chinatown}" data-village="${village}" ` +
     `data-value-land="${valLand}" data-value-bldg="${valBldg}" ` +
     `data-value-ratio="${ratioVal}" data-units="${units}" ` +
@@ -67,6 +70,7 @@ export function buildingRow(r: BuildingRecord): string {
     `<td data-sort-value="${a}">${a}</td>` +
     `<td data-sort-value="${units}">${units}</td>` +
     `<td>${escapeHtml(owner)}</td>` +
+    `<td>${escapeHtml(network)}</td>` +
     `<td data-sort-value="${year}">${year}</td>` +
     `<td data-sort-value="${h}">${h}</td>` +
     `</tr>`

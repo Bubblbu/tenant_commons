@@ -4,7 +4,7 @@ import type { BlocksCollection, BuildingRecord } from './types';
 
 const rec = (over: Partial<BuildingRecord>): BuildingRecord => ({
   b_id: 1, address: 'A', local_area: 'West End', block_id: 1, units: 10,
-  year_built: 1970, owner_group: 'O', owner_key: 'o',
+  year_built: 1970, owner_name: 'O', owner_key: 'o', network_name: 'O', network_key: 'o',
   value_land: 1, value_bldg: 1, bldg_land_ratio: 1,
   housing_type: '', ...over,
 });
@@ -13,22 +13,27 @@ describe('buildingRow', () => {
   it("reproduces rows_buildings' markup exactly", () => {
     const row = buildingRow(rec({
       b_id: 7, address: '12 Oak & Elm St', block_id: 3.0, units: 40.0,
-      year_built: 1965.0, owner_group: 'Example "Holdings"',
-      owner_key: 'example-holdings', value_land: 5000000.4, value_bldg: 800000.0,
-      bldg_land_ratio: 0.16, housing_type: 'sro',
+      year_built: 1965.0, owner_name: 'Example "Holdings"', owner_key: 'example-holdings',
+      network_name: 'Example Group', network_key: 'example-group',
+      value_land: 5000000.4, value_bldg: 800000.0, bldg_land_ratio: 0.16, housing_type: 'sro',
     }));
     expect(row).toBe(
-      '<tr data-bid="7" data-owner="example-holdings" data-block="3" data-area="West End" ' +
+      '<tr data-bid="7" data-owner="example-holdings" data-network="example-group" data-block="3" data-area="West End" ' +
         'data-chinatown="" data-village="" ' +
         'data-value-land="5000000" data-value-bldg="800000" data-value-ratio="0.16" data-units="40" ' +
-        'data-year-built="1965" data-search="12 oak &amp; elm st west end 40 example &quot;holdings&quot; sro" ' +
+        'data-year-built="1965" data-search="12 oak &amp; elm st west end 40 example &quot;holdings&quot; example group sro" ' +
         'data-housing-type="sro" data-n-issues="">' +
         '<td class="select-cell"><input type="checkbox" class="row-select" data-type="building" data-target="7"></td>' +
         '<td>12 Oak &amp; Elm St</td><td data-sort-value="West End">West End</td>' +
         '<td data-sort-value="40">40</td>' +
-        '<td>Example &quot;Holdings&quot;</td>' +
+        '<td>Example &quot;Holdings&quot;</td><td>Example Group</td>' +
         '<td data-sort-value="1965">1965</td><td data-sort-value="sro">sro</td></tr>',
     );
+  });
+
+  it('leaves the network cell blank when it names the owner again', () => {
+    const row = buildingRow(rec({ owner_name: 'GLR PROPERTIES LTD.', network_name: 'Glr Properties Ltd' }));
+    expect(row).toContain('<td>GLR PROPERTIES LTD.</td><td></td>');
   });
 
   it('leaves missing values empty and keeps them out of the search text', () => {
