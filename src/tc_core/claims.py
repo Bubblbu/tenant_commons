@@ -45,6 +45,10 @@ _CLAIM_FIELDS = (
     "retracted_reason",
 )
 
+# Names a landlord network: entity_a is any entity in a common_owner cluster,
+# entity_b is display text (never an entity — see record_claim()).
+NETWORK_LABEL = "network_label"
+
 
 def _resolve_entity_label(conn: sqlite3.Connection, entity: str) -> str:
     """clean_owner_label() plus an automatic collapse onto an existing
@@ -98,7 +102,10 @@ def record_claim(
             raise ValueError(f"record_claim: {field_name} is required and cannot be empty")
 
     entity_a = _resolve_entity_label(conn, entity_a)
-    entity_b = _resolve_entity_label(conn, entity_b)
+    if relationship == NETWORK_LABEL:
+        entity_b = " ".join(str(entity_b).split())
+    else:
+        entity_b = _resolve_entity_label(conn, entity_b)
     claim_key = claim_key or uuid.uuid4().hex
     now = datetime.now(timezone.utc).isoformat()
 
@@ -150,7 +157,9 @@ def list_known_entities(conn: sqlite3.Connection) -> list[str]:
     """
     rows = conn.execute(
         "SELECT entity_a AS entity FROM ownership_claims "
-        "UNION SELECT entity_b FROM ownership_claims ORDER BY 1"
+        "UNION SELECT entity_b FROM ownership_claims WHERE relationship != ? "
+        "ORDER BY 1",
+        (NETWORK_LABEL,),
     ).fetchall()
     return [r[0] for r in rows]
 
@@ -265,3 +274,27 @@ def resolve_owner_groups(
         for entity in cluster:
             result[entity] = sorted(cluster - {entity})
     return result
+
+
+def network_label_claims(conn: sqlite3.Connection) -> dict[str, tuple[str, str, int]]:
+    """sanitize_owner(entity) -> (label, updated_at, claim_id) of the latest
+    confirmed, active network_label claim naming that entity."""
+    rows = conn.execute(
+        "SELECT entity_a, entity_b, updated_at, claim_id FROM ownership_claims "
+        "WHERE relationship = ? AND status = 'active' AND confidence = 'confirmed' "
+        "ORDER BY updated_at, claim_id",
+        (NETWORK_LABEL,),
+    ).fetchall()
+    return {
+        sanitize_owner(entity): (label, updated_at, claim_id)
+        for entity, label, updated_at, claim_id in rows
+    }
+
+
+def confirmed_common_owner_edges(conn: sqlite3.Connection) -> list[tuple[str, str, str]]:
+    """(entity_a, entity_b, source_type) of every confirmed, active common_owner claim."""
+    rows = conn.execute(
+        "SELECT entity_a, entity_b, source_type FROM ownership_claims "
+        "WHERE relationship = 'common_owner' AND status = 'active' AND confidence = 'confirmed'"
+    ).fetchall()
+    return [(a, b, source_type) for a, b, source_type in rows]

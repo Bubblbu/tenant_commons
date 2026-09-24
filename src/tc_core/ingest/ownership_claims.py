@@ -24,7 +24,7 @@ import sqlite3
 
 import pandas as pd
 
-from ..claims import find_similar_entity, record_claim
+from ..claims import NETWORK_LABEL, find_similar_entity, record_claim
 from ..io import normalize_cols, read_any_csv
 
 logger = logging.getLogger("tc_core.ingest")
@@ -86,7 +86,10 @@ def ingest_ownership_claims(conn: sqlite3.Connection, path: str) -> int:
         # resolution (different sanitize_owner() keys, same real owner) still
         # requires a same_entity/common_owner claim — see claims.py's module
         # docstring.
-        for entity in (entity_a, entity_b):
+        relationship = _cell(row, "relationship")
+        # A network_label's entity_b is display text, not an entity.
+        entities = (entity_a,) if relationship == NETWORK_LABEL else (entity_a, entity_b)
+        for entity in entities:
             if entity is None:
                 continue
             similar = find_similar_entity(conn, entity)
@@ -106,7 +109,7 @@ def ingest_ownership_claims(conn: sqlite3.Connection, path: str) -> int:
             conn,
             entity_a=entity_a,
             entity_b=entity_b,
-            relationship=_cell(row, "relationship"),
+            relationship=relationship,
             source_type=_cell(row, "source_type"),
             claim_key=claim_key,
             **kwargs,
