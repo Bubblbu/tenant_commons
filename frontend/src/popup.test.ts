@@ -1,12 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
   formatCurrencyCompact,
-  licenceProvenance,
-  networkProvenance,
-  registryProvenance,
   renderPopup,
   safeUrl,
 } from './popup';
+import { licenceProvenance, networkProvenance, registryProvenance } from './provenance';
 import type { BuildingRecord } from './types';
 
 const building: BuildingRecord = {

@@ -6,6 +6,7 @@
  * so there is nothing for the popup to read here even by omission.
  */
 import { escapeHtml, isMissing, sameName } from './html';
+import { licenceProvenance, networkProvenance, provenanceIcon, registryProvenance } from './provenance';
 import type { BuildingRecord } from './types';
 
 const str = (v: unknown): string => (isMissing(v) ? '' : String(v).trim());
@@ -37,39 +38,7 @@ export interface PopupContext {
   licenceYear?: number | null;
 }
 
-export function registryProvenance(pids: string[], retrieved: string): string {
-  const shown = pids.slice(0, 3).join(', ');
-  const more = pids.length > 3 ? ` (+${pids.length - 3} more)` : '';
-  const pidText = pids.length ? `: ${pids.length === 1 ? 'PID' : 'PIDs'} ${shown}${more}` : '';
-  const when = retrieved ? `, record retrieved ${retrieved}` : '';
-  return `BC Land Owner Transparency Registry${pidText}${when}`;
-}
-
-export function licenceProvenance(year: number | null | undefined): string {
-  return year ? `City of Vancouver business licence, ${year}` : 'City of Vancouver business licence';
-}
-
-export function networkProvenance(r: BuildingRecord): string {
-  if (str(r.network_source) !== 'claims') return 'Grouped by business licence name';
-  const ev = (r.network_evidence ?? {}) as Record<string, unknown>;
-  const registry = num(ev.registry) ?? 0;
-  const research = num(ev.vtu_research) ?? 0;
-  const parts = [
-    registry ? plural(registry, 'provincial registry filing', 'provincial registry filings') : '',
-    research ? plural(research, 'VTU research claim', 'VTU research claims') : '',
-  ].filter(Boolean);
-  const grouped = parts.length ? `Grouped from ${parts.join(' and ')}.` : 'Grouped from ownership claims.';
-  const name = str(r.network_name_source) === 'claim'
-    ? 'Name: set by claim.'
-    : 'Name: default (entity with the most properties).';
-  return `${grouped} ${name}`;
-}
-
-/** Small "i" marker; its source text shows on hover or on focus (a tap on touch screens). */
-function provenance(text: string): string {
-  const t = escapeHtml(text);
-  return `<span class="prov" tabindex="0" role="note" aria-label="Source: ${t}" data-tip="${t}">i</span>`;
-}
+const provenance = (text: string) => provenanceIcon(text);
 
 function ownershipLines(r: BuildingRecord, ctx: PopupContext): string[] {
   const lines: string[] = [];

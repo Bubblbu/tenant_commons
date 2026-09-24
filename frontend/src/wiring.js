@@ -619,6 +619,8 @@ export function startWiring(ctx) {
       }
 
       function sortByHeader(event) {
+        // An explainer icon inside the header shows its tooltip; it doesn't sort.
+        if (event.target && event.target.closest && event.target.closest('.prov')) return;
         var th = event.currentTarget;
         var sortType = th.dataset.sort || 'text';
         if (sortType === 'none') return;

@@ -110,7 +110,29 @@ describe('group tables', () => {
     ]);
     expect([...html.matchAll(/<tr /g)]).toHaveLength(1);
     expect(html).toContain('data-bldgs="3" data-units="35"');
-    expect(html).toContain('<td>CHARTWELL CONSTRUCTION LTD.</td>');
+    expect(html).toContain('>CHARTWELL CONSTRUCTION LTD.</td>');
+  });
+
+  it('tags each network row with where its grouping comes from', () => {
+    const html = networkRowsHtml([
+      rec({ b_id: 1, network_name: 'GLR', network_key: 'net:glr', network_source: 'claims',
+        network_name_source: 'default', network_evidence: { registry: 3, vtu_research: 0 } }),
+      rec({ b_id: 2, network_name: 'Solo', network_key: 'solo', network_source: 'licence' }),
+      rec({ b_id: 3, network_name: '(Unknown)', network_key: 'unknown', network_source: null }),
+    ]);
+    expect(html).toContain('data-tip="Grouped from 3 provincial registry filings. Name: default (entity with the most properties)."');
+    expect(html).toContain('data-tip="Grouped by business licence name"');
+    expect(html).toContain('<td data-sort-value="(Unknown)">(Unknown)</td>');
+  });
+
+  it('tags each owner row with its source, keeping the name as the sort value', () => {
+    const html = ownerRowsHtml([
+      rec({ b_id: 1, owner_name: 'St. "George"', owner_key: 'st-george', owner_source: 'registry' }),
+      rec({ b_id: 2, owner_name: 'Solo', owner_key: 'solo', owner_source: 'licence' }),
+    ], 2026);
+    expect(html).toContain('<td data-sort-value="St. &quot;George&quot;">St. &quot;George&quot;<span class="prov"');
+    expect(html).toContain('data-tip="BC Land Owner Transparency Registry"');
+    expect(html).toContain('data-tip="City of Vancouver business licence, 2026"');
   });
 
   it('groups networks, sorted by total units', () => {

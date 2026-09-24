@@ -8,6 +8,7 @@
  * differently. Must render before wiring.js starts; it queries the rows once.
  */
 import { escapeHtml, isMissing, roundHalfEven, sameName } from './html';
+import { EXPLAINERS, networkProvenance, ownerRowProvenance, provenanceIcon, tipPlacement } from './provenance';
 import type { BlocksCollection, BuildingData, BuildingRecord } from './types';
 
 const num = (v: unknown): number | null => (typeof v === 'number' && Number.isFinite(v) ? v : null);
@@ -128,6 +129,7 @@ interface Group {
   key: string;
   buildings: number;
   totalUnits: number;
+  records: BuildingRecord[];
 }
 
 /**
@@ -143,9 +145,10 @@ function aggregate(records: BuildingRecord[], labelOf: (r: BuildingRecord) => st
     const key = keyOf(r);
     let g = groups.get(key);
     if (!g) {
-      g = { label, key, buildings: 0, totalUnits: 0, labels: new Map() };
+      g = { label, key, buildings: 0, totalUnits: 0, records: [], labels: new Map() };
       groups.set(key, g);
     }
+    g.records.push(r);
     g.labels.set(label, (g.labels.get(label) ?? 0) + 1);
     if (!isMissing(r.address)) g.buildings += 1;
     g.totalUnits += num(r.units) ?? 0;
@@ -158,7 +161,9 @@ function aggregate(records: BuildingRecord[], labelOf: (r: BuildingRecord) => st
     .sort((a, b) => b.totalUnits - a.totalUnits || b.buildings - a.buildings);
 }
 
-function groupRow(g: Group, type: 'owner' | 'network' | 'neighbourhood', target: string, first: string, dataKey: string): string {
+function groupRow(
+  g: Group, type: 'owner' | 'network' | 'neighbourhood', target: string, first: string, dataKey: string, icon = '',
+): string {
   const units = Math.trunc(g.totalUnits);
   const avg = avgUnits(g.totalUnits, g.buildings);
   return (
@@ -166,7 +171,7 @@ function groupRow(g: Group, type: 'owner' | 'network' | 'neighbourhood', target:
     `data-bldgs="${g.buildings}" data-units="${units}">` +
     `<td class="select-cell"><input type="checkbox" class="row-select" ` +
     `data-type="${type}" data-target="${target}"></td>` +
-    `<td>${first}</td>` +
+    `<td data-sort-value="${first}">${first}${icon}</td>` +
     `<td data-sort-value="${g.buildings}">${g.buildings}</td>` +
     `<td data-sort-value="${units}">${units}</td>` +
     `<td data-sort-value="${avg}">${avg.toFixed(1)}</td>` +
@@ -174,13 +179,19 @@ function groupRow(g: Group, type: 'owner' | 'network' | 'neighbourhood', target:
   );
 }
 
-export function ownerRowsHtml(records: BuildingRecord[]): string {
+/** A row's provenance icon, or '' when there is nothing to say. */
+const iconFor = (text: string) => (text ? provenanceIcon(text) : '');
+
+export function ownerRowsHtml(records: BuildingRecord[], licenceYear: number | null = null): string {
   return aggregate(
     records,
     (r) => (isMissing(r.owner_name) ? '(Unknown)' : String(r.owner_name)),
     (r) => (isMissing(r.owner_key) ? 'unknown' : String(r.owner_key)),
   )
-    .map((g) => groupRow(g, 'owner', escapeHtml(g.key), escapeHtml(g.label), 'data-owner'))
+    .map((g) => groupRow(
+      g, 'owner', escapeHtml(g.key), escapeHtml(g.label), 'data-owner',
+      iconFor(ownerRowProvenance(g.records.map((r) => r.owner_source), licenceYear)),
+    ))
     .join('\n');
 }
 
@@ -190,7 +201,13 @@ export function networkRowsHtml(records: BuildingRecord[]): string {
     (r) => (isMissing(r.network_name) ? '(Unknown)' : String(r.network_name)),
     (r) => (isMissing(r.network_key) ? 'unknown' : String(r.network_key)),
   )
-    .map((g) => groupRow(g, 'network', escapeHtml(g.key), escapeHtml(g.label), 'data-network'))
+    .map((g) => {
+      const sample = g.records[0];
+      const icon = sample.network_source === 'claims' || sample.network_source === 'licence'
+        ? provenanceIcon(networkProvenance(sample))
+        : '';
+      return groupRow(g, 'network', escapeHtml(g.key), escapeHtml(g.label), 'data-network', icon);
+    })
     .join('\n');
 }
 
@@ -207,7 +224,37 @@ export function neighbourhoodRowsHtml(records: BuildingRecord[]): string {
     .join('\n');
 }
 
-export function renderTables(data: BuildingData, blocks: BlocksCollection, doc: Document = document): void {
+/**
+ * Adds the explainer icon to every header marked data-explain="owner|network".
+ * Header cells are sticky (so they contain the tooltip) and tables can be wider
+ * than the screen, so the tooltip is placed inside the visible table area each
+ * time it opens.
+ */
+export function addHeaderExplainers(doc: Document = document): void {
+  doc.querySelectorAll<HTMLElement>('table.data th[data-explain]').forEach((th) => {
+    const text = EXPLAINERS[th.dataset.explain as keyof typeof EXPLAINERS];
+    if (!text || th.querySelector('.prov')) return;
+    th.insertAdjacentHTML('beforeend', provenanceIcon(text, 'About'));
+    const icon = th.querySelector<HTMLElement>('.prov');
+    if (!icon) return;
+    const place = () => {
+      const clip = (icon.closest('.table-wrap') ?? doc.documentElement).getBoundingClientRect();
+      const viewWidth = doc.defaultView?.innerWidth ?? clip.right;
+      const { left, width } = tipPlacement(
+        icon.getBoundingClientRect().left, th.getBoundingClientRect().left,
+        Math.max(clip.left, 0), Math.min(clip.right, viewWidth),
+      );
+      icon.style.setProperty('--tip-left', `${left}px`);
+      icon.style.setProperty('--tip-width', `${width}px`);
+    };
+    icon.addEventListener('mouseenter', place);
+    icon.addEventListener('focus', place);
+  });
+}
+
+export function renderTables(
+  data: BuildingData, blocks: BlocksCollection, doc: Document = document, licenceYear: number | null = null,
+): void {
   const records = Object.values(data.records);
   const fill = (tableId: string, html: string) => {
     const tbody = doc.querySelector(`#${tableId} tbody`);
@@ -215,7 +262,8 @@ export function renderTables(data: BuildingData, blocks: BlocksCollection, doc: 
   };
   fill('buildings-table', buildingRowsHtml(records));
   fill('blocks-table', blockRowsHtml(blocks));
-  fill('owners-table', ownerRowsHtml(records));
+  fill('owners-table', ownerRowsHtml(records, licenceYear));
   fill('networks-table', networkRowsHtml(records));
   fill('neighbourhoods-table', neighbourhoodRowsHtml(records));
+  addHeaderExplainers(doc);
 }

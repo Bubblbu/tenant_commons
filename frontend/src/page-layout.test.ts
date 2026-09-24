@@ -31,6 +31,20 @@ describe('Landlords tab', () => {
     expect(page).not.toContain('id="landlords-table"');
   });
 
+  it('marks the Owner and Network headers for explainer icons', () => {
+    for (const table of ['networks-table', 'owners-table', 'buildings-table']) {
+      const markup = page.slice(page.indexOf(`id="${table}"`), page.indexOf('</thead>', page.indexOf(`id="${table}"`)));
+      expect(markup).toMatch(/data-explain="(owner|network)"/);
+    }
+    const buildings = page.slice(page.indexOf('id="buildings-table"'), page.indexOf('</thead>', page.indexOf('id="buildings-table"')));
+    expect(buildings).toContain('data-explain="owner"');
+    expect(buildings).toContain('data-explain="network"');
+  });
+
+  it('does not sort when an explainer icon in a header is clicked', () => {
+    expect(wiring).toMatch(/closest\('\.prov'\)/);
+  });
+
   it('is wired for both views', () => {
     expect(wiring).toContain("'#owners-table tbody tr'");
     expect(wiring).toContain("'#networks-table tbody tr'");

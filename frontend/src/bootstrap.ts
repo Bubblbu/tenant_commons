@@ -8,6 +8,7 @@ import 'leaflet/dist/leaflet.css';
 // Folium's page loaded Bootstrap; the sidebar's font, box-sizing and spacing
 // come from its reboot layer (no Bootstrap classes or JS are used).
 import 'bootstrap/dist/css/bootstrap-reboot.min.css';
+import './provenance.css';
 import './popup.css';
 import * as L from 'leaflet';
 import { initAboutModal } from './about';
@@ -23,6 +24,7 @@ import {
 import { initLegendToggle, renderLegend } from './legend';
 import { markerStyle } from './markers';
 import { renderPopup } from './popup';
+import { initTipDismiss } from './provenance';
 import { initClearButton } from './search-clear';
 import { renderTables } from './tables';
 import { initViewToggle } from './view-toggle';
@@ -66,7 +68,8 @@ async function main(): Promise<void> {
   renderLegend(artifacts.filterConfig);
   initLegendToggle();
   initAboutModal(map);
-  renderTables(artifacts.buildingData, artifacts.blocks);
+  renderTables(artifacts.buildingData, artifacts.blocks, document, artifacts.filterConfig.licence_year ?? null);
+  initTipDismiss();
 
   startWiring({
     map,
