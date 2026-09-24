@@ -200,7 +200,7 @@ Risks to actively manage (see Section 7): the "good enough" trap, premature demo
 - [ ] Ad hoc export button (filtered CSV/JSON for sharing)
 
 **Public map**
-- [ ] Wire in claims-derived landlord clustering (grouping shell companies under a real owner where confirmed)
+- [x] Wire in claims-derived landlord clustering (grouping shell companies under a real owner where confirmed)
 - [ ] Polish filters/sidebar to match or exceed current site's functionality (neighbourhood, assessed value, unit sliders)
 - [ ] Marker clustering/canvas rendering if point count warrants it
 
