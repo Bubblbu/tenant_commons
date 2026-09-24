@@ -1,7 +1,7 @@
 # Ownership layers: owner vs. network, with provenance
 
 Date: 2026-09-23
-Status: approved in conversation, awaiting written-spec review
+Status: implemented (plan: docs/superpowers/plans/2026-09-23-ownership-layers.md)
 
 ## Problem
 
@@ -81,7 +81,7 @@ owner layer is added.
 | `owner_source` | `"registry"` or `"licence"` |
 | `registered_owners` | All distinct reporting bodies for the building, primary first; `[]` if none |
 | `registry_pids` | The building's PIDs that have a LOTR filing, dashed as filed |
-| `registry_filed` | Latest `order_created_date` (date only) across those filings; null if none |
+| `registry_retrieved` | Latest Samwise order date (date only) — when the registry record was retrieved, not a filing date; null if none |
 | `licence_holder` | The licence-holder label (today's pre-overwrite `owner_group`) |
 | `network_key` | Claims cluster key if the building is in a confirmed cluster; otherwise today's licence `owner_key` |
 | `network_name` | The cluster's display name; otherwise the licence holder label |
@@ -162,7 +162,7 @@ Each ownership line in the popup ends in a small icon. Its tooltip text, all
 of which is escaped:
 
 - **Owner, registry:** "BC Land Owner Transparency Registry: PID 008-173-613
-  (+N more), latest filing 2025-03-14". Up to three PIDs are listed.
+  (+N more), record retrieved 2025-03-14". Up to three PIDs are listed.
 - **Owner or licence line, licence:** "City of Vancouver business licence,
   {licence_year}".
 - **Network, claims:** "Grouped from {registry} provincial registry filings

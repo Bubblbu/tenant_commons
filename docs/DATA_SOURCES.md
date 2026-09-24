@@ -132,6 +132,7 @@ the raw CSVs.
     recomputed from value_bldg/value_land at merge time if missing) — left
     in `raw_buildings.py`'s column list as always-null rather than removed.
   - Address keying used to go through `prepare/address.py`'s `clean_address`, which rewrote any word starting with ` str` (e.g. `strathcona` became `stathcona`) via an unguarded substring replace. That module is retired (2026-09) in favor of `tc_core.normalize.addr_key_from_freeform`, used uniformly by `prepare/`, `ingest/`, and membership matching alike — its word-boundary-safe replacement doesn't corrupt `strathcona`, and it keeps punctuation `clean_address` used to strip (apostrophes, hyphens: `lamey's mill rd`, not `lameys mill rd`), while still stripping a trailing `*` footnote marker the FOI rental list uses on some addresses.
+  - `bsns_year`: the business-licence `folderyear` this build used, as a four-digit year (the City publishes two digits). Dataset-level — the same on every row. The export publishes it as `filter_config.licence_year` for the popup's licence provenance.
 - **Output location:** `data/derived/buildings.csv`.
 - **Consumed by:** `tc_core` (`ingest/raw_buildings.py`).
 - **Refresh cadence:** rebuilt by `prepare_data.py` after each fetch. Last

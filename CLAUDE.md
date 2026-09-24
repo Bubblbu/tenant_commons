@@ -2,7 +2,7 @@
 
 *Living document. Update this as decisions change — it's meant to be edited, not archived.*
 
-Last updated: 2026-09-18
+Last updated: 2026-09-23
 
 ---
 
@@ -76,6 +76,7 @@ Built with an eye toward generalizing to a broader `claims` pattern later (build
 - *Genuine entity resolution* (a numbered company turns out to be a named person; two different-looking names turn out to be the same legal entity; two distinct entities share a beneficial owner) — recorded as a claim, not merged at the schema level. This is literally what the claims model is for (see Section 1's example). Relationship-value convention to keep the two cases distinguishable downstream (e.g. for future map clustering): `same_entity` = literally the same legal entity, just written differently; `common_owner` = different entities, same real owner.
 - `claims.py::find_similar_entity()` gives a soft nudge (not a hard merge) when a new entity's normalized key matches an existing one under a different display spelling — used by the bulk importer as a warning, and intended for future form autocomplete.
 - `claims.py::resolve_entity_clusters()` computes, at read time (no persisted table — see the design discussion this came from), a joined display name for every entity in a `same_entity` cluster (transitive — A~B, B~C joins all three), e.g. `"0733603 BC Ltd" -> "0733603 BC Ltd / Phil Kim"`. `display_name_for()` looks up a single entity against that result, falling back to the raw name. `claims.py::resolve_owner_groups()` does the equivalent for `common_owner`, but returns each entity's *group* (the other entities sharing its real owner) rather than joining names — these are legally distinct entities, so callers should present them as a portfolio/group (this is the `resolve_owner_groups()` behind CLAUDE.md's planned public-map "claims-derived landlord clustering," Section 5 Phase 1), not rename them. Both default to `confirmed`-only claims (`include_unconfirmed=True` opts into the softer behavior), matching the confidence gate above.
+- `network_label` claims name a landlord network: `entity_a` is any entity in a `common_owner` cluster, `entity_b` the display label — free text, stored verbatim, and excluded from `list_known_entities()`/`find_similar_entity()`. The most recently updated confirmed, active label on any entity in the cluster wins; without one the network is named after the entity holding the most PIDs. Relabelling never changes a network's key.
 
 ### Ingest run tracking
 
@@ -91,6 +92,8 @@ Raw source tables (Open Data extract, FOI list, NationBuilder export, ownership_
 
 ### Sensitivity model (Q11)
 **Field-level flags, tagged incrementally, default-public.** Not every field classified up front (too much upfront work for the time budget) — instead, known-sensitive fields are flagged now (VTU membership counts/IDs, tenant names/identifying details in claim notes), everything else defaults to public, and new fields get flagged *at the moment they're added* if they touch tenant identity or membership. This is a discipline to maintain, not just a one-time setup.
+
+**Public ownership data (2026-09-23).** LOTR reporting bodies and interest holders — including private individuals — are shown on the public map as the province publishes them; owners can seek removal through the registry's own channels. Claim provenance in public artifacts is limited to source *types* and counts: `public_registry` shows as "provincial registry", every other type collapses to "VTU research" so the map never signals that a tenant reported on a landlord, and `source_note` never leaves the database (a canary test in `tests/test_export_ownership.py` enforces this). Full provenance is for the internal app.
 
 ### Export mechanism (Q12)
 Two paths, sharing the same underlying "filter to public fields" logic in `tc_core`:
@@ -201,6 +204,7 @@ Risks to actively manage (see Section 7): the "good enough" trap, premature demo
 
 **Public map**
 - [x] Wire in claims-derived landlord clustering (grouping shell companies under a real owner where confirmed)
+- [x] Separate each building's owner (LOTR reporting body or licence holder) from its landlord network, with provenance indicators — see docs/superpowers/specs/2026-09-23-ownership-layers-design.md
 - [ ] Polish filters/sidebar to match or exceed current site's functionality (neighbourhood, assessed value, unit sliders)
 - [ ] Marker clustering/canvas rendering if point count warrants it
 
