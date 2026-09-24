@@ -1473,10 +1473,6 @@ export function startWiring(ctx) {
             minLabel: minLabel,
             maxLabel: maxLabel,
             bars: bars,
-            // The bar heights' fixed denominator (see applyFilters()'s live
-            // recount): counts only ever shrink as filters narrow the set,
-            // so the original full-dataset max never needs recomputing.
-            maxCount: maxCount,
             useLog: useLog && logMax !== logMin,
             toSlider: useLog && logMax !== logMin ? toSlider : function(value) { return Number(value); },
             fromSlider: useLog && logMax !== logMin ? fromSlider : function(value) { return Number(value); },
@@ -1647,7 +1643,10 @@ export function startWiring(ctx) {
         metricKeys.forEach(function(metric) {
           const ctrl = metricControls[metric];
           const counts = binCounts[metric];
-          const maxCount = ctrl.maxCount || 1;
+          // Rescale to the current view's own tallest bar, not the original
+          // full-dataset one — otherwise every bar reads near-flat once a
+          // filter has narrowed the set well below the original max.
+          const maxCount = Math.max(1, counts.reduce(function(m, c) { return c > m ? c : m; }, 0));
           ctrl.bars.forEach(function(bar, i) {
             const count = counts[i] || 0;
             const height = maxCount ? Math.max(2, (count / maxCount) * 100) : 2;

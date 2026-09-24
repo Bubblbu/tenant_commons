@@ -102,7 +102,7 @@ def reconstruct_points(
 
     merged = merged[
         [
-            "addr_key", "address", "lat", "lon", "units", "year_built", "n_issues",
+            "addr_key", "address", "lat", "lon", "units", "year_built", "n_issues", "issues_details",
             "member_count", "has_vtu_member", "member_share_building", "owner_group",
             "owner_key", "member_count_all", "members_payload", "value_land",
             "value_bldg", "bldg_land_ratio", "local_area", "b_id", "block_id",
@@ -540,7 +540,7 @@ BUILDING_RECORD_COLUMNS = [
     "b_id", "address", "local_area", "block_id", "units",
     "year_built", "owner_group", "owner_key", "value_land",
     "value_bldg", "bldg_land_ratio",
-    "housing_type", "n_issues", "source",
+    "housing_type", "n_issues", "issues_details", "source",
     "lat", "lon",
     "portfolio_name", "portfolio_building_count", "portfolio_entities",
     *BUILDING_OVERLAY_COLUMNS,

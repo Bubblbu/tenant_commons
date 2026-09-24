@@ -239,6 +239,14 @@ def _deduplicate_buildings(df: pd.DataFrame, owner_col: str) -> pd.DataFrame:
         units = g["units"].max()
         yb = g["year_built"].median()
         n_issues = g["n_issues"].max() if "n_issues" in g.columns else np.nan
+        # The City's rental-standards detail page for whichever row
+        # contributed the max n_issues (matches it, rather than an arbitrary
+        # row's URL, on the rare chance a building has more than one).
+        issues_details = None
+        if "issues_details" in g.columns and pd.notna(n_issues):
+            issues_details = g.loc[g["n_issues"].idxmax(), "issues_details"]
+            if pd.isna(issues_details):
+                issues_details = None
 
         val_land_series = g["value_land"].dropna() if "value_land" in g.columns else pd.Series(dtype=float)
         val_bldg_series = g["value_bldg"].dropna() if "value_bldg" in g.columns else pd.Series(dtype=float)
@@ -279,6 +287,7 @@ def _deduplicate_buildings(df: pd.DataFrame, owner_col: str) -> pd.DataFrame:
                 "units": None if pd.isna(units) else float(units),
                 "year_built": None if pd.isna(yb) else float(yb),
                 "n_issues": None if pd.isna(n_issues) else float(n_issues),
+                "issues_details": issues_details,
                 "value_land": val_land,
                 "value_bldg": val_bldg,
                 "bldg_land_ratio": ratio,
@@ -382,6 +391,7 @@ def write_buildings(
                 row["value_bldg"],
                 row["bldg_land_ratio"],
                 row["n_issues"],
+                row["issues_details"],
                 landlord_id,
                 block_id,
                 json.dumps(row["source_row_ids"]),
@@ -394,9 +404,9 @@ def write_buildings(
             """
             INSERT INTO buildings (
                 addr_key, address, local_area, lat, lon, units, year_built,
-                value_land, value_bldg, bldg_land_ratio, n_issues,
+                value_land, value_bldg, bldg_land_ratio, n_issues, issues_details,
                 landlord_id, block_id, source_row_ids, created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             rows,
         )

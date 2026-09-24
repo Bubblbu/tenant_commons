@@ -62,7 +62,10 @@ export function renderPopup(r: BuildingRecord): string {
   if (assessed) facts.push(div('', escapeHtml(`Assessed ${assessed}`)));
   const issues = num(r.n_issues);
   if (issues !== null && issues > 0) {
-    facts.push(div('popup-issues', escapeHtml(plural(Math.trunc(issues), 'outstanding issue', 'outstanding issues'))));
+    let issuesHtml = escapeHtml(plural(Math.trunc(issues), 'outstanding issue', 'outstanding issues'));
+    const issuesUrl = safeUrl(r.issues_details);
+    if (issuesUrl) issuesHtml += ` · <a href="${escapeHtml(issuesUrl)}" target="_blank" rel="noopener">City details</a>`;
+    facts.push(div('popup-issues', issuesHtml));
   }
 
   const housing: string[] = [];

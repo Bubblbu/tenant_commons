@@ -207,6 +207,7 @@ CREATE TABLE buildings (
     value_bldg NUMERIC,
     bldg_land_ratio REAL,
     n_issues INTEGER,
+    issues_details TEXT,
     landlord_id INTEGER REFERENCES landlords(landlord_id),
     block_id INTEGER REFERENCES blocks(block_id),
     source_row_ids TEXT,
