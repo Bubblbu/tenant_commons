@@ -48,8 +48,7 @@ export function startWiring(ctx) {
       let blockColorScalingEnabled = true;
       let blockColorMin = 0;
       let blockColorMax = 0;
-      let showSroChecked = false;
-      let showCoopChecked = false;
+      let showHousingTypeChecked = false;
       let showIssuesChecked = false;
       // Declared here (not down with the other filter-panel DOM refs) because
       // syncMarkerAnnotations()/effectiveStrokeColor() — both called from
@@ -58,8 +57,7 @@ export function startWiring(ctx) {
       // dead zone), and since that throw happened inside wireUp()'s top-level
       // try/catch, it was being silently swallowed and retried forever —
       // filters and tab-switching never finished wiring up as a result.
-      const vizShowSroChk = document.getElementById('viz-show-sro');
-      const vizShowCoopChk = document.getElementById('viz-show-coop');
+      const vizShowHousingTypeChk = document.getElementById('viz-show-housing-type');
       const vizShowIssuesChk = document.getElementById('viz-show-issues');
 
       function computeZoomScale(zoom) {
@@ -228,9 +226,9 @@ export function startWiring(ctx) {
 
       // A building matching exactly one housing type has its OWN stroke
       // overridden to that type's ring color (see add_buildings_layers in
-      // layout.py) — no separate marker. So unchecking "Show co-ops"/"Show
-      // SRO/SRA hotels" for that case means reverting the marker's own
-      // stroke back to the plain default, not hiding/showing a child object.
+      // layout.py) — no separate marker. So unchecking "Show housing type"
+      // for that case means reverting the marker's own stroke back to the
+      // plain default, not hiding/showing a child object.
       // marker._primaryHousingType (set in applyMarkerMetadata) records which
       // type currently owns the stroke, so these two helpers are the single
       // source of truth for what color/weight a marker's stroke should
@@ -238,8 +236,7 @@ export function startWiring(ctx) {
       // of reading marker._strokeColor/_strokeWeight directly.
       function effectiveStrokeColor(marker) {
         if (!marker) return MARKER_STROKE_COLOR;
-        if ((marker._primaryHousingType === 'coop' && !showCoopChecked) ||
-            (marker._primaryHousingType === 'sro' && !showSroChecked)) {
+        if (marker._primaryHousingType && !showHousingTypeChecked) {
           return MARKER_STROKE_COLOR;
         }
         return marker._strokeColor || MARKER_STROKE_COLOR;
@@ -247,8 +244,7 @@ export function startWiring(ctx) {
 
       function effectiveStrokeWeight(marker) {
         if (!marker) return MARKER_STROKE_WEIGHT;
-        if ((marker._primaryHousingType === 'coop' && !showCoopChecked) ||
-            (marker._primaryHousingType === 'sro' && !showSroChecked)) {
+        if (marker._primaryHousingType && !showHousingTypeChecked) {
           return MARKER_STROKE_WEIGHT;
         }
         return marker._strokeWeight || MARKER_STROKE_WEIGHT;
@@ -269,8 +265,7 @@ export function startWiring(ctx) {
         if (marker._extraRings) {
           marker._extraRings.forEach(function(r) {
             if (!r || !r.marker) return;
-            var typeShown = r.housingType === 'coop' ? showCoopChecked :
-              (r.housingType === 'sro' ? showSroChecked : showIssuesChecked);
+            var typeShown = r.housingType === 'issues' ? showIssuesChecked : showHousingTypeChecked;
             var visible = buildingVisible && typeShown;
             if (typeof r.marker.setStyle === 'function') {
               r.marker.setStyle({ opacity: visible ? 0.9 : 0 });
@@ -494,8 +489,7 @@ export function startWiring(ctx) {
       // Filters panel, is the one that actually hides markers — see
       // applyFilters().)
       function applyHousingTypeFilter() {
-        showSroChecked = vizShowSroChk ? vizShowSroChk.checked !== false : false;
-        showCoopChecked = vizShowCoopChk ? vizShowCoopChk.checked !== false : false;
+        showHousingTypeChecked = vizShowHousingTypeChk ? vizShowHousingTypeChk.checked !== false : false;
         showIssuesChecked = vizShowIssuesChk ? vizShowIssuesChk.checked !== false : false;
         applyFilters();
         updateLegendVisibility();
@@ -1058,7 +1052,7 @@ export function startWiring(ctx) {
         setLegendDisplay(legendBlocksEl, showBlocksLegend);
         // Static reference info (ring colors) — only relevant once at least
         // one Building Details ring toggle is actually on.
-        const showBuildingDetailsLegend = showSroChecked || showCoopChecked || showIssuesChecked;
+        const showBuildingDetailsLegend = showHousingTypeChecked || showIssuesChecked;
         setLegendDisplay(legendBuildingDetailsEl, showBuildingDetailsLegend);
         const neighbourhoodsChecked = vizNeighbourhoodsChk ? vizNeighbourhoodsChk.checked !== false : true;
         const chinatownChecked = vizChinatownChk ? vizChinatownChk.checked !== false : true;
@@ -1479,6 +1473,10 @@ export function startWiring(ctx) {
             minLabel: minLabel,
             maxLabel: maxLabel,
             bars: bars,
+            // The bar heights' fixed denominator (see applyFilters()'s live
+            // recount): counts only ever shrink as filters narrow the set,
+            // so the original full-dataset max never needs recomputing.
+            maxCount: maxCount,
             useLog: useLog && logMax !== logMin,
             toSlider: useLog && logMax !== logMin ? toSlider : function(value) { return Number(value); },
             fromSlider: useLog && logMax !== logMin ? fromSlider : function(value) { return Number(value); },
@@ -1536,46 +1534,90 @@ export function startWiring(ctx) {
             summary: summary,
           };
         });
+        // Live histograms (see renderMetricControl): each metric's bars are
+        // recomputed below from the rows that pass every OTHER active
+        // filter — neighbourhood, search, issues-only, and every other
+        // metric's own slider — but not this metric's own threshold. That
+        // answers "how many more would I get if I loosened just this
+        // slider" (the usual faceted-search convention) rather than a
+        // metric's own bars shrinking toward whatever range it's already
+        // dragged to. Bin edges and the slider's min/max range stay fixed;
+        // only bar heights (counts) are live.
+        const binCounts = {};
+        metricKeys.forEach(function(metric) {
+          binCounts[metric] = metricControls[metric].bars.map(function() { return 0; });
+        });
+
         const visibleBids = new Set();
         buildingRows.forEach(function(row) {
           const bid = row.getAttribute('data-bid');
           const marker = window.buildingIndex[bid];
 
-          let matches = true;
+          // Every filter except the per-metric thresholds — shared by the
+          // final `matches` below and by each metric's "exclude own filter"
+          // histogram recount.
+          let baseMatches = true;
           const rowArea = (row.getAttribute('data-area') || '').toLowerCase().trim();
           if (restrictHoods) {
-            matches = matches && selectedHoods.includes(rowArea);
+            baseMatches = selectedHoods.includes(rowArea);
           } else if (hideWhenNone) {
-            matches = false;
+            baseMatches = false;
+          }
+          if (baseMatches && searchTerm) {
+            const haystack = row.getAttribute('data-search') || '';
+            baseMatches = haystack.indexOf(searchTerm) !== -1;
+          }
+          if (baseMatches && onlyIssuesChk && onlyIssuesChk.checked) {
+            const rawIssues = row.getAttribute('data-n-issues');
+            const nIssues = rawIssues === null || rawIssues === '' ? NaN : parseFloat(rawIssues);
+            baseMatches = Number.isFinite(nIssues) && nIssues > 0;
           }
 
           // Rows with no value for a metric (e.g. SRO/co-op records with no
           // building match have no units/year built) are skipped per-metric
-          // below rather than hidden by a NaN comparison.
-          if (matches && metricKeys.length) {
+          // — treated as passing that one threshold — rather than hidden by
+          // a NaN comparison.
+          let matches = baseMatches;
+          const metricPass = {};
+          const metricValue = {};
+          if (baseMatches && metricKeys.length) {
             for (let i = 0; i < metricKeys.length; i += 1) {
               const metric = metricKeys[i];
               const threshold = thresholds[metric];
               const attrName = 'data-' + threshold.summary.attr;
               const rawValue = row.getAttribute(attrName);
               const value = rawValue === null || rawValue === '' ? NaN : parseFloat(rawValue);
+              metricValue[metric] = value;
               if (Number.isNaN(value)) {
+                metricPass[metric] = true;
                 continue;
               }
-              if (threshold.min !== null && value < threshold.min) { matches = false; break; }
-              if (threshold.max !== null && value > threshold.max) { matches = false; break; }
+              const pass = !((threshold.min !== null && value < threshold.min) ||
+                (threshold.max !== null && value > threshold.max));
+              metricPass[metric] = pass;
+              if (!pass) matches = false;
             }
           }
 
-          if (matches && searchTerm) {
-            const haystack = row.getAttribute('data-search') || '';
-            matches = haystack.indexOf(searchTerm) !== -1;
-          }
-
-          if (matches && onlyIssuesChk && onlyIssuesChk.checked) {
-            const rawIssues = row.getAttribute('data-n-issues');
-            const nIssues = rawIssues === null || rawIssues === '' ? NaN : parseFloat(rawIssues);
-            matches = Number.isFinite(nIssues) && nIssues > 0;
+          if (baseMatches) {
+            for (let i = 0; i < metricKeys.length; i += 1) {
+              const metric = metricKeys[i];
+              const value = metricValue[metric];
+              if (value === undefined || Number.isNaN(value)) continue;
+              let othersPass = true;
+              for (let j = 0; j < metricKeys.length; j += 1) {
+                if (j !== i && !metricPass[metricKeys[j]]) { othersPass = false; break; }
+              }
+              if (!othersPass) continue;
+              const bins = thresholds[metric].summary.bins || [];
+              for (let b = 0; b < bins.length; b += 1) {
+                const isLast = b === bins.length - 1;
+                if (value >= bins[b].start && (isLast ? value <= bins[b].end : value < bins[b].end)) {
+                  binCounts[metric][b] += 1;
+                  break;
+                }
+              }
+            }
           }
 
           row.classList.toggle('hidden', !matches);
@@ -1600,6 +1642,22 @@ export function startWiring(ctx) {
           if (matches) {
             visibleBids.add(String(bid));
           }
+        });
+
+        metricKeys.forEach(function(metric) {
+          const ctrl = metricControls[metric];
+          const counts = binCounts[metric];
+          const maxCount = ctrl.maxCount || 1;
+          ctrl.bars.forEach(function(bar, i) {
+            const count = counts[i] || 0;
+            const height = maxCount ? Math.max(2, (count / maxCount) * 100) : 2;
+            bar.style.height = height + '%';
+            const start = parseFloat(bar.dataset.start);
+            const end = parseFloat(bar.dataset.end);
+            const rangeLabel = formatWithSummary(ctrl.summary, start) + ' – ' + formatWithSummary(ctrl.summary, end);
+            const countLabel = ' (' + count.toLocaleString() + ')';
+            bar.title = ctrl.useLog ? rangeLabel + countLabel + ' [log bin]' : rangeLabel + countLabel;
+          });
         });
 
         const hideEmptyBlocks = hideEmptyBlocksChk ? hideEmptyBlocksChk.checked : true;
@@ -1769,8 +1827,7 @@ export function startWiring(ctx) {
         toggleLayerVisibility(layerChinatown, true);
       }
       applyHousingTypeFilter();
-      if (vizShowSroChk) vizShowSroChk.addEventListener('change', applyHousingTypeFilter);
-      if (vizShowCoopChk) vizShowCoopChk.addEventListener('change', applyHousingTypeFilter);
+      if (vizShowHousingTypeChk) vizShowHousingTypeChk.addEventListener('change', applyHousingTypeFilter);
       if (vizShowIssuesChk) vizShowIssuesChk.addEventListener('change', applyHousingTypeFilter);
 
       if (resetBtn) {
@@ -1803,8 +1860,7 @@ export function startWiring(ctx) {
             vizChinatownChk.checked = true;
             toggleLayerVisibility(layerChinatown, true);
           }
-          if (vizShowSroChk) vizShowSroChk.checked = false;
-          if (vizShowCoopChk) vizShowCoopChk.checked = false;
+          if (vizShowHousingTypeChk) vizShowHousingTypeChk.checked = false;
           if (vizShowIssuesChk) vizShowIssuesChk.checked = false;
           applyHousingTypeFilter();
           if (tableSearchInput) {

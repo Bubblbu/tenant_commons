@@ -1043,26 +1043,14 @@
     <div class="filter-section">
       <h4>Building Details</h4>
       <div class="filter-visual">
+        <label><input type="checkbox" id="viz-show-housing-type"> Show housing type</label>
         <label><input type="checkbox" id="viz-show-issues"> Show rental issues</label>
-      </div>
-      <div class="filter-subsection">
-        <h5>Housing Type</h5>
-        <div class="filter-visual">
-          <label><input type="checkbox" id="viz-show-sro"> Show SRO/SRA hotels</label>
-          <label><input type="checkbox" id="viz-show-coop"> Show co-ops</label>
-        </div>
       </div>
     </div>
     <h3>Filters</h3>
     <div class="filter-section">
       <h4>Landlords</h4>
       <input type="text" id="owner-search" placeholder="Search landlord / owner name…">
-    </div>
-    <div class="filter-section">
-      <h4>Building Standards</h4>
-      <div class="filter-visual">
-        <label><input type="checkbox" id="filter-only-issues"> Only show buildings with issues</label>
-      </div>
     </div>
     <div class="filter-section">
       <h4>Neighbourhoods</h4>
@@ -1075,6 +1063,9 @@
     </div>
     <div class="filter-section">
       <h4>Buildings</h4>
+      <div class="filter-visual">
+        <label><input type="checkbox" id="filter-only-issues"> Only show buildings with issues</label>
+      </div>
       <div id="filter-building-section" class="filter-building"></div>
     </div>
   </div>
