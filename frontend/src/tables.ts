@@ -150,7 +150,7 @@ function aggregate(records: BuildingRecord[], labelOf: (r: BuildingRecord) => st
     .sort((a, b) => b.totalUnits - a.totalUnits || b.buildings - a.buildings);
 }
 
-function groupRow(g: Group, type: 'owner' | 'neighbourhood', target: string, first: string, dataKey: string): string {
+function groupRow(g: Group, type: 'owner' | 'network' | 'neighbourhood', target: string, first: string, dataKey: string): string {
   const units = Math.trunc(g.totalUnits);
   const avg = avgUnits(g.totalUnits, g.buildings);
   return (
@@ -166,13 +166,23 @@ function groupRow(g: Group, type: 'owner' | 'neighbourhood', target: string, fir
   );
 }
 
-export function landlordRowsHtml(records: BuildingRecord[]): string {
+export function ownerRowsHtml(records: BuildingRecord[]): string {
   return aggregate(
     records,
-    (r) => (isMissing(r.owner_group) ? '(Unknown)' : String(r.owner_group)),
+    (r) => (isMissing(r.owner_name) ? '(Unknown)' : String(r.owner_name)),
     (r) => (isMissing(r.owner_key) ? 'unknown' : String(r.owner_key)),
   )
     .map((g) => groupRow(g, 'owner', escapeHtml(g.key), escapeHtml(g.label), 'data-owner'))
+    .join('\n');
+}
+
+export function networkRowsHtml(records: BuildingRecord[]): string {
+  return aggregate(
+    records,
+    (r) => (isMissing(r.network_name) ? '(Unknown)' : String(r.network_name)),
+    (r) => (isMissing(r.network_key) ? 'unknown' : String(r.network_key)),
+  )
+    .map((g) => groupRow(g, 'network', escapeHtml(g.key), escapeHtml(g.label), 'data-network'))
     .join('\n');
 }
 
@@ -197,6 +207,7 @@ export function renderTables(data: BuildingData, blocks: BlocksCollection, doc: 
   };
   fill('buildings-table', buildingRowsHtml(records));
   fill('blocks-table', blockRowsHtml(blocks));
-  fill('landlords-table', landlordRowsHtml(records));
+  fill('owners-table', ownerRowsHtml(records));
+  fill('networks-table', networkRowsHtml(records));
   fill('neighbourhoods-table', neighbourhoodRowsHtml(records));
 }

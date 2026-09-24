@@ -25,6 +25,7 @@ import { markerStyle } from './markers';
 import { renderPopup } from './popup';
 import { initClearButton } from './search-clear';
 import { renderTables } from './tables';
+import { initViewToggle } from './view-toggle';
 import { startWiring } from './wiring.js';
 
 function showLoadError(err: unknown): void {
@@ -80,6 +81,14 @@ async function main(): Promise<void> {
   const ownerSearch = document.getElementById('owner-search');
   const ownerSearchClear = document.getElementById('owner-search-clear');
   if (ownerSearch instanceof HTMLInputElement && ownerSearchClear) initClearButton(ownerSearch, ownerSearchClear);
+
+  const landlordViews = ['networks', 'owners'].map((v) => ({
+    button: document.getElementById(`landlord-view-${v}`),
+    panel: document.getElementById(`${v}-panel`),
+  }));
+  if (landlordViews.every((o) => o.button && o.panel)) {
+    initViewToggle(landlordViews as { button: HTMLElement; panel: HTMLElement }[]);
+  }
 }
 
 main().catch(showLoadError);

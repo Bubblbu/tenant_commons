@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { blockRowsHtml, buildingRow, buildingRowsHtml, landlordRowsHtml, neighbourhoodRowsHtml } from './tables';
+import { blockRowsHtml, buildingRow, buildingRowsHtml, networkRowsHtml, neighbourhoodRowsHtml, ownerRowsHtml } from './tables';
 import type { BlocksCollection, BuildingRecord } from './types';
 
 const rec = (over: Partial<BuildingRecord>): BuildingRecord => ({
@@ -90,15 +90,23 @@ describe('blockRowsHtml', () => {
 
 describe('group tables', () => {
   const records = [
-    rec({ b_id: 1, owner_group: 'B Co', owner_key: 'b', units: 10, local_area: 'West End' }),
-    rec({ b_id: 2, owner_group: 'A Co', owner_key: 'a', units: 30, local_area: null }),
-    rec({ b_id: 3, owner_group: 'B Co', owner_key: 'b', units: 5, local_area: 'West End' }),
+    rec({ b_id: 1, owner_name: 'B Co', owner_key: 'b', network_name: 'Net', network_key: 'net', units: 10, local_area: 'West End' }),
+    rec({ b_id: 2, owner_name: 'A Co', owner_key: 'a', network_name: 'Net', network_key: 'net', units: 30, local_area: null }),
+    rec({ b_id: 3, owner_name: 'B Co', owner_key: 'b', network_name: 'Other', network_key: 'other', units: 5, local_area: 'West End' }),
   ];
 
-  it('groups landlords by owner, sorted by total units', () => {
-    const html = landlordRowsHtml(records);
+  it('groups owners, sorted by total units', () => {
+    const html = ownerRowsHtml(records);
     expect([...html.matchAll(/data-owner="([^"]+)"/g)].map((m) => m[1])).toEqual(['a', 'b']);
     expect(html).toContain('data-owner="b" data-bldgs="2" data-units="15"');
+    expect(html).toContain('data-type="owner" data-target="b"');
+  });
+
+  it('groups networks, sorted by total units', () => {
+    const html = networkRowsHtml(records);
+    expect([...html.matchAll(/data-network="([^"]+)"/g)].map((m) => m[1])).toEqual(['net', 'other']);
+    expect(html).toContain('data-network="net" data-bldgs="2" data-units="40"');
+    expect(html).toContain('data-type="network" data-target="net"');
   });
 
   it('groups neighbourhoods, putting missing areas under (Unknown)', () => {

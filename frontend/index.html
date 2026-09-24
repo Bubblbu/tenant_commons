@@ -321,6 +321,42 @@
     padding: 12px;
   }
 
+  .table-wrap[hidden] {
+    display: none;
+  }
+
+  .view-toggle {
+    display: flex;
+    padding: 10px 12px 0;
+  }
+
+  .view-toggle button {
+    flex: 1;
+    padding: 5px 10px;
+    border: 1px solid #cdd1dd;
+    background: #fff;
+    font-size: 12px;
+    font-weight: 600;
+    color: #27354a;
+    cursor: pointer;
+  }
+
+  .view-toggle button + button {
+    border-left: none;
+  }
+
+  .view-toggle button:first-child {
+    border-radius: 4px 0 0 4px;
+  }
+
+  .view-toggle button:last-child {
+    border-radius: 0 4px 4px 0;
+  }
+
+  .view-toggle button.active {
+    background: #e6ecf7;
+  }
+
   table.data {
     width: 100%;
     border-collapse: collapse;
@@ -487,12 +523,16 @@
       </div>
     </div>
     <div id="pane-landlords" class="pane">
-      <div class="table-wrap">
-        <table class="data" id="landlords-table">
+      <div class="view-toggle" role="group" aria-label="Group landlords by">
+        <button type="button" id="landlord-view-networks" class="active" aria-pressed="true">Networks</button>
+        <button type="button" id="landlord-view-owners" aria-pressed="false">Owners</button>
+      </div>
+      <div class="table-wrap" id="networks-panel">
+        <table class="data" id="networks-table">
           <thead>
             <tr>
               <th class="select-head" data-sort="none">Select</th>
-              <th data-sort="text">Landlord</th>
+              <th data-sort="text">Network</th>
               <th data-sort="number">Bldgs</th>
               <th data-sort="number">Units</th>
               <th data-sort="number">Avg Units/Bldg</th>
@@ -502,10 +542,33 @@
           <tfoot>
             <tr class="summary-row">
               <td></td>
-              <td id="summary-landlords-label">Totals (visible)</td>
-              <td id="summary-landlords-bldgs">0</td>
-              <td id="summary-landlords-units">0</td>
-              <td id="summary-landlords-avg">0.0</td>
+              <td id="summary-networks-label">Totals (visible)</td>
+              <td id="summary-networks-bldgs">0</td>
+              <td id="summary-networks-units">0</td>
+              <td id="summary-networks-avg">0.0</td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+      <div class="table-wrap" id="owners-panel" hidden>
+        <table class="data" id="owners-table">
+          <thead>
+            <tr>
+              <th class="select-head" data-sort="none">Select</th>
+              <th data-sort="text">Owner</th>
+              <th data-sort="number">Bldgs</th>
+              <th data-sort="number">Units</th>
+              <th data-sort="number">Avg Units/Bldg</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+          <tfoot>
+            <tr class="summary-row">
+              <td></td>
+              <td id="summary-owners-label">Totals (visible)</td>
+              <td id="summary-owners-bldgs">0</td>
+              <td id="summary-owners-units">0</td>
+              <td id="summary-owners-avg">0.0</td>
             </tr>
           </tfoot>
         </table>

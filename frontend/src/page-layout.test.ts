@@ -17,3 +17,24 @@ describe('index.html page layout', () => {
     expect(mapRule).not.toMatch(/position:\s*absolute/);
   });
 });
+
+const wiring = readFileSync(new URL('./wiring.js', import.meta.url), 'utf8');
+
+describe('Landlords tab', () => {
+  it('has an Owners and a Networks table with the totals cells wiring.js fills', () => {
+    const ids = [
+      'owners-table', 'networks-table', 'owners-panel', 'networks-panel',
+      'landlord-view-owners', 'landlord-view-networks',
+      ...['owners', 'networks'].flatMap((t) => ['label', 'bldgs', 'units', 'avg'].map((c) => `summary-${t}-${c}`)),
+    ];
+    for (const id of ids) expect(page).toContain(`id="${id}"`);
+    expect(page).not.toContain('id="landlords-table"');
+  });
+
+  it('is wired for both views', () => {
+    expect(wiring).toContain("'#owners-table tbody tr'");
+    expect(wiring).toContain("'#networks-table tbody tr'");
+    expect(wiring).toContain("typ === 'network'");
+    expect(wiring).not.toMatch(/landlords-table|summary-landlords/);
+  });
+});

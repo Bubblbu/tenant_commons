@@ -36,6 +36,7 @@ export function startWiring(ctx) {
       window.blockBuildingIndex = {};
       window.buildingIndex = {};
       window.ownerIndex = {};
+      window.networkIndex = {};
       window.hoodIndex = {};
       const BASE_ZOOM = 14;
       // Thin light stroke so overlapping markers read as distinct dots instead
@@ -375,6 +376,13 @@ export function startWiring(ctx) {
         });
       }
 
+      function setNetworkSelection(networkKey, selected) {
+        var arr = window.networkIndex[networkKey] || [];
+        arr.forEach(function(marker) {
+          adjustMarkerSelection(marker, selected ? +1 : -1);
+        });
+      }
+
       function setHoodSelection(hoodKey, selected) {
         var arr = window.hoodIndex[hoodKey] || [];
         arr.forEach(function(marker) {
@@ -465,6 +473,14 @@ export function startWiring(ctx) {
             }
           }
 
+          var networkKey = meta.network_key;
+          if (networkKey) {
+            if (!window.networkIndex[networkKey]) window.networkIndex[networkKey] = [];
+            if (window.networkIndex[networkKey].indexOf(marker) === -1) {
+              window.networkIndex[networkKey].push(marker);
+            }
+          }
+
           var hoodKey = String(meta.local_area || '').toLowerCase().trim();
           if (hoodKey) {
             if (!window.hoodIndex[hoodKey]) window.hoodIndex[hoodKey] = [];
@@ -543,6 +559,18 @@ export function startWiring(ctx) {
         });
       }
 
+      function networkHover(networkKey, on) {
+        var arr = window.networkIndex[networkKey] || [];
+        arr.forEach(function(marker) {
+          if (!marker || marker._isFiltered) return;
+          if (on) {
+            highlightMarker(marker, true);
+          } else if ((marker._selectionRefs || 0) === 0) {
+            highlightMarker(marker, false);
+          }
+        });
+      }
+
       function neighbourhoodHover(hoodKey, on) {
         var arr = window.hoodIndex[hoodKey] || [];
         arr.forEach(function(marker) {
@@ -569,6 +597,8 @@ export function startWiring(ctx) {
           setBlockSelectionMarkers(key, cb.checked);
         } else if (typ === 'owner') {
           setOwnerSelection(key, cb.checked);
+        } else if (typ === 'network') {
+          setNetworkSelection(key, cb.checked);
         } else if (typ === 'neighbourhood') {
           setHoodSelection(key.toLowerCase().trim(), cb.checked);
         }
@@ -761,10 +791,16 @@ export function startWiring(ctx) {
         row.addEventListener('mouseleave', function() { buildingHover(bid, false); });
       });
 
-      document.querySelectorAll('#landlords-table tbody tr').forEach(function(row) {
+      document.querySelectorAll('#owners-table tbody tr').forEach(function(row) {
         var key = row.getAttribute('data-owner');
         row.addEventListener('mouseenter', function() { ownerHover(key, true); });
         row.addEventListener('mouseleave', function() { ownerHover(key, false); });
+      });
+
+      document.querySelectorAll('#networks-table tbody tr').forEach(function(row) {
+        var key = row.getAttribute('data-network');
+        row.addEventListener('mouseenter', function() { networkHover(key, true); });
+        row.addEventListener('mouseleave', function() { networkHover(key, false); });
       });
 
       document.querySelectorAll('#neighbourhoods-table tbody tr').forEach(function(row) {
@@ -794,9 +830,13 @@ export function startWiring(ctx) {
         });
       }
 
-      const landlordRows = Array.from(document.querySelectorAll('#landlords-table tbody tr'));
-      landlordRows.forEach(function(row) { row.__checkbox = row.querySelector('.row-select'); });
-      cacheRowCells(landlordRows, { bldgs: 2, units: 3, avg: 4 });
+      const ownerRows = Array.from(document.querySelectorAll('#owners-table tbody tr'));
+      ownerRows.forEach(function(row) { row.__checkbox = row.querySelector('.row-select'); });
+      cacheRowCells(ownerRows, { bldgs: 2, units: 3, avg: 4 });
+
+      const networkRows = Array.from(document.querySelectorAll('#networks-table tbody tr'));
+      networkRows.forEach(function(row) { row.__checkbox = row.querySelector('.row-select'); });
+      cacheRowCells(networkRows, { bldgs: 2, units: 3, avg: 4 });
 
       const neighbourhoodRows = Array.from(document.querySelectorAll('#neighbourhoods-table tbody tr'));
       neighbourhoodRows.forEach(function(row) { row.__checkbox = row.querySelector('.row-select'); });
@@ -1024,9 +1064,13 @@ export function startWiring(ctx) {
           label: 'summary-blocks-label', bldgs: 'summary-blocks-bldgs',
           units: 'summary-blocks-units', avg: 'summary-blocks-avg',
         });
-        updateGroupTableSummary(landlordRows, {
-          label: 'summary-landlords-label', bldgs: 'summary-landlords-bldgs',
-          units: 'summary-landlords-units', avg: 'summary-landlords-avg',
+        updateGroupTableSummary(ownerRows, {
+          label: 'summary-owners-label', bldgs: 'summary-owners-bldgs',
+          units: 'summary-owners-units', avg: 'summary-owners-avg',
+        });
+        updateGroupTableSummary(networkRows, {
+          label: 'summary-networks-label', bldgs: 'summary-networks-bldgs',
+          units: 'summary-networks-units', avg: 'summary-networks-avg',
         });
         updateGroupTableSummary(neighbourhoodRows, {
           label: 'summary-neighbourhoods-label', bldgs: 'summary-neighbourhoods-bldgs',
@@ -1837,7 +1881,7 @@ export function startWiring(ctx) {
         // the selector engine, on every slider tick. window.ownerIndex (built once at
         // load) plus the marker._isFiltered flag set just above give the same answer as
         // a plain array check with no DOM/CSS involved.
-        landlordRows.forEach(function(row) {
+        ownerRows.forEach(function(row) {
           var owner = row.getAttribute('data-owner');
           var markers = window.ownerIndex[owner] || [];
           var hasVisible = markers.some(function(m) { return !m._isFiltered; });
@@ -1846,6 +1890,19 @@ export function startWiring(ctx) {
           if (!hasVisible && checkbox && checkbox.checked) {
             checkbox.checked = false;
             setOwnerSelection(owner, false);
+          }
+          updateGroupRowValues(row, markers);
+        });
+
+        networkRows.forEach(function(row) {
+          var network = row.getAttribute('data-network');
+          var markers = window.networkIndex[network] || [];
+          var hasVisible = markers.some(function(m) { return !m._isFiltered; });
+          row.classList.toggle('hidden', !hasVisible);
+          const checkbox = row.__checkbox;
+          if (!hasVisible && checkbox && checkbox.checked) {
+            checkbox.checked = false;
+            setNetworkSelection(network, false);
           }
           updateGroupRowValues(row, markers);
         });
