@@ -1,0 +1,1 @@
+{"type": "FeatureCollection", "features": [{"type": "Feature", "properties": {"id": 1, "name": "Example St & Sample Ave"}, "geometry": {"type": "Polygon", "coordinates": [[[-123.132, 49.279], [-123.128, 49.279], [-123.128, 49.283], [-123.132, 49.283], [-123.132, 49.279]]]}}]}

@@ -107,6 +107,24 @@ BOUNDARY = {
     ],
 }
 
+VILLAGES = {
+    "type": "FeatureCollection",
+    "features": [
+        {"type": "Feature",
+         "properties": {"id": 1, "name": "Example St & Sample Ave"},
+         "geometry": _square(-123.132, 49.279, 0.004)},
+    ],
+}
+
+CHINATOWN = {
+    "type": "FeatureCollection",
+    "features": [
+        {"type": "Feature",
+         "properties": {"id": 1},
+         "geometry": {"type": "MultiPolygon", "coordinates": [_square(-123.128, 49.281, 0.003)["coordinates"]]}},
+    ],
+}
+
 
 def build(out_dir: Path) -> None:
     conn = sqlite3.connect(":memory:")
@@ -115,7 +133,18 @@ def build(out_dir: Path) -> None:
     with tempfile.TemporaryDirectory() as tmp:
         boundary = Path(tmp) / "local-area-boundary.geojson"
         boundary.write_text(json.dumps(BOUNDARY), encoding="utf-8")
-        export_artifacts(conn, out_dir, boundary_geojson_path=str(boundary), now=NOW)
+        villages = Path(tmp) / "villages_plan_areas.geojson"
+        villages.write_text(json.dumps(VILLAGES), encoding="utf-8")
+        chinatown = Path(tmp) / "chinatown_boundary.geojson"
+        chinatown.write_text(json.dumps(CHINATOWN), encoding="utf-8")
+        export_artifacts(
+            conn,
+            out_dir,
+            boundary_geojson_path=str(boundary),
+            villages_geojson_path=str(villages),
+            chinatown_geojson_path=str(chinatown),
+            now=NOW,
+        )
 
 
 def main() -> int:

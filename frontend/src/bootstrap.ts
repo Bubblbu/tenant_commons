@@ -13,7 +13,13 @@ import * as L from 'leaflet';
 import { initAboutModal } from './about';
 import { BASEMAPS, DEFAULT_BASEMAP, DEFAULT_CENTER, DEFAULT_ZOOM } from './config';
 import { loadArtifacts } from './data';
-import { createBlocksLayer, createBuildingLayers, createNeighbourhoodsLayer } from './layers';
+import {
+  createBlocksLayer,
+  createBuildingLayers,
+  createChinatownLayer,
+  createNeighbourhoodsLayer,
+  createVillagesLayer,
+} from './layers';
 import { initLegendToggle, renderLegend } from './legend';
 import { markerStyle } from './markers';
 import { renderPopup } from './popup';
@@ -39,6 +45,8 @@ async function main(): Promise<void> {
   // Same order Folium added them: blocks, neighbourhoods, then buildings.
   const blocks = createBlocksLayer(artifacts.blocks).addTo(map);
   const neighbourhoods = createNeighbourhoodsLayer(artifacts.boundaries).addTo(map);
+  const villages = createVillagesLayer(artifacts.villages).addTo(map);
+  const chinatown = createChinatownLayer(artifacts.chinatown).addTo(map);
   const styled = artifacts.markers.map((m) => ({ ...m, ...markerStyle(m) }));
   const records = artifacts.buildingData.records;
   // Lazy: the markup is built on first open, from the one record the table and filters also read.
@@ -57,7 +65,7 @@ async function main(): Promise<void> {
 
   startWiring({
     map,
-    layers: { blocks, buildings: buildings.buildings, neighbourhoods },
+    layers: { blocks, buildings: buildings.buildings, neighbourhoods, villages, chinatown },
     markersById: buildings.markersById,
     ringsById: buildings.ringsById,
     filterConfig: artifacts.filterConfig,

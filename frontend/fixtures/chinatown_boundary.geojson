@@ -1,0 +1,1 @@
+{"type": "FeatureCollection", "features": [{"type": "Feature", "properties": {"id": 1}, "geometry": {"type": "MultiPolygon", "coordinates": [[[[-123.128, 49.281], [-123.125, 49.281], [-123.125, 49.284], [-123.128, 49.284], [-123.128, 49.281]]]]}}]}

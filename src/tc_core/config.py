@@ -62,6 +62,15 @@ class IngestConfig:
     # fetch/cov_open_data.py) and the overlay matcher needs it for the
     # point-in-polygon local_area lookup on records with no building match.
     local_area_boundary_geojson: str = DEFAULT_BOUNDARY_GEOJSON
+    # Optional: hand-traced City "Village Plan Area" boundaries (see
+    # data/curated/villages_plan_areas.geojson's provenance) for the map's
+    # reference overlay. City/program-specific, not part of _REQUIRED_PATHS —
+    # a non-Vancouver deployment wouldn't have this.
+    villages_plan_areas_geojson: str | None = None
+    # Optional: the Chinatown boundary already used by prepare/properties.py
+    # (via DataPaths.chinatown_boundary) to flag buildings — reused here,
+    # unmodified, as a second map reference overlay.
+    chinatown_boundary_geojson: str | None = None
     # Where export_artifacts() writes the frontend's input (the artifact
     # directory, spec §3/§6). frontend/ reads it via TC_ARTIFACTS_DIR.
     artifacts: str = DEFAULT_ARTIFACTS_DIR
@@ -122,6 +131,16 @@ def load_ingest_config(path: str) -> IngestConfig:
         ),
         local_area_boundary_geojson=str(
             flat.get("local_area_boundary_geojson", DEFAULT_BOUNDARY_GEOJSON)
+        ),
+        villages_plan_areas_geojson=(
+            str(flat["villages_plan_areas_geojson"])
+            if flat.get("villages_plan_areas_geojson")
+            else None
+        ),
+        chinatown_boundary_geojson=(
+            str(flat["chinatown_boundary_geojson"])
+            if flat.get("chinatown_boundary_geojson")
+            else None
         ),
         artifacts=str(flat.get("artifacts", DEFAULT_ARTIFACTS_DIR)),
     )

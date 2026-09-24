@@ -404,6 +404,8 @@ def export_artifacts(
     out_dir: str | Path,
     pid_address_map_path: str | None = None,
     boundary_geojson_path: str | None = None,
+    villages_geojson_path: str | None = None,
+    chinatown_geojson_path: str | None = None,
     now: pd.Timestamp | None = None,
 ) -> None:
     """Write the complete frontend artifact set.
@@ -444,6 +446,16 @@ def export_artifacts(
     if boundary_geojson_path:
         shutil.copyfile(
             boundary_geojson_path, out_dir / "local-area-boundary.geojson"
+        )
+
+    if villages_geojson_path:
+        shutil.copyfile(
+            villages_geojson_path, out_dir / "villages_plan_areas.geojson"
+        )
+
+    if chinatown_geojson_path:
+        shutil.copyfile(
+            chinatown_geojson_path, out_dir / "chinatown_boundary.geojson"
         )
 
 

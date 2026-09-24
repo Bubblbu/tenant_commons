@@ -49,6 +49,8 @@ def main() -> int:
         config.artifacts,
         pid_address_map_path=config.pid_address_map,
         boundary_geojson_path=config.local_area_boundary_geojson,
+        villages_geojson_path=config.villages_plan_areas_geojson,
+        chinatown_geojson_path=config.chinatown_boundary_geojson,
     )
 
     print(f"Done — artifacts in {config.artifacts}")

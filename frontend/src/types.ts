@@ -62,10 +62,15 @@ export interface BoundaryProperties {
 
 export type BoundaryCollection = FeatureCollection<Geometry, BoundaryProperties>;
 
+/** villages_plan_areas.geojson: same shape as a boundary collection (name + polygon), no geo_point_2d. */
+export type VillagesCollection = BoundaryCollection;
+
 export interface Artifacts {
   filterConfig: FilterConfig;
   markers: MarkerRecord[];
   buildingData: BuildingData;
   blocks: BlocksCollection;
   boundaries: BoundaryCollection;
+  villages: VillagesCollection;
+  chinatown: BoundaryCollection;
 }

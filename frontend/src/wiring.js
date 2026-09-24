@@ -24,6 +24,8 @@ export function startWiring(ctx) {
       const layerBlocks = ctx.layers.blocks;
       const layerBuildings = ctx.layers.buildings;
       const layerNeighbourhoods = ctx.layers.neighbourhoods;
+      const layerVillages = ctx.layers.villages;
+      const layerChinatown = ctx.layers.chinatown;
       const mapInstance = ctx.map;
 
       if (!layerBlocks || typeof layerBlocks.eachLayer !== 'function') {
@@ -814,6 +816,8 @@ export function startWiring(ctx) {
       const vizBlocksChk = document.getElementById('viz-show-blocks');
       const hideEmptyBlocksChk = document.getElementById('viz-hide-empty-blocks');
       const vizNeighbourhoodsChk = document.getElementById('viz-show-neighbourhoods');
+      const vizVillagesChk = document.getElementById('viz-show-villages');
+      const vizChinatownChk = document.getElementById('viz-show-chinatown');
       const tableSearchInput = document.getElementById('owner-search');
       const statusCells = {
         total: {
@@ -831,6 +835,7 @@ export function startWiring(ctx) {
       const legendContainerEl = document.getElementById('legend-map');
       const legendBlocksEl = document.getElementById('legend-blocks-section');
       const legendHousingEl = document.getElementById('legend-housing-section');
+      const legendBoundariesEl = document.getElementById('legend-boundaries-section');
 
       const metricControls = {};
       let metricKeys = [];
@@ -1047,8 +1052,14 @@ export function startWiring(ctx) {
         // once at least one housing-type toggle is actually on.
         const showHousingLegend = showSroChecked || showCoopChecked;
         setLegendDisplay(legendHousingEl, showHousingLegend);
+        const neighbourhoodsChecked = vizNeighbourhoodsChk ? vizNeighbourhoodsChk.checked !== false : true;
+        const chinatownChecked = vizChinatownChk ? vizChinatownChk.checked !== false : true;
+        const villagesChecked = vizVillagesChk ? vizVillagesChk.checked !== false : true;
+        const showBoundariesLegend = neighbourhoodsChecked || chinatownChecked || villagesChecked;
+        setLegendDisplay(legendBoundariesEl, showBoundariesLegend);
         if (legendContainerEl) {
-          const shouldShow = (showBlocksLegend && legendBlocksEl) || (showHousingLegend && legendHousingEl);
+          const shouldShow = (showBlocksLegend && legendBlocksEl) || (showHousingLegend && legendHousingEl) ||
+            (showBoundariesLegend && legendBoundariesEl);
           legendContainerEl.style.display = shouldShow ? 'flex' : 'none';
         }
       }
@@ -1718,9 +1729,28 @@ export function startWiring(ctx) {
         toggleLayerVisibility(layerNeighbourhoods, vizNeighbourhoodsChk.checked !== false);
         vizNeighbourhoodsChk.addEventListener('change', function() {
           toggleLayerVisibility(layerNeighbourhoods, vizNeighbourhoodsChk.checked);
+          updateLegendVisibility();
         });
       } else {
         toggleLayerVisibility(layerNeighbourhoods, true);
+      }
+      if (vizVillagesChk) {
+        toggleLayerVisibility(layerVillages, vizVillagesChk.checked !== false);
+        vizVillagesChk.addEventListener('change', function() {
+          toggleLayerVisibility(layerVillages, vizVillagesChk.checked);
+          updateLegendVisibility();
+        });
+      } else {
+        toggleLayerVisibility(layerVillages, true);
+      }
+      if (vizChinatownChk) {
+        toggleLayerVisibility(layerChinatown, vizChinatownChk.checked !== false);
+        vizChinatownChk.addEventListener('change', function() {
+          toggleLayerVisibility(layerChinatown, vizChinatownChk.checked);
+          updateLegendVisibility();
+        });
+      } else {
+        toggleLayerVisibility(layerChinatown, true);
       }
       applyHousingTypeFilter();
       if (vizShowSroChk) vizShowSroChk.addEventListener('change', applyHousingTypeFilter);
@@ -1747,6 +1777,14 @@ export function startWiring(ctx) {
           if (vizNeighbourhoodsChk) {
             vizNeighbourhoodsChk.checked = true;
             toggleLayerVisibility(layerNeighbourhoods, true);
+          }
+          if (vizVillagesChk) {
+            vizVillagesChk.checked = true;
+            toggleLayerVisibility(layerVillages, true);
+          }
+          if (vizChinatownChk) {
+            vizChinatownChk.checked = true;
+            toggleLayerVisibility(layerChinatown, true);
           }
           if (vizShowSroChk) vizShowSroChk.checked = false;
           if (vizShowCoopChk) vizShowCoopChk.checked = false;

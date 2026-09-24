@@ -6,7 +6,7 @@ Everything under `data/` is ignored by git except this README and the
 | Folder | Meaning |
 |---|---|
 | `raw/` | As received from the source. Never hand-edited. One folder per source, each with a `MANIFEST.md`. |
-| `curated/` | Hand-authored: `ownership_claims.csv`, `landlord_mapping.toml`, `chinatown_boundary.geojson`. No backup in git — keep your own copy. |
+| `curated/` | Hand-authored: `ownership_claims.csv`, `landlord_mapping.toml`, `chinatown_boundary.geojson`, `villages_plan_areas.{geojson,shp,...}`. No backup in git — keep your own copy. |
 | `derived/` | Regenerable by scripts; safe to delete and rebuild. Includes the SQLite db. |
 | `exports/` | Reserved for what leaves the pipeline. The map's feed is `derived/artifacts/`. |
 
