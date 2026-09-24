@@ -33,6 +33,7 @@ CREATE TABLE raw_buildings (
     bsns_trade_name TEXT,
     bsns_type TEXT,
     bsns_subtype TEXT,
+    bsns_year INTEGER,      -- business-licence data year this build used; same on every row
     value_land TEXT,        -- verbatim: source mixes plain numbers and "$..." strings; parse at merge time
     value_bldg TEXT,        -- verbatim, same reason
     bldg_land_ratio REAL,

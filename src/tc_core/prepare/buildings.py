@@ -147,6 +147,8 @@ def run(paths: DataPaths) -> None:
     businesses = load_polars(business_licenses_f)
     latest_year = businesses.select(pl.col("folderyear").cast(pl.Int32).max()).item()
     print(f"Using latest business-licence folderyear: {latest_year}")
+    # The City publishes folderyear as two digits ("26").
+    licence_year = latest_year if latest_year >= 1000 else 2000 + latest_year
     businesses = businesses.filter(pl.col("folderyear") == str(latest_year))
 
     businesses = businesses.with_columns(
@@ -220,6 +222,7 @@ def run(paths: DataPaths) -> None:
         )
     ).drop("_all_addresses")
 
+    buildings = buildings.with_columns(bsns_year=pl.lit(licence_year))
     buildings = buildings.select(
         "address",
         "secondary_addresses",
@@ -239,6 +242,7 @@ def run(paths: DataPaths) -> None:
         "bsns_trade_name",
         "bsns_type",
         "bsns_subtype",
+        "bsns_year",
         "name",
         "management",
         "n_issues",

@@ -64,6 +64,7 @@ RAW_BUILDINGS_COLUMNS = [
     "bsns_trade_name",
     "bsns_type",
     "bsns_subtype",
+    "bsns_year",
     "value_land",
     "value_bldg",
     "bldg_land_ratio",
