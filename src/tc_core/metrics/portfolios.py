@@ -21,10 +21,13 @@ from __future__ import annotations
 import csv
 import re
 import sqlite3
+from collections import defaultdict
 from dataclasses import dataclass, field
 
-from ..claims import resolve_owner_groups
+from ..claims import confirmed_common_owner_edges, network_label_claims, resolve_owner_groups
 from ..normalize import sanitize_owner
+
+REGISTRY_SOURCE = "public_registry"
 
 
 def _normalize_pid(pid: str) -> str:
@@ -40,16 +43,19 @@ def _normalize_pid(pid: str) -> str:
 
 @dataclass
 class Portfolio:
+    # Stable id: sanitize_owner() of the default name, whatever the display
+    # name — relabelling a network through a claim never changes its key.
     portfolio_key: str
-    # Display name for the whole cluster: the entity holding the most PIDs
-    # (ties broken alphabetically) — kept stable across every building in the
-    # portfolio, rather than naming it after whichever entity happens to be
-    # the direct reporting body for one particular address. Individual
-    # buildings still show their own real reporting body name separately;
-    # this is only the portfolio-level label.
+    # Display name: a confirmed network_label claim if any entity in the
+    # cluster has one (latest wins), else the entity holding the most PIDs
+    # (ties alphabetical).
     portfolio_name: str
+    name_source: str  # "default" | "claim"
     entities: list[str]
     addr_keys: set[str] = field(default_factory=set)
+    # Confirmed common_owner claims inside the cluster, by public source
+    # category: "registry" (public_registry) or "vtu_research" (all others).
+    evidence: dict[str, int] = field(default_factory=dict)
 
 
 def _load_pid_to_addr_key(path: str) -> dict[str, str]:
@@ -68,12 +74,8 @@ def _entity_pids(conn: sqlite3.Connection) -> dict[str, set[str]]:
 
     Keyed by sanitize_owner() rather than the verbatim string: raw_lotr_
     ownership is un-deduplicated source data, so the same corporation can
-    appear as both "GLR PROPERTIES LTD" and "GLR PROPERTIES LTD." across
-    different rows. ownership_claims (via record_claim()'s auto-collapse)
-    only ever stores ONE of those spellings, so looking this up by the exact
-    string would silently drop whichever variant's PIDs didn't happen to
-    match the surviving spelling -- see build_landlord_portfolios(), which
-    looks up cluster entities the same normalized way.
+    appear as both "GLR PROPERTIES LTD" and "GLR PROPERTIES LTD." across rows,
+    while ownership_claims stores only one of those spellings.
     """
     rows = conn.execute(
         "SELECT reporting_body_name, pid FROM raw_lotr_ownership "
@@ -88,49 +90,79 @@ def _entity_pids(conn: sqlite3.Connection) -> dict[str, set[str]]:
     return pids_by_entity
 
 
-def build_landlord_portfolios(
-    conn: sqlite3.Connection, pid_address_map_path: str
-) -> dict[str, Portfolio]:
-    """Returns {addr_key: Portfolio} for every building reached by a
-    confirmed common_owner cluster (resolve_owner_groups()'s default
-    confidence gate — same as the rest of the claims model). A cluster
-    reaches an addr_key if any entity in it is the reporting body for a PID
-    that maps to that addr_key. Buildings outside any cluster, or whose PIDs
-    aren't in pid_address_map.csv, are simply absent from the result.
-    """
-    pid_to_addr_key = _load_pid_to_addr_key(pid_address_map_path)
-    entity_pids = _entity_pids(conn)
-    owner_groups = resolve_owner_groups(conn)
-
-    clusters: list[set[str]] = []
+def _clusters(conn: sqlite3.Connection) -> list[list[str]]:
+    clusters: list[list[str]] = []
     seen: set[str] = set()
-    for entity, others in owner_groups.items():
+    for entity, others in resolve_owner_groups(conn).items():
         if entity in seen:
             continue
         cluster = {entity, *others}
         seen |= cluster
-        clusters.append(cluster)
+        clusters.append(sorted(cluster))
+    return clusters
 
-    by_addr_key: dict[str, Portfolio] = {}
-    for cluster in clusters:
+
+def build_landlord_portfolios(
+    conn: sqlite3.Connection, pid_address_map_path: str
+) -> dict[str, Portfolio]:
+    """Returns {addr_key: Portfolio} for every building reached by a confirmed
+    common_owner cluster. A cluster reaches an addr_key if any of its entities
+    is the reporting body for a PID mapped to it. A building reached by
+    several clusters goes to the one holding most of its PIDs, then the
+    larger cluster (more addr_keys), then the smaller key — independent of
+    claim order.
+    """
+    pid_to_addr_key = _load_pid_to_addr_key(pid_address_map_path)
+    entity_pids = _entity_pids(conn)
+    labels = network_label_claims(conn)
+    clusters = _clusters(conn)
+
+    cluster_of = {entity: i for i, cluster in enumerate(clusters) for entity in cluster}
+    evidence = [{"registry": 0, "vtu_research": 0} for _ in clusters]
+    for a, b, source_type in confirmed_common_owner_edges(conn):
+        i = cluster_of.get(a)
+        if i is not None and cluster_of.get(b) == i:
+            evidence[i]["registry" if source_type == REGISTRY_SOURCE else "vtu_research"] += 1
+
+    portfolios: list[Portfolio] = []
+    portfolio_pids: list[set[str]] = []
+    for i, cluster in enumerate(clusters):
         pids: set[str] = set()
         for entity in cluster:
             pids |= entity_pids.get(sanitize_owner(entity), set())
-        if not pids:
-            continue
         addr_keys = {pid_to_addr_key[pid] for pid in pids if pid in pid_to_addr_key}
         if not addr_keys:
             continue
+        default_name = max(cluster, key=lambda e: len(entity_pids.get(sanitize_owner(e), set())))
+        label = max(
+            (labels[key] for key in {sanitize_owner(e) for e in cluster} if key in labels),
+            key=lambda claim: (claim[1], claim[2]),
+            default=None,
+        )
+        portfolios.append(
+            Portfolio(
+                portfolio_key=sanitize_owner(default_name),
+                portfolio_name=label[0] if label else default_name,
+                name_source="claim" if label else "default",
+                entities=cluster,
+                addr_keys=addr_keys,
+                evidence=evidence[i],
+            )
+        )
+        portfolio_pids.append(pids)
 
-        portfolio_name = max(
-            sorted(cluster), key=lambda e: len(entity_pids.get(sanitize_owner(e), set()))
+    pid_counts: dict[str, dict[int, int]] = defaultdict(lambda: defaultdict(int))
+    for j, pids in enumerate(portfolio_pids):
+        for pid in pids:
+            addr_key = pid_to_addr_key.get(pid)
+            if addr_key is not None:
+                pid_counts[addr_key][j] += 1
+
+    by_addr_key: dict[str, Portfolio] = {}
+    for addr_key, per_portfolio in pid_counts.items():
+        best = min(
+            per_portfolio,
+            key=lambda j: (-per_portfolio[j], -len(portfolios[j].addr_keys), portfolios[j].portfolio_key),
         )
-        portfolio = Portfolio(
-            portfolio_key=sanitize_owner(portfolio_name),
-            portfolio_name=portfolio_name,
-            entities=sorted(cluster),
-            addr_keys=addr_keys,
-        )
-        for addr_key in addr_keys:
-            by_addr_key[addr_key] = portfolio
+        by_addr_key[addr_key] = portfolios[best]
     return by_addr_key

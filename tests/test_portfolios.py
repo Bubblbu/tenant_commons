@@ -15,7 +15,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
-from tc_core.claims import record_claim
+from tc_core.claims import NETWORK_LABEL, record_claim
 from tc_core.db import get_connection, init_db
 from tc_core.metrics.portfolios import build_landlord_portfolios
 
@@ -143,3 +143,90 @@ def test_build_landlord_portfolios_omits_unclustered_and_unmapped_buildings(tmp_
     # No common_owner claim at all -> resolve_owner_groups() has nothing to
     # cluster, so no portfolio is produced even though the PID resolves fine.
     assert portfolios == {}
+
+
+def _glr_setup(tmp_path):
+    conn = _conn()
+    _insert_raw_lotr(conn, "111", "GLR PROPERTIES LTD")
+    _insert_raw_lotr(conn, "222", "GLR PROPERTIES LTD")
+    _insert_raw_lotr(conn, "333", "RENER HOLDINGS LTD")
+    pid_map_path = tmp_path / "pid_address_map.csv"
+    _write_pid_address_map(
+        pid_map_path,
+        [("111", "1200 alberni st"), ("222", "1210 alberni st"), ("333", "800 nicola st")],
+    )
+    return conn, str(pid_map_path)
+
+
+def _link(conn, a, b, source_type="public_registry", confidence="confirmed"):
+    record_claim(conn, entity_a=a, entity_b=b, relationship="common_owner",
+                 source_type=source_type, confidence=confidence)
+
+
+def test_network_name_defaults_to_the_entity_with_most_pids(tmp_path):
+    conn, pid_map = _glr_setup(tmp_path)
+    _link(conn, "GLR PROPERTIES LTD", "RENER HOLDINGS LTD")
+    p = build_landlord_portfolios(conn, pid_map)["800 nicola st"]
+    assert (p.portfolio_name, p.name_source, p.portfolio_key) == (
+        "GLR PROPERTIES LTD", "default", "glr-properties-ltd"
+    )
+
+
+def test_confirmed_network_label_renames_the_network_but_keeps_its_key(tmp_path):
+    conn, pid_map = _glr_setup(tmp_path)
+    _link(conn, "GLR PROPERTIES LTD", "RENER HOLDINGS LTD")
+    record_claim(conn, "RENER HOLDINGS LTD", "Rener family", NETWORK_LABEL,
+                 "manual_research", confidence="confirmed")
+    p = build_landlord_portfolios(conn, pid_map)["1200 alberni st"]
+    assert (p.portfolio_name, p.name_source, p.portfolio_key) == (
+        "Rener family", "claim", "glr-properties-ltd"
+    )
+
+
+def test_unconfirmed_or_stray_labels_are_ignored(tmp_path):
+    conn, pid_map = _glr_setup(tmp_path)
+    _link(conn, "GLR PROPERTIES LTD", "RENER HOLDINGS LTD")
+    record_claim(conn, "RENER HOLDINGS LTD", "Unconfirmed name", NETWORK_LABEL, "manual_research")
+    record_claim(conn, "SOMEONE ELSE LTD", "Stray name", NETWORK_LABEL,
+                 "manual_research", confidence="confirmed")
+    p = build_landlord_portfolios(conn, pid_map)["1200 alberni st"]
+    assert (p.portfolio_name, p.name_source) == ("GLR PROPERTIES LTD", "default")
+
+
+def test_evidence_counts_collapse_non_registry_sources(tmp_path):
+    conn, pid_map = _glr_setup(tmp_path)
+    _link(conn, "GLR PROPERTIES LTD", "RENER HOLDINGS LTD")
+    _link(conn, "GLR PROPERTIES LTD", "RENER, LUDVIK", source_type="manual_research")
+    _link(conn, "RENER HOLDINGS LTD", "RENER, LUDVIK", source_type="tenant_report")
+    _link(conn, "RENER HOLDINGS LTD", "RENER, ANA", source_type="manual_research",
+          confidence="unconfirmed")
+    p = build_landlord_portfolios(conn, pid_map)["1200 alberni st"]
+    assert p.evidence == {"registry": 1, "vtu_research": 2}
+
+
+def _contested(tmp_path, pids: list[tuple[str, str, str]], x_first: bool):
+    """pids: (pid, reporting body, addr_key). Networks X and Y are each one
+    confirmed link; x_first controls which claim is inserted first."""
+    conn = _conn()
+    for pid, body, _ in pids:
+        _insert_raw_lotr(conn, pid, body)
+    pid_map = tmp_path / f"map_{len(pids)}_{x_first}.csv"
+    _write_pid_address_map(pid_map, [(pid, addr_key) for pid, _, addr_key in pids])
+    links = [("X ONE LTD", "X TWO LTD"), ("Y ONE LTD", "Y TWO LTD")]
+    for a, b in (links if x_first else links[::-1]):
+        _link(conn, a, b)
+    return build_landlord_portfolios(conn, str(pid_map))
+
+
+def test_contested_building_goes_to_the_network_holding_most_of_its_pids(tmp_path):
+    pids = [("1", "X ONE LTD", "5 shared st"), ("2", "X ONE LTD", "5 shared st"),
+            ("3", "Y ONE LTD", "5 shared st"), ("4", "Y ONE LTD", "9 y st")]
+    for x_first in (True, False):
+        assert _contested(tmp_path, pids, x_first)["5 shared st"].portfolio_key == "x-one-ltd"
+
+
+def test_contested_tie_goes_to_the_larger_network(tmp_path):
+    pids = [("1", "X ONE LTD", "5 shared st"), ("3", "Y ONE LTD", "5 shared st"),
+            ("4", "Y ONE LTD", "9 y st")]
+    for x_first in (True, False):
+        assert _contested(tmp_path, pids, x_first)["5 shared st"].portfolio_key == "y-one-ltd"
