@@ -56,7 +56,7 @@ async function main(): Promise<void> {
   const boundaryRenderer = createBoundaryRenderer(map);
   const blocks = createBlocksLayer(artifacts.blocks).addTo(map);
   const neighbourhoods = createNeighbourhoodsLayer(artifacts.boundaries, boundaryRenderer).addTo(map);
-  const villages = createVillagesLayer(artifacts.villages, boundaryRenderer).addTo(map);
+  const villages = createVillagesLayer(artifacts.villages, boundaryRenderer);
   const chinatown = createChinatownLayer(artifacts.chinatown, boundaryRenderer).addTo(map);
   const styled = artifacts.markers.map((m) => ({ ...m, ...markerStyle(m) }));
   const records = artifacts.buildingData.records;

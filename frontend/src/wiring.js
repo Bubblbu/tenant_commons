@@ -1177,7 +1177,7 @@ export function startWiring(ctx) {
         setLegendDisplay(legendBuildingDetailsEl, showBuildingDetailsLegend);
         const neighbourhoodsChecked = vizNeighbourhoodsChk ? vizNeighbourhoodsChk.checked !== false : true;
         const chinatownChecked = vizChinatownChk ? vizChinatownChk.checked !== false : true;
-        const villagesChecked = vizVillagesChk ? vizVillagesChk.checked !== false : true;
+        const villagesChecked = vizVillagesChk ? vizVillagesChk.checked : false;
         const showBoundariesLegend = neighbourhoodsChecked || chinatownChecked || villagesChecked;
         setLegendDisplay(legendBoundariesEl, showBoundariesLegend);
         if (legendContainerEl) {
@@ -2074,13 +2074,13 @@ export function startWiring(ctx) {
         toggleLayerVisibility(layerNeighbourhoods, true);
       }
       if (vizVillagesChk) {
-        toggleLayerVisibility(layerVillages, vizVillagesChk.checked !== false);
+        toggleLayerVisibility(layerVillages, vizVillagesChk.checked);
         vizVillagesChk.addEventListener('change', function() {
           toggleLayerVisibility(layerVillages, vizVillagesChk.checked);
           updateLegendVisibility();
         });
       } else {
-        toggleLayerVisibility(layerVillages, true);
+        toggleLayerVisibility(layerVillages, false);
       }
       if (vizChinatownChk) {
         toggleLayerVisibility(layerChinatown, vizChinatownChk.checked !== false);
@@ -2119,8 +2119,8 @@ export function startWiring(ctx) {
             toggleLayerVisibility(layerNeighbourhoods, true);
           }
           if (vizVillagesChk) {
-            vizVillagesChk.checked = true;
-            toggleLayerVisibility(layerVillages, true);
+            vizVillagesChk.checked = false;
+            toggleLayerVisibility(layerVillages, false);
           }
           if (vizChinatownChk) {
             vizChinatownChk.checked = true;
