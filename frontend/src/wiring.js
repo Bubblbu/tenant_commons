@@ -1,3 +1,4 @@
+import { initPaneResize as initPaneGutters } from './pane-resize';
 import { pinLast } from './tables';
 
 export function startWiring(ctx) {
@@ -1282,98 +1283,23 @@ export function startWiring(ctx) {
       }
 
       function initPaneResize() {
-        const handles = document.querySelectorAll('.pane-resize-handle[data-target]');
-        handles.forEach(function(handle) {
-          const targetSelector = handle.getAttribute('data-target');
-          if (!targetSelector) return;
-          const target = document.querySelector(targetSelector);
-          if (!target) return;
-          const side = (handle.getAttribute('data-side') || 'right').toLowerCase();
-          const minWidthAttr = Number(handle.getAttribute('data-min-width'));
-          const maxWidthAttr = Number(handle.getAttribute('data-max-width'));
-          const minWidth = Number.isFinite(minWidthAttr) ? minWidthAttr : (side === 'left' ? 240 : 300);
-          const maxWidth = Number.isFinite(maxWidthAttr) ? maxWidthAttr : (side === 'left' ? 520 : 760);
-
-          const startResize = function(startEvent) {
-            if (startEvent.button !== undefined && startEvent.button !== 0) return;
-            const isPointer = startEvent.type === 'pointerdown';
-            if (isPointer && startEvent.pointerType === 'touch') {
-              startEvent.preventDefault();
-            } else {
-              startEvent.preventDefault();
+        const gutter = function(pane) { return document.querySelector('.pane-gutter[data-pane="' + pane + '"]'); };
+        const dataGutter = gutter('data');
+        const filtersGutter = gutter('filters');
+        const dataPanel = document.getElementById('sidebar-container');
+        const filtersPanel = document.getElementById('filters-panel');
+        if (!dataGutter || !filtersGutter || !dataPanel || !filtersPanel) return;
+        initPaneGutters([
+          { gutter: dataGutter, side: 'left', panel: dataPanel, storageKey: 'tc-data-width', min: 280, max: 1000, defaultWidth: 480 },
+          { gutter: filtersGutter, side: 'right', panel: filtersPanel, storageKey: 'tc-filters-width', min: 240, max: 520, defaultWidth: 300 },
+        ], {
+          onResize: updateLegendVisibility,
+          onResizeEnd: function() {
+            if (mapInstance && typeof mapInstance.invalidateSize === 'function') {
+              mapInstance.invalidateSize({ animate: false });
             }
-            const pointerId = isPointer ? startEvent.pointerId : null;
-            const startX = startEvent.clientX;
-            const initialWidth = target.offsetWidth || parseFloat(getComputedStyle(target).width) || 0;
-
-            const resizeTo = function(clientX) {
-              if (typeof clientX !== 'number') return;
-              let delta = clientX - startX;
-              let newWidth = initialWidth;
-              if (side === 'right') {
-                newWidth = initialWidth + delta;
-              } else {
-                newWidth = initialWidth - delta;
-              }
-              if (Number.isFinite(minWidth)) newWidth = Math.max(minWidth, newWidth);
-              if (Number.isFinite(maxWidth)) newWidth = Math.min(maxWidth, newWidth);
-              target.style.width = newWidth + 'px';
-              updateLegendVisibility();
-              if (mapInstance && typeof mapInstance.invalidateSize === 'function') {
-                mapInstance.invalidateSize({ animate: false });
-              }
-            };
-
-            const onMove = function(moveEvent) {
-              if (isPointer && moveEvent.pointerId !== pointerId) return;
-              resizeTo(moveEvent.clientX);
-            };
-
-            const cleanup = function() {
-              document.body.style.userSelect = '';
-              document.body.style.cursor = '';
-              if (isPointer) {
-                window.removeEventListener('pointermove', onMove);
-                window.removeEventListener('pointerup', onUp);
-                window.removeEventListener('pointercancel', onCancel);
-              } else {
-                window.removeEventListener('mousemove', onMove);
-                window.removeEventListener('mouseup', onUp);
-              }
-              updateLegendVisibility();
-              if (mapInstance && typeof mapInstance.invalidateSize === 'function') {
-                mapInstance.invalidateSize({ animate: false });
-              }
-            };
-
-            const onUp = function(endEvent) {
-              if (isPointer && endEvent.pointerId !== pointerId) return;
-              cleanup();
-            };
-
-            const onCancel = function(cancelEvent) {
-              if (isPointer && cancelEvent.pointerId !== pointerId) return;
-              cleanup();
-            };
-
-            document.body.style.userSelect = 'none';
-            document.body.style.cursor = 'col-resize';
-
-            if (isPointer) {
-              window.addEventListener('pointermove', onMove);
-              window.addEventListener('pointerup', onUp);
-              window.addEventListener('pointercancel', onCancel);
-            } else {
-              window.addEventListener('mousemove', onMove);
-              window.addEventListener('mouseup', onUp);
-            }
-          };
-
-          if (window.PointerEvent) {
-            handle.addEventListener('pointerdown', startResize);
-          } else {
-            handle.addEventListener('mousedown', startResize);
-          }
+            updateLegendVisibility();
+          },
         });
       }
 

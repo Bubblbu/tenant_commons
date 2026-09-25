@@ -20,6 +20,10 @@
 </head>
 <body>
 <div id="map" class="folium-map"></div>
+<div class="pane-gutter" data-pane="data" role="separator" aria-orientation="vertical" tabindex="0"
+  aria-controls="sidebar-container" aria-label="Resize data table" title="Drag to resize, double-click to reset"></div>
+<div class="pane-gutter" data-pane="filters" role="separator" aria-orientation="vertical" tabindex="0"
+  aria-controls="filters-panel" aria-label="Resize filters" title="Drag to resize, double-click to reset"></div>
 <button type="button" id="mobile-toggle-sidebar" class="mobile-panel-toggle mobile-panel-toggle-left" aria-expanded="false" aria-controls="sidebar-container">☰ Data</button>
 <button type="button" id="mobile-toggle-filters" class="mobile-panel-toggle mobile-panel-toggle-right" aria-expanded="false" aria-controls="filters-panel">⚙ Filters</button>
 <!-- About modal: a static info panel (project context, prototype status, support
@@ -200,7 +204,7 @@
   }
 
   body>.folium-map {
-    order: 1;
+    order: 2;
     flex: 1 1 auto;
     min-width: 0;
     height: 100%;
@@ -214,9 +218,9 @@
 
   #sidebar-container {
     order: 0;
-    width: 900px;
-    min-width: 280px;
-    max-width: 900px;
+    flex: none;
+    /* Default before pane-resize.ts sets the viewer's width inline. */
+    width: 480px;
     height: 100%;
     background: #fff;
     border-right: 1px solid #d7dbe5;
@@ -228,25 +232,53 @@
     z-index: 2;
   }
 
-  #sidebar-container .pane-resize-handle {
-    position: absolute;
-    top: 0;
-    right: -4px;
+  /* Gutters (pane-resize.ts): their own flex columns between the panels
+     and the map, so neither can paint over them. */
+  .pane-gutter {
+    flex: none;
     width: 8px;
-    bottom: 0;
-    cursor: ew-resize;
+    position: relative;
+    z-index: 3;
+    background: #e6e9f0;
+    cursor: col-resize;
+    touch-action: none;
     user-select: none;
   }
 
-  #sidebar-container .pane-resize-handle::after {
+  .pane-gutter[data-pane="data"] {
+    order: 1;
+  }
+
+  .pane-gutter[data-pane="filters"] {
+    order: 3;
+  }
+
+  /* Grip: three dots centred on the gutter. */
+  .pane-gutter::after {
     content: "";
     position: absolute;
-    top: 20px;
-    bottom: 20px;
-    left: 3px;
+    top: 50%;
+    left: 50%;
     width: 2px;
-    background: #d0d4dd;
-    border-radius: 2px;
+    height: 20px;
+    transform: translate(-50%, -50%);
+    background: radial-gradient(circle, #8a90a2 1px, transparent 1.5px) 0 0 / 2px 7px repeat-y;
+  }
+
+  .pane-gutter:hover,
+  .pane-gutter:focus-visible,
+  body.pane-resizing .pane-gutter:active {
+    background: #c9d3ea;
+  }
+
+  .pane-gutter:focus-visible {
+    outline: 2px solid #3b6fd8;
+    outline-offset: -2px;
+  }
+
+  body.pane-resizing {
+    cursor: col-resize;
+    user-select: none;
   }
 
   #sidebar-tabs {
@@ -454,8 +486,6 @@
 <div id="sidebar-container">
   <button type="button" class="mobile-panel-close" aria-label="Close">×</button>
   <div class="mobile-panel-header">Data</div>
-  <div class="pane-resize-handle" data-target="#sidebar-container" data-side="right" data-min-width="280"
-    data-max-width="760" aria-hidden="true"></div>
   <div id="sidebar-tabs">
     <button id="tab-buildings" class="active">Buildings</button>
     <button id="tab-landlords">Landlords</button>
@@ -731,10 +761,10 @@
 <!-- from sica_mapping/frontend/templates/legend_filters.html -->
 <style>
   #filters-panel {
-    order: 2;
-    width: 520px;
-    min-width: 240px;
-    max-width: 520px;
+    order: 4;
+    flex: none;
+    /* Default before pane-resize.ts sets the viewer's width inline. */
+    width: 300px;
     height: 100%;
     background: #fff;
     border-left: 1px solid #d7dbe5;
@@ -744,27 +774,6 @@
     position: relative;
     overflow: hidden;
     z-index: 2;
-  }
-
-  #filters-panel .pane-resize-handle {
-    position: absolute;
-    top: 0;
-    left: -4px;
-    width: 8px;
-    bottom: 0;
-    cursor: ew-resize;
-    user-select: none;
-  }
-
-  #filters-panel .pane-resize-handle::after {
-    content: "";
-    position: absolute;
-    top: 20px;
-    bottom: 20px;
-    right: 3px;
-    width: 2px;
-    background: #d0d4dd;
-    border-radius: 2px;
   }
 
   #filters-panel .filters-card {
@@ -1424,8 +1433,6 @@
 <div id="filters-panel">
   <button type="button" class="mobile-panel-close" aria-label="Close">×</button>
   <div class="mobile-panel-header">Filters</div>
-  <div class="pane-resize-handle" data-target="#filters-panel" data-side="left" data-min-width="240" data-max-width="520"
-    aria-hidden="true"></div>
   <div class="filters-card">
     <div class="filter-section">
       <h3>Map Summary</h3>
@@ -1532,7 +1539,8 @@
     #filters-panel {
       position: fixed;
       top: 0;
-      width: 100%;
+      /* !important: beats the desktop width pane-resize.ts sets inline. */
+      width: 100% !important;
       max-width: 100%;
       height: 100%;
       z-index: 20000;
@@ -1556,8 +1564,7 @@
       transform: translateX(0);
     }
 
-    #sidebar-container .pane-resize-handle,
-    #filters-panel .pane-resize-handle {
+    .pane-gutter {
       display: none;
     }
 
