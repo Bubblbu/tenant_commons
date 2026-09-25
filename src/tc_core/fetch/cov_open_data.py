@@ -34,6 +34,7 @@ DATASETS = (
     Dataset("business-licences", ("geojson",)),
     Dataset("non-market-housing", ("geojson",)),
     Dataset("rental-standards-current-issues", ("geojson",)),
+    Dataset("city-owned-properties", ("csv",)),
     Dataset("block-outlines", ("csv",)),
     Dataset("block-numbers", ("csv",)),
 )

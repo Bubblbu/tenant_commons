@@ -28,6 +28,7 @@ def test_plan_covers_every_consumer_format(tmp_path):
         "business-licences.geojson",
         "non-market-housing.geojson",
         "rental-standards-current-issues.geojson",
+        "city-owned-properties.csv",
         "block-outlines.csv",
         "block-numbers.csv",
     }
