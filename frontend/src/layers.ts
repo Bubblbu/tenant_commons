@@ -132,6 +132,10 @@ export function createBuildingLayers(
         color: ringColor(ring.housing_type),
         weight: RING_WEIGHT,
         opacity: RING_OPACITY,
+        // A canvas CircleMarker hit-tests its whole disc even with fill off,
+        // so an interactive ring (drawn above every base marker) would
+        // swallow the click meant for the building's own popup.
+        interactive: false,
       });
       buildings.addLayer(marker);
       return { housing_type: ring.housing_type, marker };
