@@ -14,6 +14,7 @@ import * as L from 'leaflet';
 import { initAboutModal } from './about';
 import { BASEMAPS, DEFAULT_BASEMAP, DEFAULT_CENTER, DEFAULT_ZOOM } from './config';
 import { loadArtifacts } from './data';
+import { initHoodUrlSync } from './hood-url';
 import {
   createBlocksLayer,
   createBuildingLayers,
@@ -67,6 +68,7 @@ async function main(): Promise<void> {
   if (b) map.fitBounds([[b.lat_min, b.lon_min], [b.lat_max, b.lon_max]]);
 
   renderLegend(artifacts.filterConfig);
+  initHoodUrlSync();
   initLegendToggle();
   initAboutModal(map);
   renderTables(artifacts.buildingData, artifacts.blocks, document, artifacts.filterConfig.licence_year ?? null);
