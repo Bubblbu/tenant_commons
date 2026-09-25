@@ -302,11 +302,11 @@
 
   .sidebar-hint {
     margin: 0;
-    padding: 8px 14px;
-    font-size: 12px;
-    color: #6b7280;
+    padding: 6px 14px 0;
+    font-size: 11px;
+    font-style: italic;
+    color: #9aa0ab;
     background: #fff;
-    border-bottom: 1px solid #e3e7f0;
   }
 
   #sidebar-content {
@@ -397,6 +397,9 @@
     padding: 6px;
   }
 
+  table.data .cell-sub { font-size: 0.85em; color: #666; }
+  table.data .cell-sub-inline { font-size: 0.85em; color: #666; white-space: nowrap; }
+  table.data .not-on-record { color: #888; font-style: italic; }
   table.data tbody tr:hover {
     background: #fff4e5;
   }
@@ -454,18 +457,17 @@
   <div class="pane-resize-handle" data-target="#sidebar-container" data-side="right" data-min-width="280"
     data-max-width="760" aria-hidden="true"></div>
   <div id="sidebar-tabs">
-    <button id="tab-neighbourhoods" class="active">Neighbourhoods</button>
-    <button id="tab-blocks">Blocks</button>
-    <button id="tab-buildings">Buildings</button>
+    <button id="tab-buildings" class="active">Buildings</button>
     <button id="tab-landlords">Landlords</button>
+    <button id="tab-neighbourhoods">Neighbourhoods</button>
   </div>
+  <p class="sidebar-hint">Select rows to highlight them on the map.</p>
   <div id="table-search-bar" class="search-field">
     <input type="text" id="table-search" placeholder="Search table rows…" aria-label="Search table rows">
     <button type="button" id="table-search-clear" class="search-clear" aria-label="Clear table search" hidden>&times;</button>
   </div>
-  <p class="sidebar-hint">Select rows below to highlight them on the map.</p>
   <div id="sidebar-content">
-    <div id="pane-neighbourhoods" class="pane active">
+    <div id="pane-neighbourhoods" class="pane">
       <div class="table-wrap">
         <table class="data" id="neighbourhoods-table">
           <thead>
@@ -490,6 +492,8 @@
         </table>
       </div>
     </div>
+    <!-- No tab: the blocks table stays as the filter model wiring.js reads
+         (each block's neighbourhood and boundary flags, for the map). -->
     <div id="pane-blocks" class="pane">
       <div class="table-wrap">
         <table class="data" id="blocks-table">
@@ -517,7 +521,7 @@
         </table>
       </div>
     </div>
-    <div id="pane-buildings" class="pane">
+    <div id="pane-buildings" class="pane active">
       <div class="table-controls"></div>
       <div class="table-wrap">
         <table class="data" id="buildings-table">
@@ -525,21 +529,21 @@
             <tr>
               <th class="select-head" data-sort="none">Select</th>
               <th data-sort="text">Address</th>
+              <th data-sort="text">Name</th>
               <th data-sort="text">Neighbourhood</th>
               <th data-sort="number">Units</th>
-              <th data-sort="text" data-explain="owner">Owner</th>
-              <th data-sort="text" data-explain="network">Network</th>
+              <th data-sort="text" data-explain="owner">Landlord</th>
               <th data-sort="number">Year</th>
-              <th data-sort="text">Housing type</th>
+              <th data-sort="number">Open issues</th>
             </tr>
           </thead>
           <tbody></tbody>
           <tfoot>
             <tr class="summary-row">
               <td></td>
-              <td colspan="2" id="summary-buildings-label">Totals (visible)</td>
+              <td colspan="3" id="summary-buildings-label">Totals (visible)</td>
               <td id="summary-buildings-units">0</td>
-              <td colspan="4" id="summary-buildings-rows">0 rows</td>
+              <td colspan="3" id="summary-buildings-rows">0 rows</td>
             </tr>
           </tfoot>
         </table>
@@ -547,15 +551,15 @@
     </div>
     <div id="pane-landlords" class="pane">
       <div class="view-toggle" role="group" aria-label="Group landlords by">
-        <button type="button" id="landlord-view-networks" class="active" aria-pressed="true">Networks</button>
-        <button type="button" id="landlord-view-owners" aria-pressed="false">Owners</button>
+        <button type="button" id="landlord-view-owners" class="active" aria-pressed="true">By landlord</button>
+        <button type="button" id="landlord-view-networks" aria-pressed="false">By ownership group</button>
       </div>
-      <div class="table-wrap" id="networks-panel">
+      <div class="table-wrap" id="networks-panel" hidden>
         <table class="data" id="networks-table">
           <thead>
             <tr>
               <th class="select-head" data-sort="none">Select</th>
-              <th data-sort="text" data-explain="network">Network</th>
+              <th data-sort="text" data-explain="network">Ownership group</th>
               <th data-sort="number">Bldgs</th>
               <th data-sort="number">Units</th>
               <th data-sort="number">Avg Units/Bldg</th>
@@ -573,12 +577,12 @@
           </tfoot>
         </table>
       </div>
-      <div class="table-wrap" id="owners-panel" hidden>
+      <div class="table-wrap" id="owners-panel">
         <table class="data" id="owners-table">
           <thead>
             <tr>
               <th class="select-head" data-sort="none">Select</th>
-              <th data-sort="text" data-explain="owner">Owner</th>
+              <th data-sort="text" data-explain="owner">Landlord</th>
               <th data-sort="number">Bldgs</th>
               <th data-sort="number">Units</th>
               <th data-sort="number">Avg Units/Bldg</th>
@@ -1217,7 +1221,7 @@
     <div class="filter-section">
       <h4>Landlords</h4>
       <div class="search-field">
-        <input type="text" id="owner-search" placeholder="Search landlord / owner name…">
+        <input type="text" id="owner-search" placeholder="Search landlord or ownership group…">
         <button type="button" id="owner-search-clear" class="search-clear" aria-label="Clear landlord search" hidden>&times;</button>
       </div>
     </div>

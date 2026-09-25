@@ -25,7 +25,7 @@ import sqlite3
 from collections import defaultdict
 from dataclasses import dataclass, field
 
-from ..claims import confirmed_common_owner_edges, network_label_claims, resolve_owner_groups
+from ..claims import confirmed_common_owner_edges, confirmed_group_edges, network_label_claims
 from ..normalize import addr_key_from_freeform, sanitize_owner
 
 REGISTRY_SOURCE = "public_registry"
@@ -128,15 +128,43 @@ def _entity_pids(conn: sqlite3.Connection) -> dict[str, set[str]]:
 
 
 def _clusters(conn: sqlite3.Connection) -> list[list[str]]:
+    """Connected components over confirmed common_owner and same_entity
+    claims: two spellings of one company share an owner by definition."""
+    adjacency: dict[str, set[str]] = defaultdict(set)
+    for a, b in confirmed_group_edges(conn):
+        adjacency[a].add(b)
+        adjacency[b].add(a)
     clusters: list[list[str]] = []
     seen: set[str] = set()
-    for entity, others in resolve_owner_groups(conn).items():
-        if entity in seen:
+    for node in sorted(adjacency):
+        if node in seen:
             continue
-        cluster = {entity, *others}
+        cluster, stack = set(), [node]
+        while stack:
+            current = stack.pop()
+            if current not in cluster:
+                cluster.add(current)
+                stack.extend(adjacency[current] - cluster)
         seen |= cluster
         clusters.append(sorted(cluster))
     return clusters
+
+
+def _licence_addr_keys(conn: sqlite3.Connection) -> dict[str, set[str]]:
+    """{sanitize_owner(licensee as filed): {addr_key, ...}} from raw_buildings.bsns_name.
+
+    The licence route for groups whose companies aren't on any registry
+    filing: many research claims name companies known only as licensees.
+    """
+    mapping: dict[str, set[str]] = defaultdict(set)
+    for address, names in conn.execute(
+        "SELECT address, bsns_name FROM raw_buildings WHERE address IS NOT NULL AND bsns_name IS NOT NULL"
+    ):
+        addr_key = addr_key_from_freeform(address)
+        for name in str(names).split(";"):
+            if name.strip():
+                mapping[sanitize_owner(name)].add(addr_key)
+    return mapping
 
 
 def build_landlord_portfolios(
@@ -156,6 +184,7 @@ def build_landlord_portfolios(
     labels = network_label_claims(conn)
     clusters = _clusters(conn)
     keys_by_pid = pid_addr_keys(conn, pid_address_map_path)
+    licence_keys = _licence_addr_keys(conn)
 
     cluster_of = {entity: i for i, cluster in enumerate(clusters) for entity in cluster}
     evidence = [{"registry": 0, "vtu_research": 0} for _ in clusters]
@@ -166,6 +195,7 @@ def build_landlord_portfolios(
 
     portfolios: list[Portfolio] = []
     portfolio_pids: list[set[str]] = []
+    portfolio_licensed: list[set[str]] = []
     for i, cluster in enumerate(clusters):
         pids: set[str] = set()
         for entity in cluster:
@@ -175,10 +205,17 @@ def build_landlord_portfolios(
         covered_points = set().union(
             *(point_keys_by_pid.get(pid, set()) for pid in pids if pid in building_keys_by_pid)
         )
-        addr_keys = building_keys | point_keys
+        licensed = set().union(*(licence_keys.get(sanitize_owner(e), set()) for e in cluster))
+        addr_keys = building_keys | point_keys | licensed
         if not addr_keys:
             continue
-        default_name = max(cluster, key=lambda e: len(entity_pids.get(sanitize_owner(e), set())))
+        default_name = max(
+            cluster,
+            key=lambda e: (
+                len(entity_pids.get(sanitize_owner(e), set())),
+                len(licence_keys.get(sanitize_owner(e), set())),
+            ),
+        )
         label = max(
             (labels[key] for key in {sanitize_owner(e) for e in cluster} if key in labels),
             key=lambda claim: (claim[1], claim[2]),
@@ -192,10 +229,11 @@ def build_landlord_portfolios(
                 entities=cluster,
                 addr_keys=addr_keys,
                 evidence=evidence[i],
-                building_count=len(building_keys | (point_keys - covered_points)),
+                building_count=len(building_keys | licensed | (point_keys - covered_points)),
             )
         )
         portfolio_pids.append(pids)
+        portfolio_licensed.append(licensed)
 
     pid_counts: dict[str, dict[int, int]] = defaultdict(lambda: defaultdict(int))
     for j, pids in enumerate(portfolio_pids):
@@ -203,11 +241,21 @@ def build_landlord_portfolios(
             for addr_key in keys_by_pid.get(pid, set()):
                 pid_counts[addr_key][j] += 1
 
+    # Registry filings outweigh a licence: a group reaches a building through
+    # its licence name only as the weakest evidence.
+    for j, licensed in enumerate(portfolio_licensed):
+        for addr_key in licensed:
+            pid_counts[addr_key][j] += 0
     by_addr_key: dict[str, Portfolio] = {}
     for addr_key, per_portfolio in pid_counts.items():
         best = min(
             per_portfolio,
-            key=lambda j: (-per_portfolio[j], -len(portfolios[j].addr_keys), portfolios[j].portfolio_key),
+            key=lambda j: (
+                -per_portfolio[j],
+                -(addr_key in portfolio_licensed[j]),
+                -len(portfolios[j].addr_keys),
+                portfolios[j].portfolio_key,
+            ),
         )
         by_addr_key[addr_key] = portfolios[best]
     return by_addr_key

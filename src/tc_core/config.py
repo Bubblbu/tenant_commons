@@ -71,6 +71,14 @@ class IngestConfig:
     # (via DataPaths.chinatown_boundary) to flag buildings — reused here,
     # unmodified, as a second map reference overlay.
     chinatown_boundary_geojson: str | None = None
+    # Optional: hand-curated list of property-management companies
+    # (curated/property_managers.toml). A rental licence they hold names the
+    # building's manager, not its landlord (see export.apply_property_managers).
+    property_managers: str | None = None
+    # Optional: directory of dated property-manager listing snapshots
+    # (data/raw/property_managers/<manager>/<YYYY-MM-DD>.json), accumulated
+    # into raw_manager_listings (ingest/manager_listings.py).
+    manager_listings: str | None = None
     # Where export_artifacts() writes the frontend's input (the artifact
     # directory, spec §3/§6). frontend/ reads it via TC_ARTIFACTS_DIR.
     artifacts: str = DEFAULT_ARTIFACTS_DIR
@@ -141,6 +149,12 @@ def load_ingest_config(path: str) -> IngestConfig:
             str(flat["chinatown_boundary_geojson"])
             if flat.get("chinatown_boundary_geojson")
             else None
+        ),
+        property_managers=(
+            str(flat["property_managers"]) if flat.get("property_managers") else None
+        ),
+        manager_listings=(
+            str(flat["manager_listings"]) if flat.get("manager_listings") else None
         ),
         artifacts=str(flat.get("artifacts", DEFAULT_ARTIFACTS_DIR)),
     )

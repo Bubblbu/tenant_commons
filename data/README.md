@@ -6,7 +6,7 @@ Everything under `data/` is ignored by git except this README and the
 | Folder | Meaning |
 |---|---|
 | `raw/` | As received from the source. Never hand-edited. One folder per source, each with a `MANIFEST.md`. |
-| `curated/` | Hand-authored: `ownership_claims.csv`, `landlord_mapping.toml`, `chinatown_boundary.geojson`, `villages_plan_areas.{geojson,shp,...}`. No backup in git — keep your own copy. |
+| `curated/` | Hand-authored: `ownership_claims.csv`, `property_managers.toml`, `landlord_mapping.toml` (retired 2026-09-24: its groupings live in `ownership_claims.csv`; kept for history), `chinatown_boundary.geojson`, `villages_plan_areas.{geojson,shp,...}`. No backup in git — keep your own copy. |
 | `derived/` | Regenerable by scripts; safe to delete and rebuild. Includes the SQLite db. |
 | `exports/` | Reserved for what leaves the pipeline. The map's feed is `derived/artifacts/`. |
 
@@ -25,8 +25,8 @@ Ingest always needs `raw/cov_open_data/local-area-boundary.geojson` (fetched
 by the first step): its overlays step resolves neighbourhoods for co-op/SRO
 records with it, and fails the run if the file is missing.
 
-Sources without a fetch script (FOI, VanMaps, NationBuilder, Samwise) are
-manual: see each folder's `MANIFEST.md` for what to put there. The co-op list
+Sources without a fetch script (FOI, VanMaps, NationBuilder, Samwise,
+property-manager listing snapshots) are manual: see each folder's `MANIFEST.md` for what to put there. The co-op list
 refreshes with `uv run python scripts/fetch_coops.py`, and claims are imported
 with `uv run python scripts/update_claims.py` (ownership_claims.csv) and
 `uv run python scripts/import_lotr_claims.py` (raw/samwise).

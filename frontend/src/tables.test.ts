@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { blockRowsHtml, buildingRow, buildingRowsHtml, networkRowsHtml, neighbourhoodRowsHtml, ownerRowsHtml } from './tables';
+import { blockRowsHtml, buildingRow, buildingRowsHtml, networkRowsHtml, neighbourhoodRowsHtml, ownerRowsHtml, pinLast } from './tables';
 import type { BlocksCollection, BuildingRecord } from './types';
 
 const rec = (over: Partial<BuildingRecord>): BuildingRecord => ({
@@ -24,16 +24,41 @@ describe('buildingRow', () => {
         'data-year-built="1965" data-search="12 oak &amp; elm st west end 40 example &quot;holdings&quot; example group sro" ' +
         'data-housing-type="sro" data-n-issues="">' +
         '<td class="select-cell"><input type="checkbox" class="row-select" data-type="building" data-target="7"></td>' +
-        '<td>12 Oak &amp; Elm St</td><td data-sort-value="West End">West End</td>' +
+        '<td>12 Oak &amp; Elm St</td><td></td><td data-sort-value="West End">West End</td>' +
         '<td data-sort-value="40">40</td>' +
-        '<td>Example &quot;Holdings&quot;</td><td>Example Group</td>' +
-        '<td data-sort-value="1965">1965</td><td data-sort-value="sro">sro</td></tr>',
+        '<td>Example &quot;Holdings&quot;<div class="cell-sub">Group: Example Group</div></td>' +
+        '<td data-sort-value="1965">1965</td><td data-sort-value=""></td></tr>',
     );
   });
 
-  it('leaves the network cell blank when it names the owner again', () => {
-    const row = buildingRow(rec({ owner_name: 'GLR PROPERTIES LTD.', network_name: 'Glr Properties Ltd' }));
-    expect(row).toContain('<td>GLR PROPERTIES LTD.</td><td></td>');
+  it('omits the group line when the group names the landlord again', () => {
+    const row = buildingRow(rec({ owner_name: 'GLR PROPERTIES LTD.', network_name: 'Glr Properties Ltd', year_built: 1970 }));
+    expect(row).toContain('<td>GLR PROPERTIES LTD.</td><td data-sort-value="1970">');
+  });
+
+  it('names the property manager under the landlord, or under "Not on record"', () => {
+    const none = buildingRow(rec({ owner_name: '(Unknown)', owner_key: 'unknown', managed_by: 'Tribe Rental Management' }));
+    expect(none).toContain('<td class="not-on-record">Not on record<div class="cell-sub">Managed by Tribe Rental Management</div></td>');
+    expect(none).toContain('tribe rental management');
+    const owned = buildingRow(rec({ owner_name: 'GREENBRIER HOLDINGS LTD.', network_name: 'Greenbrier Holdings Ltd', managed_by: 'Tribe Rental Management' }));
+    expect(owned).toContain('<td>GREENBRIER HOLDINGS LTD.<div class="cell-sub">Managed by Tribe Rental Management</div></td>');
+  });
+
+  it('shows the building name, and finds it by any of its names', () => {
+    const row = buildingRow(rec({ building_name: 'Maple Apartments', other_names: ['The Maple Apts'] }));
+    expect(row).toContain('<td>A</td><td>Maple Apartments</td>');
+    expect(row).toMatch(/data-search="[^"]*maple apartments the maple apts/);
+  });
+
+  it('shows the address in readable form', () => {
+    expect(buildingRow(rec({ address: '350 e 6th ave' }))).toContain('<td>350 E 6th Ave</td>');
+  });
+
+  it('shows a building with no known landlord as not on record, not as a landlord', () => {
+    const row = buildingRow(rec({ owner_name: '(Unknown)', owner_key: 'unknown', network_name: '(Unknown)', network_key: 'unknown' }));
+    expect(row).toContain('<td class="not-on-record">Not on record</td>');
+    expect(row).not.toContain('Group:');
+    expect(row).not.toMatch(/data-search="[^"]*unknown/);
   });
 
   it('leaves missing values empty and keeps them out of the search text', () => {
@@ -41,6 +66,11 @@ describe('buildingRow', () => {
     expect(row).toContain('data-block="" data-area=""');
     expect(row).toContain('data-units="" data-year-built=""');
     expect(row).toContain('data-search="x o"');
+  });
+
+  it('shows the number of open issues, blank when the building has no record', () => {
+    expect(buildingRow(rec({ b_id: 20, n_issues: 3 }))).toMatch(/<td data-sort-value="3">3<\/td><\/tr>$/);
+    expect(buildingRow(rec({ b_id: 21, n_issues: null }))).toMatch(/<td data-sort-value=""><\/td><\/tr>$/);
   });
 
   it('carries the outstanding-issues count for the "only show buildings with issues" filter', () => {
@@ -122,7 +152,26 @@ describe('group tables', () => {
     ]);
     expect(html).toContain('data-tip="Grouped from 3 provincial registry filings. Name: default (entity with the most properties)."');
     expect(html).toContain('data-tip="Grouped by business licence name"');
-    expect(html).toContain('<td data-sort-value="(Unknown)">(Unknown)</td>');
+    expect(html).toContain('>Not on record</td>');
+  });
+
+  it('pins buildings with no known landlord to one greyed row at the bottom of both views', () => {
+    const recs = [
+      rec({ b_id: 1, owner_name: '(Unknown)', owner_key: 'unknown', network_name: '(Unknown)', network_key: 'unknown', units: 500 }),
+      rec({ b_id: 2, owner_name: 'A Co', owner_key: 'a', network_name: 'A Co', network_key: 'a', units: 10 }),
+    ];
+    for (const html of [ownerRowsHtml(recs), networkRowsHtml(recs)]) {
+      const rows = html.split('\n');
+      expect(rows).toHaveLength(2);
+      expect(rows[1]).toContain('data-pin="last" class="not-on-record"');
+      expect(rows[1]).toContain('<td data-sort-value="">Not on record</td>');
+    }
+  });
+
+  it('says how many landlords an ownership group folds together', () => {
+    const html = networkRowsHtml(records);
+    expect(html).toContain('<td data-sort-value="Net">Net<span class="cell-sub-inline"> · 2 landlords</span></td>');
+    expect(html).toContain('<td data-sort-value="Other">Other</td>');
   });
 
   it('tags each owner row with its source, keeping the name as the sort value', () => {
@@ -145,5 +194,14 @@ describe('group tables', () => {
   it('groups neighbourhoods, putting missing areas under (Unknown)', () => {
     const html = neighbourhoodRowsHtml(records);
     expect([...html.matchAll(/<tr data-area="([^"]+)"/g)].map((m) => m[1])).toEqual(['(Unknown)', 'West End']);
+  });
+});
+
+describe('pinLast', () => {
+  const row = (id: string, pin = '') => ({ id, getAttribute: (n: string) => (n === 'data-pin' ? pin || null : null) });
+
+  it('moves pinned rows to the end, keeping both groups in order', () => {
+    const rows = [row('x', 'last'), row('a'), row('b'), row('y', 'last'), row('c')];
+    expect(pinLast(rows).map((r) => r.id)).toEqual(['a', 'b', 'c', 'x', 'y']);
   });
 });

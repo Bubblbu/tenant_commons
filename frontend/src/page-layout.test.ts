@@ -20,6 +20,35 @@ describe('index.html page layout', () => {
 
 const wiring = readFileSync(new URL('./wiring.js', import.meta.url), 'utf8');
 
+describe('sidebar', () => {
+  it('orders the data tabs Buildings, Landlords, Neighbourhoods, opening on Buildings', () => {
+    const tabs = [...page.matchAll(/<button id="tab-(\w+)"( class="active")?>/g)].map((m) => m[1] + (m[2] ? '*' : ''));
+    expect(tabs).toEqual(['buildings*', 'landlords', 'neighbourhoods']);
+    expect(page).toContain('<div id="pane-buildings" class="pane active">');
+    expect(page).toContain('<div id="pane-neighbourhoods" class="pane">');
+  });
+
+  it('keeps the blocks table without a tab: the map block filter reads its rows', () => {
+    expect(page).toContain('id="blocks-table"');
+    expect(page).not.toContain('id="tab-blocks"');
+  });
+
+  it('shows the selection hint above the table search, as a note', () => {
+    expect(page.indexOf('class="sidebar-hint"')).toBeLessThan(page.indexOf('id="table-search-bar"'));
+  });
+
+  it('has a Name column right after Address in the Buildings table', () => {
+    const head = page.slice(page.indexOf('id="buildings-table"'), page.indexOf('</thead>', page.indexOf('id="buildings-table"')));
+    expect(head).toMatch(/<th data-sort="text">Address<\/th>\s*<th data-sort="text">Name<\/th>/);
+  });
+
+  it('lists open issues instead of housing type in the Buildings table', () => {
+    const head = page.slice(page.indexOf('id="buildings-table"'), page.indexOf('</thead>', page.indexOf('id="buildings-table"')));
+    expect(head).toContain('<th data-sort="number">Open issues</th>');
+    expect(head).not.toContain('Housing type');
+  });
+});
+
 describe('Landlords tab', () => {
   it('has an Owners and a Networks table with the totals cells wiring.js fills', () => {
     const ids = [
@@ -31,14 +60,24 @@ describe('Landlords tab', () => {
     expect(page).not.toContain('id="landlords-table"');
   });
 
-  it('marks the Owner and Network headers for explainer icons', () => {
-    for (const table of ['networks-table', 'owners-table', 'buildings-table']) {
-      const markup = page.slice(page.indexOf(`id="${table}"`), page.indexOf('</thead>', page.indexOf(`id="${table}"`)));
-      expect(markup).toMatch(/data-explain="(owner|network)"/);
-    }
-    const buildings = page.slice(page.indexOf('id="buildings-table"'), page.indexOf('</thead>', page.indexOf('id="buildings-table"')));
-    expect(buildings).toContain('data-explain="owner"');
-    expect(buildings).toContain('data-explain="network"');
+  it('marks the Landlord and Ownership group headers for explainer icons', () => {
+    const head = (table: string) =>
+      page.slice(page.indexOf(`id="${table}"`), page.indexOf('</thead>', page.indexOf(`id="${table}"`)));
+    expect(head('owners-table')).toMatch(/data-explain="owner">Landlord</);
+    expect(head('networks-table')).toMatch(/data-explain="network">Ownership group</);
+    expect(head('buildings-table')).toMatch(/data-explain="owner">Landlord</);
+    expect(head('buildings-table')).not.toContain('data-explain="network"');
+  });
+
+  it('opens on the by-landlord view, with ownership groups one click away', () => {
+    expect(page).toMatch(/id="landlord-view-owners" class="active" aria-pressed="true">By landlord</);
+    expect(page).toMatch(/id="landlord-view-networks" aria-pressed="false">By ownership group</);
+    expect(page).toMatch(/id="networks-panel" hidden/);
+    expect(page).not.toMatch(/id="owners-panel" hidden/);
+  });
+
+  it('keeps "Not on record" rows at the bottom when a column is sorted', () => {
+    expect(wiring).toMatch(/pinLast\(/);
   });
 
   it('does not sort when an explainer icon in a header is clicked', () => {

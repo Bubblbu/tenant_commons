@@ -298,3 +298,13 @@ def confirmed_common_owner_edges(conn: sqlite3.Connection) -> list[tuple[str, st
         "WHERE relationship = 'common_owner' AND status = 'active' AND confidence = 'confirmed'"
     ).fetchall()
     return [(a, b, source_type) for a, b, source_type in rows]
+
+
+def confirmed_group_edges(conn: sqlite3.Connection) -> list[tuple[str, str]]:
+    """(entity_a, entity_b) of every confirmed, active common_owner or
+    same_entity claim: the edges that put entities in one ownership group."""
+    rows = conn.execute(
+        "SELECT entity_a, entity_b FROM ownership_claims "
+        "WHERE relationship IN ('common_owner', 'same_entity') AND status = 'active' AND confidence = 'confirmed'"
+    ).fetchall()
+    return [(a, b) for a, b in rows]

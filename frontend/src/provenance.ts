@@ -11,16 +11,18 @@ const num = (v: unknown): number | null => (typeof v === 'number' && Number.isFi
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 
 const REGISTRY = 'BC Land Owner Transparency Registry';
+export const SRO_INVENTORY = 'City of Vancouver SRO inventory';
 
 /** What each ownership layer means, for the table-header icons. */
 export const EXPLAINERS = {
   network:
-    'Buildings grouped under one real owner. Legally separate companies and people are linked by ' +
-    'confirmed ownership claims (provincial registry filings, VTU research). Where there are no ' +
-    'claims, buildings are grouped by business-licence name.',
+    'Landlords that belong together: legally separate companies and people linked by confirmed ' +
+    'ownership claims (provincial registry filings, VTU research). Where there are no claims, ' +
+    'landlords are grouped by business-licence name.',
   owner:
-    "The owner on title for the building's parcels, from the BC Land Owner Transparency Registry. " +
-    "Where there is no registry record, it's the business-licence holder.",
+    'The entity a tenant can hold accountable for the building: the owner on title from the BC Land ' +
+    'Owner Transparency Registry; otherwise the business-licence holder; otherwise the owner in the ' +
+    "City's SRO inventory. Not on record: none of these sources names anyone yet.",
 } as const;
 
 export function registryProvenance(pids: string[], retrieved: string): string {
@@ -51,17 +53,16 @@ export function networkProvenance(r: BuildingRecord): string {
   return `${grouped} ${name}`;
 }
 
-/** Source of an Owners-table row, from its buildings' owner_source values ('' if none is known). */
+/** Source of a Landlord-table row, from its buildings' owner_source values ('' if none is known). */
 export function ownerRowProvenance(sources: unknown[], year: number | null | undefined): string {
-  const registry = sources.filter((s) => s === 'registry').length;
-  const licence = sources.filter((s) => s === 'licence').length;
-  if (registry && licence) {
-    return `${REGISTRY} (${plural(registry, 'building', 'buildings')}); ` +
-      `${licenceProvenance(year)} (${plural(licence, 'building', 'buildings')})`;
-  }
-  if (registry) return REGISTRY;
-  if (licence) return licenceProvenance(year);
-  return '';
+  const labels: [string, string][] = [
+    ['registry', REGISTRY], ['licence', licenceProvenance(year)], ['sro_list', SRO_INVENTORY],
+  ];
+  const found = labels
+    .map(([source, label]) => [label, sources.filter((s) => s === source).length] as const)
+    .filter(([, n]) => n > 0);
+  if (found.length === 1) return found[0][0];
+  return found.map(([label, n]) => `${label} (${plural(n, 'building', 'buildings')})`).join('; ');
 }
 
 /**

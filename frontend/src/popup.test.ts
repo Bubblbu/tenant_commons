@@ -25,7 +25,7 @@ describe('renderPopup', () => {
     const html = renderPopup(building);
     expect(html.indexOf('ST. GEORGE ESTATES LTD.')).toBeLessThan(html.indexOf('87 units'));
     expect(html).toContain('Licensed as Willow Lane Apartments Inc');
-    expect(html).toContain('Part of the <strong>GLR PROPERTIES LTD.</strong> network');
+    expect(html).toContain('Part of the <strong>GLR PROPERTIES LTD.</strong> ownership group');
     expect(html).toContain('19 buildings on map · 23 properties on title · 6 linked entities');
     expect(html).toContain('87 units · built 1974');
     expect(html).toContain('Assessed $20.1M land · $950K building');
@@ -50,7 +50,7 @@ describe('renderPopup', () => {
 
   it('omits missing facts rather than printing blanks', () => {
     const html = renderPopup({ b_id: 9, address: '300 Invented Rd', owner_name: '(Unknown)', units: null, year_built: null });
-    expect(html).not.toMatch(/units|built|Assessed|network|null|undefined/);
+    expect(html).not.toMatch(/units|built|Assessed|group|null|undefined|Unknown/);
   });
 
   it('shows the outstanding-issues count only when there is one', () => {
@@ -74,9 +74,10 @@ describe('renderPopup', () => {
 
   it('escapes every value', () => {
     const html = renderPopup({ ...building, address: '<img src=x onerror=alert(1)>', owner_name: 'A & B' });
-    expect(html).toContain('&lt;img src=x onerror=alert(1)&gt;');
+    // The address is title-cased for display (formatAddress), then escaped.
+    expect(html).toMatch(/&lt;img src=x onerror=alert\(1\)&gt;/i);
     expect(html).toContain('A &amp; B');
-    expect(html).not.toContain('<img');
+    expect(html).not.toMatch(/<img/i);
   });
 });
 
@@ -110,18 +111,52 @@ describe('ownership lines', () => {
       ...building, network_source: 'licence', network_name: 'Solo Rentals Ltd',
       network_entities: null, network_properties_on_title: null, network_evidence: null,
     };
-    expect(renderPopup({ ...lic, network_buildings_on_map: 1 })).not.toContain('network');
+    expect(renderPopup({ ...lic, network_buildings_on_map: 1 })).not.toContain('ownership group');
     const html = renderPopup({ ...lic, network_buildings_on_map: 3 });
-    expect(html).toContain('Part of the <strong>Solo Rentals Ltd</strong> network');
+    expect(html).toContain('Part of the <strong>Solo Rentals Ltd</strong> ownership group');
     expect(html).toContain('>3 buildings on map<');
     expect(html).toContain('data-tip="Grouped by business licence name"');
   });
 
-  it('shows no provenance for an unknown owner', () => {
-    const html = renderPopup({ b_id: 9, address: '999 Nowhere Rd', owner_name: '(Unknown)', owner_source: null, network_source: null });
-    expect(html).toContain('(Unknown)');
+  it('says "Not on record", with no provenance, when no landlord is known', () => {
+    const html = renderPopup({
+      b_id: 9, address: '999 Nowhere Rd', owner_name: '(Unknown)', owner_key: 'unknown', owner_source: null, network_source: null,
+    });
+    expect(html).toContain('Landlord not on record');
+    expect(html).not.toContain('(Unknown)');
     expect(html).not.toContain('class="prov"');
-    expect(html).not.toContain('network');
+    expect(html).not.toContain('ownership group');
+  });
+
+  it('names the property manager when the landlord is not on record', () => {
+    const html = renderPopup({
+      b_id: 9, address: '1220 cardero st', owner_name: '(Unknown)', owner_key: 'unknown', owner_source: null,
+      licence_holder: 'Tribe Rental Management', managed_by: 'Tribe Rental Management', network_source: null,
+    }, { licenceYear: 2026 });
+    expect(html).toContain('Landlord not on record');
+    expect(html).toContain('Managed by Tribe Rental Management<span class="prov"');
+    expect(html).toContain('data-tip="City of Vancouver business licence, 2026"');
+  });
+
+  it('says "managed by" rather than "licensed as" for a known property manager', () => {
+    const html = renderPopup({ ...building, licence_holder: 'Tribe Rental Management', managed_by: 'Tribe Rental Management' });
+    expect(html).toContain('Managed by Tribe Rental Management');
+    expect(html).not.toContain('Licensed as');
+  });
+
+  it('heads the popup with the building name, listing its other names', () => {
+    const html = renderPopup({ b_id: 9, address: '1220 cardero st', building_name: 'Maple Apartments', other_names: ['The Maple Apts'] });
+    expect(html).toContain('<div class="popup-name">Maple Apartments</div>');
+    expect(html).toContain('Also known as The Maple Apts');
+  });
+
+  it('shows the address in readable form', () => {
+    expect(renderPopup({ b_id: 9, address: '350 e 6th ave' })).toContain('>350 E 6th Ave<');
+  });
+
+  it('sources an owner taken from the SRO inventory', () => {
+    const html = renderPopup({ ...building, owner_name: 'BC Housing', owner_key: 'bc-housing', owner_source: 'sro_list', licence_holder: '(Unknown)' });
+    expect(html).toContain('data-tip="City of Vancouver SRO inventory"');
   });
 
   it('escapes provenance text', () => {

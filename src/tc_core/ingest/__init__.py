@@ -42,7 +42,9 @@ from typing import Any, Callable
 from ..config import load_ingest_config, IngestConfig
 from ..db import get_connection, init_db
 from .block_numbers import ingest_raw_block_numbers
+from .building_names import derive_building_names
 from .blocks import ingest_blocks
+from .manager_listings import ingest_manager_listings
 from .membership import ingest_membership
 from .merge import run_merge
 from .overlay_write import ingest_overlays
@@ -116,6 +118,13 @@ def run_ingest(conn: sqlite3.Connection, config: IngestConfig) -> dict[str, int]
     counts["overlays"] = run_source(
         conn, run_id, "overlays", ingest_overlays, conn,
         config.local_area_boundary_geojson,
+    )
+    if config.manager_listings:
+        counts["raw_manager_listings"] = run_source(
+            conn, run_id, "raw_manager_listings", ingest_manager_listings, conn, config.manager_listings
+        )
+    counts["building_names"] = run_source(
+        conn, run_id, "building_names", derive_building_names, conn
     )
     counts["vtu_membership"] = run_source(
         conn, run_id, "vtu_membership", ingest_membership, conn, config.vtu_raw

@@ -1,3 +1,5 @@
+import { pinLast } from './tables';
+
 export function startWiring(ctx) {
   let filterConfig = {};
   let markerMetadata = [];
@@ -655,8 +657,9 @@ export function startWiring(ctx) {
           if (cmp === 0) cmp = a.idx - b.idx;
           return direction === 'asc' ? cmp : -cmp;
         });
-        rowsWithIndex.forEach(function(item) {
-          tbody.appendChild(item.row);
+        // "Not on record" (data-pin="last") stays at the bottom in either direction.
+        pinLast(rowsWithIndex.map(function(item) { return item.row; })).forEach(function(row) {
+          tbody.appendChild(row);
         });
       }
 

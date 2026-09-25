@@ -51,6 +51,7 @@ def main() -> int:
         boundary_geojson_path=config.local_area_boundary_geojson,
         villages_geojson_path=config.villages_plan_areas_geojson,
         chinatown_geojson_path=config.chinatown_boundary_geojson,
+        property_managers_path=config.property_managers,
     )
 
     print(f"Done — artifacts in {config.artifacts}")

@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import json
 import shutil
+import tomllib
 import sqlite3
 from pathlib import Path
 
@@ -31,6 +32,7 @@ from shapely.geometry import Point, shape
 from shapely.strtree import STRtree
 
 from .geometry import parse_geom
+from .ingest.building_names import pick_building_name
 from .ingest.overlay_write import BUILDING_OVERLAY_COLUMNS
 from .metrics.building_metrics import BUILDING_METRICS, build_building_metrics
 from .metrics.membership_metrics import compute_building_member_metrics
@@ -40,7 +42,10 @@ from .normalize import sanitize_owner
 
 
 def reconstruct_points(
-    conn: sqlite3.Connection, now: pd.Timestamp, pid_address_map_path: str | None = None
+    conn: sqlite3.Connection,
+    now: pd.Timestamp,
+    pid_address_map_path: str | None = None,
+    property_managers: set[str] | None = None,
 ) -> pd.DataFrame:
     buildings = pd.read_sql_query("SELECT * FROM buildings", conn)
     landlords = pd.read_sql_query(
@@ -83,13 +88,14 @@ def reconstruct_points(
         build_landlord_portfolios(conn, pid_address_map_path) if pid_address_map_path else {}
     )
     _assign_ownership(merged, registry, portfolios)
+    apply_property_managers(merged, property_managers or set())
 
     merged = merged[
         [
             "addr_key", "address", "lat", "lon", "units", "year_built", "n_issues", "issues_details",
             "member_count", "has_vtu_member", "member_share_building",
             "owner_name", "owner_key", "owner_source", "registered_owners", "registry_pids",
-            "registry_retrieved", "licence_holder", "network_key", "network_name",
+            "registry_retrieved", "licence_holder", "managed_by", "network_key", "network_name",
             "network_source", "network_name_source", "network_entities",
             "network_properties_on_title", "network_evidence",
             "member_count_all", "members_payload", "value_land",
@@ -99,6 +105,9 @@ def reconstruct_points(
         ]
     ]
     merged = _append_overlay_housing(conn, merged)
+    fill_owner_from_sro(merged)
+    fallback_group_to_owner(merged)
+    apply_building_names(merged, _load_building_names(conn))
 
     # Derived post-union (not stored): the matcher's exact expression from
     # ingest/overlays.py, applied uniformly across both origins now that
@@ -143,6 +152,128 @@ def _assign_ownership(df: pd.DataFrame, registry: dict, portfolios: dict) -> Non
     df["network_entities"] = [list(p.entities) if p else None for p in port]
     df["network_properties_on_title"] = [len(p.addr_keys) if p else None for p in port]
     df["network_evidence"] = [dict(p.evidence) if p else None for p in port]
+
+
+# The SRO inventory abbreviates and truncates names; expand the ones that recur.
+# Anything else is shown as published.
+SRO_NAME_ALIASES = {
+    "BCH": "BC Housing",
+    "COV": "City of Vancouver",
+    "Atira Property Managem": "Atira Property Management",
+    "PHS": "PHS Community Services Society",
+    "Lookout": "Lookout Housing and Health Society",
+}
+# Values that describe a kind of owner or operator rather than naming one
+# ("Private" in the operator column means the owner runs the building).
+SRO_CATEGORY_WORDS = {"private", "government", "non-profit"}
+
+
+def clean_sro_name(name) -> str | None:
+    """Display form of an SRO owner/operator name; None when it names no one."""
+    if name is None or pd.isna(name):
+        return None
+    text = str(name).strip()
+    if not text or text.lower() in SRO_CATEGORY_WORDS:
+        return None
+    return SRO_NAME_ALIASES.get(text, text)
+
+
+def fill_owner_from_sro(df: pd.DataFrame) -> None:
+    """Expands SRO owner/operator names, and makes the SRO owner the landlord
+    of buildings that neither the registry nor a licence names.
+
+    In place. Never replaces a registry or licence owner: when sources
+    disagree (BC Housing on title, PHS as licensee), choosing between them is
+    the headline rule of the roles spec, not this fallback. Such a building's
+    group is itself, as for a licence-only landlord.
+    """
+    for col in ("sro_owner", "sro_operator"):
+        if col in df.columns:
+            df[col] = df[col].map(clean_sro_name).astype(object)
+    if "sro_owner" not in df.columns:
+        return
+    fill = (df["owner_key"] == "unknown") & df["sro_owner"].notna()
+    df.loc[fill, "owner_name"] = df.loc[fill, "sro_owner"]
+    df.loc[fill, "owner_key"] = df.loc[fill, "sro_owner"].map(sanitize_owner)
+    df.loc[fill, "owner_source"] = "sro_list"
+    group = fill & (df["network_key"] == "unknown")
+    df.loc[group, "network_key"] = df.loc[group, "owner_key"]
+    df.loc[group, "network_name"] = df.loc[group, "owner_name"]
+    df.loc[group, "network_source"] = "sro_list"
+
+
+def load_property_managers(path: str | None) -> set[str]:
+    """Keys of the companies listed in curated/property_managers.toml
+    ([[manager]] name = "..."). No file means no known managers."""
+    if not path or not Path(path).exists():
+        return set()
+    data = tomllib.loads(Path(path).read_text())
+    return {sanitize_owner(m["name"]) for m in data.get("manager", []) if m.get("name")}
+
+
+def managers_from_claims(conn: sqlite3.Connection) -> set[str]:
+    """Keys of the managing side (entity_a) of confirmed, active managed_by claims."""
+    rows = conn.execute(
+        "SELECT entity_a FROM ownership_claims "
+        "WHERE relationship = 'managed_by' AND status = 'active' AND confidence = 'confirmed'"
+    ).fetchall()
+    return {sanitize_owner(a) for (a,) in rows}
+
+
+def apply_property_managers(df: pd.DataFrame, managers: set[str]) -> None:
+    """A rental licence held by a known property manager names who runs the
+    building, not who owns it (Tribe Rental Management holds licences for
+    Greenbrier Holdings' buildings). In place: records the manager in
+    `managed_by`; where the licence was the only source for the landlord,
+    the building becomes not on record instead. Registry owners and claims
+    groups are kept.
+    """
+    licence_keys = df["licence_holder"].map(sanitize_owner)
+    managed = licence_keys.isin(managers)
+    df["managed_by"] = df["licence_holder"].where(managed, None).astype(object)
+    owner = managed & (df["owner_source"] == "licence")
+    df.loc[owner, ["owner_name", "owner_key"]] = ["(Unknown)", "unknown"]
+    df.loc[owner, "owner_source"] = None
+    # A group that came from the manager's licence falls back to the landlord
+    # itself (a group of one), or to not on record when there is none.
+    group = managed & (df["network_source"] == "licence")
+    df.loc[group, "network_name"] = df.loc[group, "owner_name"]
+    df.loc[group, "network_key"] = df.loc[group, "owner_key"]
+    df.loc[group, "network_source"] = df.loc[group, "owner_source"]
+
+
+def _load_building_names(conn: sqlite3.Connection) -> dict[int, list[tuple[str, str]]]:
+    names: dict[int, list[tuple[str, str]]] = {}
+    try:
+        rows = conn.execute("SELECT building_id, name, source_type FROM building_names").fetchall()
+    except sqlite3.OperationalError:  # a database built before building_names existed
+        return names
+    for bid, name, source_type in rows:
+        names.setdefault(int(bid), []).append((name, source_type))
+    return names
+
+
+def apply_building_names(df: pd.DataFrame, names: dict[int, list[tuple[str, str]]]) -> None:
+    """Adds building_name (the one shown) and other_names. In place.
+    Buildings take theirs from building_names; overlay records, whose b_ids
+    aren't building ids, keep their own co-op/SRO name."""
+    picked = [
+        pick_building_name(names.get(int(bid), [])) if src == "building"
+        else ((None if pd.isna(hn) or not str(hn).strip() else str(hn)), [])
+        for bid, src, hn in zip(df["b_id"], df["source"], df["housing_name"])
+    ]
+    df["building_name"] = pd.Series([p[0] for p in picked], index=df.index, dtype=object)
+    df["other_names"] = pd.Series([p[1] for p in picked], index=df.index, dtype=object)
+
+
+def fallback_group_to_owner(df: pd.DataFrame) -> None:
+    """A landlord with no group (no claims cluster, no licence to group by)
+    is its own group of one, so the by-ownership-group view never files a
+    known landlord under "not on record". In place."""
+    alone = (df["owner_key"] != "unknown") & (df["network_key"] == "unknown")
+    df.loc[alone, "network_name"] = df.loc[alone, "owner_name"]
+    df.loc[alone, "network_key"] = df.loc[alone, "owner_key"]
+    df.loc[alone, "network_source"] = df.loc[alone, "owner_source"]
 
 
 def _append_overlay_housing(
@@ -517,6 +648,7 @@ def export_artifacts(
     villages_geojson_path: str | None = None,
     chinatown_geojson_path: str | None = None,
     now: pd.Timestamp | None = None,
+    property_managers_path: str | None = None,
 ) -> None:
     """Write the complete frontend artifact set.
 
@@ -529,7 +661,10 @@ def export_artifacts(
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    points_df = reconstruct_points(conn, now, pid_address_map_path)
+    points_df = reconstruct_points(
+        conn, now, pid_address_map_path,
+        load_property_managers(property_managers_path) | managers_from_claims(conn),
+    )
 
     # Chinatown/Villages Plan Areas double as filterable "special areas"
     # (Filters > Neighbourhoods, after the separator) alongside local_area —
@@ -668,9 +803,9 @@ def _marker_records(points_df: pd.DataFrame) -> list[dict]:
 # owner_* (the building's own owner) and network_* (its landlord network);
 # claim provenance is public only as source-type counts, never notes.
 BUILDING_RECORD_COLUMNS = [
-    "b_id", "address", "local_area", "block_id", "units",
+    "b_id", "address", "building_name", "other_names", "local_area", "block_id", "units",
     "year_built", "owner_name", "owner_key", "owner_source",
-    "registered_owners", "registry_pids", "registry_retrieved", "licence_holder",
+    "registered_owners", "registry_pids", "registry_retrieved", "licence_holder", "managed_by",
     "network_key", "network_name", "network_source", "network_name_source",
     "network_entities", "network_buildings_on_map", "network_properties_on_title",
     "network_evidence",

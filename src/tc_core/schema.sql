@@ -3,6 +3,7 @@
 -- Derived from source CSVs; nothing here is hand-authored.
 -- ============================================================
 
+DROP TABLE IF EXISTS building_names;  -- references buildings: drop first
 DROP TABLE IF EXISTS vtu_membership;
 DROP TABLE IF EXISTS buildings;
 DROP TABLE IF EXISTS landlords;
@@ -41,7 +42,8 @@ CREATE TABLE raw_buildings (
     zoning TEXT,
     zoning_district TEXT,
     zoning_classification TEXT,
-    name TEXT,
+    name TEXT,                 -- non-market housing list's project name
+    foi_name TEXT,             -- FOI rental list's building name
     management TEXT,
     n_issues INTEGER,
     issues_details TEXT,
@@ -268,6 +270,18 @@ LEFT JOIN buildings bd ON bd.block_id = bl.block_id
 LEFT JOIN vtu_membership vm ON vm.building_id = bd.building_id
 GROUP BY bl.block_id;
 
+-- Every name a source gives a building, with its source (see
+-- ingest/building_names.py). The map shows one, picked at export.
+CREATE TABLE building_names (
+    building_name_id INTEGER PRIMARY KEY,
+    building_id INTEGER NOT NULL REFERENCES buildings(building_id),
+    name TEXT NOT NULL,
+    source_type TEXT NOT NULL,   -- licence_trade_name / manager_listing / foi_rental_list / non_market_list / sro_list / coop_list
+    source_table TEXT,
+    source_row_id INTEGER
+);
+CREATE INDEX idx_building_names_building ON building_names(building_id);
+
 -- ============================================================
 -- PERSISTENT — never dropped by rebuild. Hand-authored, irreplaceable.
 -- Uses CREATE TABLE IF NOT EXISTS only. The ingest/rebuild routine must
@@ -380,3 +394,21 @@ CREATE TABLE IF NOT EXISTS raw_lotr_ownership (
 );
 CREATE INDEX IF NOT EXISTS idx_raw_lotr_ownership_pid ON raw_lotr_ownership(pid);
 CREATE INDEX IF NOT EXISTS idx_raw_lotr_ownership_reporting_body ON raw_lotr_ownership(reporting_body_name);
+
+-- Property-manager listings, from dated snapshots of each manager's own
+-- listings (data/raw/property_managers/<manager>/<YYYY-MM-DD>.json, see
+-- ingest/manager_listings.py). PERSISTENT: a listing that disappears is
+-- itself a fact (management change, sale), and old versions of a web page
+-- can't be re-downloaded. One row per listing; first_seen/last_seen span the
+-- snapshots it appears in. Staff contact details are never stored.
+CREATE TABLE IF NOT EXISTS raw_manager_listings (
+    listing_row_id INTEGER PRIMARY KEY,
+    manager TEXT NOT NULL,
+    external_id TEXT NOT NULL,
+    name TEXT,
+    address TEXT,
+    url TEXT,
+    first_seen TEXT NOT NULL,
+    last_seen TEXT NOT NULL,
+    UNIQUE (manager, external_id)
+);

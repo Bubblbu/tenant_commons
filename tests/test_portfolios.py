@@ -316,3 +316,71 @@ def test_building_count_keeps_two_buildings_on_one_parcel(tmp_path):
     portfolios = build_landlord_portfolios(conn, str(pid_map_path))
 
     assert portfolios["350 keefer st"].building_count == 3
+
+
+def _insert_licensed_building(conn, address: str, licensee: str, pid: str | None = None) -> None:
+    conn.execute(
+        "INSERT INTO raw_buildings (address, pid, bsns_name, ingested_at) "
+        "VALUES (?, ?, ?, '2026-01-01T00:00:00+00:00')",
+        (address, pid, licensee),
+    )
+
+
+def _claim(conn, a, b, relationship="common_owner", source_type="manual_research"):
+    record_claim(conn, entity_a=a, entity_b=b, relationship=relationship,
+                 source_type=source_type, confidence="confirmed")
+
+
+def test_group_reaches_buildings_through_the_licence_holder_name(tmp_path):
+    # Wolverton Group: companies linked by research claims, known only as licensees.
+    conn = _conn()
+    _claim(conn, "Huntly Investments Ltd", "Lord Nelson Suites Inc")
+    _insert_licensed_building(conn, "1 Huntly St", "Huntly Investments Ltd")
+    _insert_licensed_building(conn, "2 Nelson St", "Lord Nelson Suites Inc")
+    _insert_licensed_building(conn, "3 Other St", "Unrelated Ltd")
+    pid_map = tmp_path / "pid_address_map.csv"
+    _write_pid_address_map(pid_map, [])
+
+    portfolios = build_landlord_portfolios(conn, str(pid_map))
+
+    assert set(portfolios) == {"1 huntly st", "2 nelson st"}
+    assert portfolios["1 huntly st"].building_count == 2
+
+
+def test_same_entity_claims_group_spellings_of_one_company(tmp_path):
+    conn = _conn()
+    _claim(conn, "Hollyburn Properties Ltd", "Hollyburn Properties Limited", relationship="same_entity")
+    _insert_licensed_building(conn, "1 Beach Ave", "Hollyburn Properties Limited")
+    _insert_licensed_building(conn, "2 Beach Ave", "Hollyburn Properties Ltd")
+    pid_map = tmp_path / "pid_address_map.csv"
+    _write_pid_address_map(pid_map, [])
+
+    portfolios = build_landlord_portfolios(conn, str(pid_map))
+
+    assert portfolios["1 beach ave"] is portfolios["2 beach ave"]
+
+
+def test_registry_filings_outweigh_a_licence_when_two_groups_reach_a_building(tmp_path):
+    conn = _conn()
+    _cluster_glr_and_rener(conn)  # registry group: GLR (PID 111) ~ Rener (PID 222)
+    _claim(conn, "Licensee A Ltd", "Licensee B Ltd")
+    _insert_licensed_building(conn, "500 Contested St", "Licensee A Ltd", pid="222")
+    _insert_licensed_building(conn, "501 Other St", "Licensee B Ltd")
+    pid_map = tmp_path / "pid_address_map.csv"
+    _write_pid_address_map(pid_map, [("111", "1200 alberni st")])
+
+    portfolios = build_landlord_portfolios(conn, str(pid_map))
+
+    assert "RENER HOLDINGS LTD" in portfolios["500 contested st"].entities
+
+
+def test_group_name_defaults_to_the_company_with_most_buildings_when_none_is_on_title(tmp_path):
+    conn = _conn()
+    _claim(conn, "Alpha Ltd", "Beta Ltd")
+    _insert_licensed_building(conn, "1 A St", "Beta Ltd")
+    _insert_licensed_building(conn, "2 A St", "Beta Ltd")
+    _insert_licensed_building(conn, "3 A St", "Alpha Ltd")
+    pid_map = tmp_path / "pid_address_map.csv"
+    _write_pid_address_map(pid_map, [])
+
+    assert build_landlord_portfolios(conn, str(pid_map))["1 a st"].portfolio_name == "Beta Ltd"

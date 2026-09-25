@@ -3,8 +3,9 @@ attribution) and derived/ct_properties.csv from refreshed inputs.
 
 Ported from vhd's scripts/build_buildings.py (logic unchanged: address
 cleaning, the FOI/non-market/issues joins, the `Long-term Rental` business
-licence filter, `bsns_group` from curated/landlord_mapping.toml, and the
-`secondary_addresses` column). Removed: the writes of rental_properties.csv,
+licence filter, and the
+`secondary_addresses` column), except that licensees keep their filed names
+(no curated/landlord_mapping.toml renaming; see ownership_claims). Removed: the writes of rental_properties.csv,
 nm_rental_properties.csv, address_index.csv and landlord_summary.csv, which
 nothing in this repo reads. vhd's own docstring records why the notebook
 logic was reconstructed the way it was (the undefined `addresses` variable,
@@ -15,7 +16,6 @@ from __future__ import annotations
 
 import polars as pl
 import polars.selectors as cs
-from tomlkit import parse
 
 from ..paths import DataPaths
 from ..normalize import addr_key_from_freeform
@@ -60,7 +60,6 @@ def run(paths: DataPaths) -> None:
     business_licenses_f = paths.cov("business-licences", "geojson")
     non_market_housing_f = paths.cov("non-market-housing", "geojson")
     rental_standards_issues_f = paths.cov("rental-standards-current-issues", "geojson")
-    landlord_mapping_f = paths.landlord_mapping
     buildings_f = paths.buildings
     ct_properties_f = paths.ct_properties
     buildings_f.parent.mkdir(parents=True, exist_ok=True)
@@ -93,6 +92,7 @@ def run(paths: DataPaths) -> None:
             "Current rental units": "units",
             "Year built": "year_built",
             "Current zoning": "zoning",
+            "Name": "foi_name",
         }
     ).with_columns(address=CLEAN("address"))
     rentals = rentals.unique(subset="address", keep="first").drop("id")
@@ -164,13 +164,11 @@ def run(paths: DataPaths) -> None:
     )
     print("housing (after issues join):", housing.shape)
 
-    # --- Businesses / landlord mapping ---
-    landlord_mapping = parse(landlord_mapping_f.read_text())
-    bsns_mapping = {}
-    for ll in landlord_mapping["landlord"]:
-        for bsns_name in ll["businesses"]:
-            bsns_mapping[bsns_name] = ll["name"]
-
+    # --- Businesses ---
+    # bsns_group is the licensee as filed. It used to be renamed through
+    # curated/landlord_mapping.toml; those groupings now live in
+    # ownership_claims (same_entity / common_owner / managed_by), so each
+    # company keeps its own name and the claims group it.
     businesses = load_polars(business_licenses_f)
     latest_year = businesses.select(pl.col("folderyear").cast(pl.Int32).max()).item()
     print(f"Using latest business-licence folderyear: {latest_year}")
@@ -185,7 +183,7 @@ def run(paths: DataPaths) -> None:
     )
     businesses = businesses.with_columns(
         "address",
-        bsns_group=pl.col("businessname").replace(bsns_mapping).replace(BC_versions),
+        bsns_group=pl.col("businessname").replace(BC_versions),
         bsns_name=pl.col("businessname"),
         bsns_trade_name="businesstradename",
         bsns_type="businesstype",
@@ -271,6 +269,7 @@ def run(paths: DataPaths) -> None:
         "bsns_subtype",
         "bsns_year",
         "name",
+        "foi_name",
         "management",
         "n_issues",
         "issues_details",

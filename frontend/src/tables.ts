@@ -7,6 +7,7 @@
  * render as JS numbers (15, not Python's 15.0), and tied rows may order
  * differently. Must render before wiring.js starts; it queries the rows once.
  */
+import { formatAddress } from './address';
 import { escapeHtml, isMissing, roundHalfEven, sameName } from './html';
 import { EXPLAINERS, networkProvenance, ownerRowProvenance, provenanceIcon, tipPlacement } from './provenance';
 import type { BlocksCollection, BuildingData, BuildingRecord } from './types';
@@ -25,6 +26,18 @@ function descMissingLast(a: number | null, b: number | null): number {
   if (a === null) return 1;
   if (b === null) return -1;
   return b - a;
+}
+
+/**
+ * A building with no known landlord. The export still writes the "unknown"
+ * key; it is shown as "Not on record" and never ranked as a landlord.
+ */
+const notOnRecord = (key: unknown): boolean => isMissing(key) || key === 'unknown';
+
+/** Rows in their current order, with data-pin="last" rows moved to the end (wiring.js sorting). */
+export function pinLast<T extends { getAttribute(name: string): string | null }>(rows: T[]): T[] {
+  const pinned = (r: T) => r.getAttribute('data-pin') === 'last';
+  return [...rows.filter((r) => !pinned(r)), ...rows.filter(pinned)];
 }
 
 /** Python's str ordering (code points), not localeCompare. */
@@ -46,10 +59,18 @@ export function buildingRow(r: BuildingRecord): string {
   const ratioVal = ratio === null ? '' : String(roundHalfEven(ratio, 3));
   const area = text(r.local_area);
   const housing = text(r.housing_type);
-  const owner = text(r.owner_name);
-  const networkName = text(r.network_name);
+  const onRecord = !notOnRecord(r.owner_key);
+  const owner = onRecord ? text(r.owner_name) : '';
+  const networkName = onRecord && !notOnRecord(r.network_key) ? text(r.network_name) : '';
   const network = sameName(networkName, owner) ? '' : networkName;
-  const search = [text(r.address), area, units, owner, network, housing]
+  const manager = text(r.managed_by);
+  const sub = (line: string) => (line ? `<div class="cell-sub">${escapeHtml(line)}</div>` : '');
+  const managerLine = sub(manager ? `Managed by ${manager}` : '');
+  const landlordCell = onRecord
+    ? `<td>${escapeHtml(owner)}${sub(network ? `Group: ${network}` : '')}${managerLine}</td>`
+    : `<td class="not-on-record">Not on record${managerLine}</td>`;
+  const names = [text(r.building_name), ...(Array.isArray(r.other_names) ? r.other_names.map(text) : [])];
+  const search = [text(r.address), ...names, area, units, owner, network, manager, housing]
     .filter((v) => v !== '')
     .map((v) => v.toLowerCase())
     .join(' ');
@@ -67,13 +88,13 @@ export function buildingRow(r: BuildingRecord): string {
     `data-housing-type="${h}" data-n-issues="${nIssues}">` +
     `<td class="select-cell"><input type="checkbox" class="row-select" ` +
     `data-type="building" data-target="${bid}"></td>` +
-    `<td>${escapeHtml(text(r.address))}</td>` +
+    `<td>${escapeHtml(formatAddress(r.address))}</td>` +
+    `<td>${escapeHtml(text(r.building_name))}</td>` +
     `<td data-sort-value="${a}">${a}</td>` +
     `<td data-sort-value="${units}">${units}</td>` +
-    `<td>${escapeHtml(owner)}</td>` +
-    `<td>${escapeHtml(network)}</td>` +
+    landlordCell +
     `<td data-sort-value="${year}">${year}</td>` +
-    `<td data-sort-value="${h}">${h}</td>` +
+    `<td data-sort-value="${nIssues}">${nIssues}</td>` +
     `</tr>`
   );
 }
@@ -163,15 +184,18 @@ function aggregate(records: BuildingRecord[], labelOf: (r: BuildingRecord) => st
 
 function groupRow(
   g: Group, type: 'owner' | 'network' | 'neighbourhood', target: string, first: string, dataKey: string, icon = '',
+  pinned = false,
 ): string {
   const units = Math.trunc(g.totalUnits);
   const avg = avgUnits(g.totalUnits, g.buildings);
+  const pin = pinned ? 'data-pin="last" class="not-on-record" ' : '';
+  const label = pinned ? 'Not on record' : first;
   return (
-    `<tr ${dataKey}="${target}" ` +
+    `<tr ${dataKey}="${target}" ${pin}` +
     `data-bldgs="${g.buildings}" data-units="${units}">` +
     `<td class="select-cell"><input type="checkbox" class="row-select" ` +
     `data-type="${type}" data-target="${target}"></td>` +
-    `<td data-sort-value="${first}">${first}${icon}</td>` +
+    `<td data-sort-value="${pinned ? '' : first}">${label}${icon}</td>` +
     `<td data-sort-value="${g.buildings}">${g.buildings}</td>` +
     `<td data-sort-value="${units}">${units}</td>` +
     `<td data-sort-value="${avg}">${avg.toFixed(1)}</td>` +
@@ -179,34 +203,42 @@ function groupRow(
   );
 }
 
+/** Landlord groups with the "Not on record" group moved to the end. */
+function landlordGroups(records: BuildingRecord[], nameOf: (r: BuildingRecord) => unknown, keyOf: (r: BuildingRecord) => unknown): Group[] {
+  const groups = aggregate(
+    records,
+    (r) => (notOnRecord(keyOf(r)) ? '' : text(nameOf(r))),
+    (r) => (notOnRecord(keyOf(r)) ? 'unknown' : String(keyOf(r))),
+  );
+  return [...groups.filter((g) => g.key !== 'unknown'), ...groups.filter((g) => g.key === 'unknown')];
+}
+
 /** A row's provenance icon, or '' when there is nothing to say. */
 const iconFor = (text: string) => (text ? provenanceIcon(text) : '');
 
 export function ownerRowsHtml(records: BuildingRecord[], licenceYear: number | null = null): string {
-  return aggregate(
-    records,
-    (r) => (isMissing(r.owner_name) ? '(Unknown)' : String(r.owner_name)),
-    (r) => (isMissing(r.owner_key) ? 'unknown' : String(r.owner_key)),
-  )
-    .map((g) => groupRow(
-      g, 'owner', escapeHtml(g.key), escapeHtml(g.label), 'data-owner',
-      iconFor(ownerRowProvenance(g.records.map((r) => r.owner_source), licenceYear)),
-    ))
+  return landlordGroups(records, (r) => r.owner_name, (r) => r.owner_key)
+    .map((g) => {
+      if (g.key === 'unknown') return groupRow(g, 'owner', 'unknown', '', 'data-owner', '', true);
+      return groupRow(
+        g, 'owner', escapeHtml(g.key), escapeHtml(g.label), 'data-owner',
+        iconFor(ownerRowProvenance(g.records.map((r) => r.owner_source), licenceYear)),
+      );
+    })
     .join('\n');
 }
 
 export function networkRowsHtml(records: BuildingRecord[]): string {
-  return aggregate(
-    records,
-    (r) => (isMissing(r.network_name) ? '(Unknown)' : String(r.network_name)),
-    (r) => (isMissing(r.network_key) ? 'unknown' : String(r.network_key)),
-  )
+  return landlordGroups(records, (r) => r.network_name, (r) => r.network_key)
     .map((g) => {
+      if (g.key === 'unknown') return groupRow(g, 'network', 'unknown', '', 'data-network', '', true);
       const sample = g.records[0];
       const icon = sample.network_source === 'claims' || sample.network_source === 'licence'
         ? provenanceIcon(networkProvenance(sample))
         : '';
-      return groupRow(g, 'network', escapeHtml(g.key), escapeHtml(g.label), 'data-network', icon);
+      const landlords = new Set(g.records.map((r) => r.owner_key).filter((k) => !notOnRecord(k))).size;
+      const members = landlords > 1 ? `<span class="cell-sub-inline"> · ${landlords} landlords</span>` : '';
+      return groupRow(g, 'network', escapeHtml(g.key), escapeHtml(g.label), 'data-network', members + icon);
     })
     .join('\n');
 }

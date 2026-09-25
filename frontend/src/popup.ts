@@ -6,7 +6,8 @@
  * so there is nothing for the popup to read here even by omission.
  */
 import { escapeHtml, isMissing, sameName } from './html';
-import { licenceProvenance, networkProvenance, provenanceIcon, registryProvenance } from './provenance';
+import { formatAddress } from './address';
+import { SRO_INVENTORY, licenceProvenance, networkProvenance, provenanceIcon, registryProvenance } from './provenance';
 import type { BuildingRecord } from './types';
 
 const str = (v: unknown): string => (isMissing(v) ? '' : String(v).trim());
@@ -42,24 +43,35 @@ const provenance = (text: string) => provenanceIcon(text);
 
 function ownershipLines(r: BuildingRecord, ctx: PopupContext): string[] {
   const lines: string[] = [];
-  const owner = str(r.owner_name);
+  const onRecord = !isMissing(r.owner_key) && r.owner_key !== 'unknown' && str(r.owner_name) !== '(Unknown)';
+  const owner = onRecord ? str(r.owner_name) : '';
   const ownerSource = str(r.owner_source);
-  if (owner) {
+  const manager = str(r.managed_by);
+  const managerLine = () =>
+    div('', escapeHtml(`Managed by ${manager}`) + provenance(licenceProvenance(ctx.licenceYear)));
+  if (!owner) {
+    lines.push(div('popup-owner popup-muted', 'Landlord not on record'));
+    if (manager) lines.push(managerLine());
+    return lines;
+  }
+  {
     let html = escapeHtml(owner);
     if (ownerSource === 'registry') html += provenance(registryProvenance(strList(r.registry_pids), str(r.registry_retrieved)));
     else if (ownerSource === 'licence') html += provenance(licenceProvenance(ctx.licenceYear));
+    else if (ownerSource === 'sro_list') html += provenance(SRO_INVENTORY);
     const coOwners = strList(r.registered_owners).length - 1;
     if (coOwners > 0) html += ` <span class="popup-muted">${escapeHtml(`+${plural(coOwners, 'co-owner', 'co-owners')}`)}</span>`;
     lines.push(div('popup-owner', html));
   }
   const licence = str(r.licence_holder);
-  if (ownerSource === 'registry' && licence && licence !== '(Unknown)' && !sameName(licence, owner)) {
+  if (manager) lines.push(managerLine());
+  else if (ownerSource === 'registry' && licence && licence !== '(Unknown)' && !sameName(licence, owner)) {
     lines.push(div('', escapeHtml(`Licensed as ${licence}`) + provenance(licenceProvenance(ctx.licenceYear))));
   }
   const netSource = str(r.network_source);
   const onMap = num(r.network_buildings_on_map);
   if (netSource === 'claims' || (netSource === 'licence' && onMap !== null && onMap > 1)) {
-    lines.push(div('', `Part of the <strong>${escapeHtml(str(r.network_name))}</strong> network${provenance(networkProvenance(r))}`));
+    lines.push(div('', `Part of the <strong>${escapeHtml(str(r.network_name))}</strong> ownership group${provenance(networkProvenance(r))}`));
     const onTitle = num(r.network_properties_on_title);
     const entities = strList(r.network_entities).length;
     const counts = [
@@ -73,8 +85,11 @@ function ownershipLines(r: BuildingRecord, ctx: PopupContext): string[] {
 }
 
 export function renderPopup(r: BuildingRecord, ctx: PopupContext = {}): string {
-  const head = [div('popup-address', escapeHtml(str(r.address)))];
-  if (str(r.housing_name)) head.push(div('popup-name', escapeHtml(str(r.housing_name))));
+  const head = [div('popup-address', escapeHtml(formatAddress(r.address)))];
+  const name = str(r.building_name) || str(r.housing_name);
+  if (name) head.push(div('popup-name', escapeHtml(name)));
+  const otherNames = strList(r.other_names);
+  if (otherNames.length) head.push(div('popup-muted', escapeHtml(`Also known as ${otherNames.join(', ')}`)));
 
   const ownership = ownershipLines(r, ctx);
 

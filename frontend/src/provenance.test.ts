@@ -13,16 +13,26 @@ describe('ownerRowProvenance', () => {
     );
   });
 
+  it('names the SRO inventory as a source', () => {
+    expect(ownerRowProvenance(['sro_list'], 2026)).toBe('City of Vancouver SRO inventory');
+    expect(ownerRowProvenance(['licence', 'sro_list'], 2026)).toBe(
+      'City of Vancouver business licence, 2026 (1 building); City of Vancouver SRO inventory (1 building)',
+    );
+  });
+
   it('has nothing to say for owners with no known source', () => {
     expect(ownerRowProvenance([null, null], 2026)).toBe('');
   });
 });
 
 describe('EXPLAINERS', () => {
-  it('explains both ownership layers', () => {
-    expect(EXPLAINERS.network).toMatch(/real owner/);
-    expect(EXPLAINERS.network).toMatch(/business-licence name/);
+  it('explains the landlord and the ownership group', () => {
+    expect(EXPLAINERS.owner).toMatch(/^The entity a tenant can hold accountable/);
     expect(EXPLAINERS.owner).toMatch(/Land Owner Transparency Registry/);
+    expect(EXPLAINERS.owner).toMatch(/SRO inventory/);
+    expect(EXPLAINERS.owner).toMatch(/Not on record/);
+    expect(EXPLAINERS.network).toMatch(/^Landlords that belong together/);
+    expect(EXPLAINERS.network).toMatch(/business-licence name/);
   });
 });
 
