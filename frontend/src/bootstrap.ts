@@ -12,7 +12,7 @@ import './provenance.css';
 import './popup.css';
 import * as L from 'leaflet';
 import { initAboutModal } from './about';
-import { BASEMAPS, DEFAULT_BASEMAP, DEFAULT_CENTER, DEFAULT_ZOOM } from './config';
+import { BASEMAPS, DEFAULT_BASEMAP, DEFAULT_CENTER, DEFAULT_ZOOM, MAX_ZOOM } from './config';
 import { renderCoverage } from './coverage';
 import { loadArtifacts } from './data';
 import { initHoodUrlSync } from './hood-url';
@@ -47,10 +47,14 @@ function showLoadError(err: unknown): void {
 async function main(): Promise<void> {
   const artifacts = await loadArtifacts();
 
-  const map = L.map('map', { preferCanvas: true }).setView(DEFAULT_CENTER, DEFAULT_ZOOM);
+  const map = L.map('map', { preferCanvas: true, maxZoom: MAX_ZOOM }).setView(DEFAULT_CENTER, DEFAULT_ZOOM);
   const basemap = BASEMAPS[DEFAULT_BASEMAP];
-  L.tileLayer(basemap.tiles, { attribution: basemap.attribution }).addTo(map);
-  if (basemap.labels) L.tileLayer(basemap.labels, { attribution: basemap.attribution }).addTo(map);
+  L.tileLayer(basemap.tiles, {
+    attribution: basemap.attribution,
+    maxZoom: MAX_ZOOM,
+    maxNativeZoom: basemap.maxNativeZoom,
+  }).addTo(map);
+  if (basemap.labels) L.tileLayer(basemap.labels, { attribution: basemap.attribution, maxZoom: MAX_ZOOM }).addTo(map);
 
   // Blocks, then buildings, share the default canvas; boundaries draw in their own pane above both.
   const boundaryRenderer = createBoundaryRenderer(map);

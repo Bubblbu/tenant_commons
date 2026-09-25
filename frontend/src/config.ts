@@ -21,7 +21,12 @@ export interface Basemap {
   attribution: string;
   /** Optional reference layer (street/place labels) drawn above the base tiles. */
   labels?: string;
+  /** Deepest zoom the base tiles have real imagery for; Leaflet upscales them beyond it. */
+  maxNativeZoom?: number;
 }
+
+/** Street-level zoom; without it Leaflet drops tile layers past their default maxZoom (18). */
+export const MAX_ZOOM = 19;
 
 // Keyless Esri Light Gray Canvas. CARTO retired unauthenticated access to its
 // positron tiles; this is the closest drop-in that needs no key.
@@ -33,10 +38,13 @@ export const BASEMAPS: Record<string, Basemap> = {
     tiles: `${ESRI_CANVAS}/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}`,
     attribution: ESRI_GRAY_ATTR,
     labels: `${ESRI_CANVAS}/World_Light_Gray_Reference/MapServer/tile/{z}/{y}/{x}`,
+    // Light Gray Base serves a "Map data not yet available" placeholder from z17.
+    maxNativeZoom: 16,
   },
   'esri-gray-plain': {
     tiles: `${ESRI_CANVAS}/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}`,
     attribution: ESRI_GRAY_ATTR,
+    maxNativeZoom: 16,
   },
 };
 
