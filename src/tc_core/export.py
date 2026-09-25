@@ -90,7 +90,7 @@ def reconstruct_points(
         lambda k: portfolios[k].portfolio_name if k in portfolios else None
     )
     merged["portfolio_building_count"] = merged["addr_key"].map(
-        lambda k: len(portfolios[k].addr_keys) if k in portfolios else None
+        lambda k: portfolios[k].building_count if k in portfolios else None
     )
     merged["portfolio_entities"] = merged["addr_key"].map(
         lambda k: portfolios[k].entities if k in portfolios else None

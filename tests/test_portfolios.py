@@ -143,3 +143,89 @@ def test_build_landlord_portfolios_omits_unclustered_and_unmapped_buildings(tmp_
     # No common_owner claim at all -> resolve_owner_groups() has nothing to
     # cluster, so no portfolio is produced even though the PID resolves fine.
     assert portfolios == {}
+
+
+def _insert_raw_building(conn, address: str, pid: str) -> None:
+    conn.execute(
+        "INSERT INTO raw_buildings (address, pid, ingested_at) "
+        "VALUES (?, ?, '2026-01-01T00:00:00+00:00')",
+        (address, pid),
+    )
+
+
+def _cluster_glr_and_rener(conn) -> None:
+    _insert_raw_lotr(conn, "111", "GLR PROPERTIES LTD")
+    _insert_raw_lotr(conn, "222", "RENER HOLDINGS LTD")
+    record_claim(
+        conn,
+        entity_a="GLR PROPERTIES LTD",
+        entity_b="RENER HOLDINGS LTD",
+        relationship="common_owner",
+        source_type="public_registry",
+        confidence="confirmed",
+    )
+
+
+def test_build_landlord_portfolios_reaches_building_through_its_own_pid(tmp_path):
+    # 512 Campbell Ave sits on the 500 Campbell Ave parcel: the City's
+    # address points (pid_address_map.csv) only know the parcel's primary
+    # address, but the building record carries the PID itself.
+    conn = _conn()
+    _cluster_glr_and_rener(conn)
+    _insert_raw_building(conn, "512 Campbell Ave", "222")
+
+    pid_map_path = tmp_path / "pid_address_map.csv"
+    _write_pid_address_map(
+        pid_map_path, [("111", "1200 alberni st"), ("222", "500 campbell ave")]
+    )
+
+    portfolios = build_landlord_portfolios(conn, str(pid_map_path))
+
+    assert "512 campbell ave" in portfolios
+    assert portfolios["512 campbell ave"].portfolio_name == portfolios["1200 alberni st"].portfolio_name
+
+
+def test_build_landlord_portfolios_reaches_every_address_point_of_a_pid(tmp_path):
+    conn = _conn()
+    _cluster_glr_and_rener(conn)
+    _insert_raw_building(conn, "900 Multi Pid St", "111;333")
+
+    pid_map_path = tmp_path / "pid_address_map.csv"
+    _write_pid_address_map(
+        pid_map_path,
+        [("111", "1200 alberni st"), ("111", "1202 alberni st"), ("222", "800 nicola st")],
+    )
+
+    portfolios = build_landlord_portfolios(conn, str(pid_map_path))
+
+    assert {"1200 alberni st", "1202 alberni st", "900 multi pid st"} <= set(portfolios)
+
+
+def test_building_count_does_not_double_count_a_building_and_its_parcel_address(tmp_path):
+    conn = _conn()
+    _cluster_glr_and_rener(conn)
+    _insert_raw_building(conn, "512 Campbell Ave", "222")
+
+    pid_map_path = tmp_path / "pid_address_map.csv"
+    _write_pid_address_map(
+        pid_map_path, [("111", "1200 alberni st"), ("222", "500 campbell ave")]
+    )
+
+    portfolios = build_landlord_portfolios(conn, str(pid_map_path))
+
+    # 1200 Alberni + 512 Campbell; 500 Campbell is 512's parcel, not a second building.
+    assert portfolios["512 campbell ave"].building_count == 2
+
+
+def test_building_count_keeps_two_buildings_on_one_parcel(tmp_path):
+    conn = _conn()
+    _cluster_glr_and_rener(conn)
+    _insert_raw_building(conn, "350 Keefer St", "222")
+    _insert_raw_building(conn, "705 Jackson Ave", "222")
+
+    pid_map_path = tmp_path / "pid_address_map.csv"
+    _write_pid_address_map(pid_map_path, [("111", "1200 alberni st"), ("222", "610 gore ave")])
+
+    portfolios = build_landlord_portfolios(conn, str(pid_map_path))
+
+    assert portfolios["350 keefer st"].building_count == 3

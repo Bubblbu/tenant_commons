@@ -11,7 +11,8 @@ matching against that label can't be the join key.
 
 Instead the join goes through PID: raw_lotr_ownership already records which
 PIDs each reporting corporation discloses an interest in, and
-pid_address_map.csv bridges PID -> addr_key. So a resolve_owner_groups()
+pid_address_map.csv plus the PIDs on each building record (raw_buildings.pid)
+bridge PID -> addr_key. So a resolve_owner_groups()
 cluster's full building footprint can be computed independent of any older
 business-name label.
 """
@@ -24,7 +25,7 @@ import sqlite3
 from dataclasses import dataclass, field
 
 from ..claims import resolve_owner_groups
-from ..normalize import sanitize_owner
+from ..normalize import addr_key_from_freeform, sanitize_owner
 
 
 def _normalize_pid(pid: str) -> str:
@@ -50,16 +51,44 @@ class Portfolio:
     portfolio_name: str
     entities: list[str]
     addr_keys: set[str] = field(default_factory=set)
+    # Buildings reached, not addresses: a building record and its parcel's
+    # own address point (512 and 500 Campbell Ave) count once.
+    building_count: int = 0
 
 
-def _load_pid_to_addr_key(path: str) -> dict[str, str]:
-    mapping: dict[str, str] = {}
+def _load_pid_to_addr_keys(path: str) -> dict[str, set[str]]:
+    """{pid: {addr_key, ...}}: a PID with several address points reaches all of them."""
+    mapping: dict[str, set[str]] = {}
     with open(path, newline="", encoding="utf-8") as f:
         for row in csv.DictReader(f):
             pid = _normalize_pid(row.get("pid") or "")
             addr_key = (row.get("addr_key") or "").strip()
             if pid and addr_key:
-                mapping[pid] = addr_key
+                mapping.setdefault(pid, set()).add(addr_key)
+    return mapping
+
+
+def _building_pids(conn: sqlite3.Connection) -> dict[str, set[str]]:
+    """{pid: {addr_key, ...}} from the PIDs each building record carries.
+
+    The City's address points only know a parcel's primary address, so a
+    building listed at another address on the same parcel (512 Campbell Ave
+    on the 500 Campbell Ave parcel) is unreachable through
+    pid_address_map.csv alone. raw_buildings.pid is semicolon-joined, and
+    addr_key is derived from the address the same way ingest/merge.py does.
+    """
+    rows = conn.execute(
+        "SELECT address, pid FROM raw_buildings WHERE address IS NOT NULL AND pid IS NOT NULL"
+    ).fetchall()
+    mapping: dict[str, set[str]] = {}
+    for address, pids in rows:
+        addr_key = addr_key_from_freeform(address)
+        if not addr_key:
+            continue
+        for pid in str(pids).split(";"):
+            normalized_pid = _normalize_pid(pid)
+            if normalized_pid:
+                mapping.setdefault(normalized_pid, set()).add(addr_key)
     return mapping
 
 
@@ -96,9 +125,11 @@ def build_landlord_portfolios(
     confidence gate — same as the rest of the claims model). A cluster
     reaches an addr_key if any entity in it is the reporting body for a PID
     that maps to that addr_key. Buildings outside any cluster, or whose PIDs
-    aren't in pid_address_map.csv, are simply absent from the result.
+    are in neither pid_address_map.csv nor raw_buildings, are simply absent
+    from the result.
     """
-    pid_to_addr_key = _load_pid_to_addr_key(pid_address_map_path)
+    point_keys_by_pid = _load_pid_to_addr_keys(pid_address_map_path)
+    building_keys_by_pid = _building_pids(conn)
     entity_pids = _entity_pids(conn)
     owner_groups = resolve_owner_groups(conn)
 
@@ -118,7 +149,12 @@ def build_landlord_portfolios(
             pids |= entity_pids.get(sanitize_owner(entity), set())
         if not pids:
             continue
-        addr_keys = {pid_to_addr_key[pid] for pid in pids if pid in pid_to_addr_key}
+        building_keys = set().union(*(building_keys_by_pid.get(pid, set()) for pid in pids))
+        point_keys = set().union(*(point_keys_by_pid.get(pid, set()) for pid in pids))
+        covered_points = set().union(
+            *(point_keys_by_pid.get(pid, set()) for pid in pids if pid in building_keys_by_pid)
+        )
+        addr_keys = building_keys | point_keys
         if not addr_keys:
             continue
 
@@ -130,6 +166,7 @@ def build_landlord_portfolios(
             portfolio_name=portfolio_name,
             entities=sorted(cluster),
             addr_keys=addr_keys,
+            building_count=len(building_keys | (point_keys - covered_points)),
         )
         for addr_key in addr_keys:
             by_addr_key[addr_key] = portfolio
