@@ -44,6 +44,13 @@ BUILDING_METRICS = {
         "attr": "units",
         "bins": 18,
         "force_log": True,
+        # Buildings effectively start at 3 units (16 of ~5,250 have 0–2).
+        # Unfloored, the log range spent three bins below 3, two of them
+        # always empty (no integer lies in 1–1.4 or 2.1–2.9). The floor bin
+        # takes values *at or below* it, so 2.5 keeps it to 0–2 and gives
+        # 3 and 4 units a bin each; a floor of 3 would sweep the 1,600-odd
+        # three-unit buildings into it.
+        "log_floor": 2.5,
     },
     "year_built": {
         "label": "Year built",
