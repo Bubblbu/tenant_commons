@@ -26,6 +26,7 @@ import { markerStyle } from './markers';
 import { renderPopup } from './popup';
 import { initTipDismiss } from './provenance';
 import { initClearButton } from './search-clear';
+import { initTableSearch } from './table-search';
 import { renderTables } from './tables';
 import { initViewToggle } from './view-toggle';
 import { startWiring } from './wiring.js';
@@ -91,6 +92,14 @@ async function main(): Promise<void> {
   }));
   if (landlordViews.every((o) => o.button && o.panel)) {
     initViewToggle(landlordViews as { button: HTMLElement; panel: HTMLElement }[]);
+  }
+
+  const tableSearch = document.getElementById('table-search');
+  const tableSearchClear = document.getElementById('table-search-clear');
+  if (tableSearch instanceof HTMLInputElement) {
+    const tables = Array.from(document.querySelectorAll<HTMLTableElement>('#sidebar-content table.data'));
+    initTableSearch(tableSearch, tables);
+    if (tableSearchClear) initClearButton(tableSearch, tableSearchClear);
   }
 }
 

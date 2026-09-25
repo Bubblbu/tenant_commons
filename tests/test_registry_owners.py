@@ -74,3 +74,24 @@ def test_failed_fetches_and_unmapped_pids_are_ignored(tmp_path):
     _lotr(conn, "009-999-999", "B LTD")
     owners = build_registry_owners(conn, _pid_map(tmp_path, [("001000001", "1 a st")]))
     assert owners == {}
+
+
+def test_building_reaches_its_owner_through_its_own_pid(tmp_path):
+    # 512 Campbell Ave sits on the 500 Campbell Ave parcel: only the building
+    # record carries the PID, the City's address points don't.
+    conn = _conn()
+    _lotr(conn, "001-000-001", "A LTD")
+    conn.execute(
+        "INSERT INTO raw_buildings (address, pid, ingested_at) VALUES ('512 Campbell Ave', '001000001', 'now')"
+    )
+    owners = build_registry_owners(conn, _pid_map(tmp_path, [("001000001", "500 campbell ave")]))
+    assert owners["512 campbell ave"].owners == ["A LTD"]
+    assert owners["500 campbell ave"].owners == ["A LTD"]
+
+
+def test_every_address_point_of_a_pid_gets_its_owner(tmp_path):
+    conn = _conn()
+    _lotr(conn, "001-000-001", "A LTD")
+    owners = build_registry_owners(conn, _pid_map(
+        tmp_path, [("001000001", "1200 alberni st"), ("001000001", "1202 alberni st")]))
+    assert set(owners) == {"1200 alberni st", "1202 alberni st"}

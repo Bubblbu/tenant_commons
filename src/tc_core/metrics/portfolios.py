@@ -11,7 +11,8 @@ matching against that label can't be the join key.
 
 Instead the join goes through PID: raw_lotr_ownership already records which
 PIDs each reporting corporation discloses an interest in, and
-pid_address_map.csv bridges PID -> addr_key. So a resolve_owner_groups()
+pid_address_map.csv plus the PIDs on each building record (raw_buildings.pid)
+bridge PID -> addr_key. So a resolve_owner_groups()
 cluster's full building footprint can be computed independent of any older
 business-name label.
 """
@@ -25,7 +26,7 @@ from collections import defaultdict
 from dataclasses import dataclass, field
 
 from ..claims import confirmed_common_owner_edges, network_label_claims, resolve_owner_groups
-from ..normalize import sanitize_owner
+from ..normalize import addr_key_from_freeform, sanitize_owner
 
 REGISTRY_SOURCE = "public_registry"
 
@@ -56,16 +57,52 @@ class Portfolio:
     # Confirmed common_owner claims inside the cluster, by public source
     # category: "registry" (public_registry) or "vtu_research" (all others).
     evidence: dict[str, int] = field(default_factory=dict)
+    # Buildings reached, not addresses: a building record and its parcel's
+    # own address point (512 and 500 Campbell Ave) count once.
+    building_count: int = 0
 
 
-def _load_pid_to_addr_key(path: str) -> dict[str, str]:
-    mapping: dict[str, str] = {}
+def _load_pid_to_addr_keys(path: str) -> dict[str, set[str]]:
+    """{pid: {addr_key, ...}}: a PID with several address points reaches all of them."""
+    mapping: dict[str, set[str]] = {}
     with open(path, newline="", encoding="utf-8") as f:
         for row in csv.DictReader(f):
             pid = _normalize_pid(row.get("pid") or "")
             addr_key = (row.get("addr_key") or "").strip()
             if pid and addr_key:
-                mapping[pid] = addr_key
+                mapping.setdefault(pid, set()).add(addr_key)
+    return mapping
+
+
+def _building_pids(conn: sqlite3.Connection) -> dict[str, set[str]]:
+    """{pid: {addr_key, ...}} from the PIDs each building record carries.
+
+    The City's address points only know a parcel's primary address, so a
+    building listed at another address on the same parcel (512 Campbell Ave
+    on the 500 Campbell Ave parcel) is unreachable through
+    pid_address_map.csv alone. raw_buildings.pid is semicolon-joined, and
+    addr_key is derived from the address the same way ingest/merge.py does.
+    """
+    rows = conn.execute(
+        "SELECT address, pid FROM raw_buildings WHERE address IS NOT NULL AND pid IS NOT NULL"
+    ).fetchall()
+    mapping: dict[str, set[str]] = {}
+    for address, pids in rows:
+        addr_key = addr_key_from_freeform(address)
+        if not addr_key:
+            continue
+        for pid in str(pids).split(";"):
+            normalized_pid = _normalize_pid(pid)
+            if normalized_pid:
+                mapping.setdefault(normalized_pid, set()).add(addr_key)
+    return mapping
+
+
+def pid_addr_keys(conn: sqlite3.Connection, pid_address_map_path: str) -> dict[str, set[str]]:
+    """{pid: {addr_key, ...}}: every address point of a PID, plus every building record carrying it."""
+    mapping = _load_pid_to_addr_keys(pid_address_map_path)
+    for pid, keys in _building_pids(conn).items():
+        mapping.setdefault(pid, set()).update(keys)
     return mapping
 
 
@@ -107,15 +144,18 @@ def build_landlord_portfolios(
 ) -> dict[str, Portfolio]:
     """Returns {addr_key: Portfolio} for every building reached by a confirmed
     common_owner cluster. A cluster reaches an addr_key if any of its entities
-    is the reporting body for a PID mapped to it. A building reached by
-    several clusters goes to the one holding most of its PIDs, then the
-    larger cluster (more addr_keys), then the smaller key — independent of
-    claim order.
+    is the reporting body for a PID mapped to it, through pid_address_map.csv
+    or the PIDs on the building records. A building reached by several
+    clusters goes to the one holding most of its PIDs, then the larger
+    cluster (more addr_keys), then the smaller key — independent of claim
+    order.
     """
-    pid_to_addr_key = _load_pid_to_addr_key(pid_address_map_path)
+    point_keys_by_pid = _load_pid_to_addr_keys(pid_address_map_path)
+    building_keys_by_pid = _building_pids(conn)
     entity_pids = _entity_pids(conn)
     labels = network_label_claims(conn)
     clusters = _clusters(conn)
+    keys_by_pid = pid_addr_keys(conn, pid_address_map_path)
 
     cluster_of = {entity: i for i, cluster in enumerate(clusters) for entity in cluster}
     evidence = [{"registry": 0, "vtu_research": 0} for _ in clusters]
@@ -130,7 +170,12 @@ def build_landlord_portfolios(
         pids: set[str] = set()
         for entity in cluster:
             pids |= entity_pids.get(sanitize_owner(entity), set())
-        addr_keys = {pid_to_addr_key[pid] for pid in pids if pid in pid_to_addr_key}
+        building_keys = set().union(*(building_keys_by_pid.get(pid, set()) for pid in pids))
+        point_keys = set().union(*(point_keys_by_pid.get(pid, set()) for pid in pids))
+        covered_points = set().union(
+            *(point_keys_by_pid.get(pid, set()) for pid in pids if pid in building_keys_by_pid)
+        )
+        addr_keys = building_keys | point_keys
         if not addr_keys:
             continue
         default_name = max(cluster, key=lambda e: len(entity_pids.get(sanitize_owner(e), set())))
@@ -147,6 +192,7 @@ def build_landlord_portfolios(
                 entities=cluster,
                 addr_keys=addr_keys,
                 evidence=evidence[i],
+                building_count=len(building_keys | (point_keys - covered_points)),
             )
         )
         portfolio_pids.append(pids)
@@ -154,8 +200,7 @@ def build_landlord_portfolios(
     pid_counts: dict[str, dict[int, int]] = defaultdict(lambda: defaultdict(int))
     for j, pids in enumerate(portfolio_pids):
         for pid in pids:
-            addr_key = pid_to_addr_key.get(pid)
-            if addr_key is not None:
+            for addr_key in keys_by_pid.get(pid, set()):
                 pid_counts[addr_key][j] += 1
 
     by_addr_key: dict[str, Portfolio] = {}

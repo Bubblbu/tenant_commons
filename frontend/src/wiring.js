@@ -946,7 +946,7 @@ export function startWiring(ctx) {
           return cb && cb.checked;
         });
         const targetRows = selectedRows.length ? selectedRows : allRows.filter(function(row) {
-          return !row.classList.contains('hidden');
+          return !row.classList.contains('hidden') && !row.classList.contains('search-hidden');
         });
         const label = selectedRows.length ? 'Totals (selected)' : 'Totals (visible)';
         let unitsSum = 0;
@@ -1039,7 +1039,7 @@ export function startWiring(ctx) {
           return cb && cb.checked;
         });
         const targetRows = selectedRows.length ? selectedRows : rows.filter(function(row) {
-          return !row.classList.contains('hidden');
+          return !row.classList.contains('hidden') && !row.classList.contains('search-hidden');
         });
         const label = selectedRows.length ? 'Totals (selected)' : 'Totals (visible)';
         let bldgsSum = 0;
@@ -1930,6 +1930,12 @@ export function startWiring(ctx) {
 
       if (hideEmptyBlocksChk) hideEmptyBlocksChk.addEventListener('change', applyFilters);
       if (tableSearchInput) tableSearchInput.addEventListener('input', scheduleApplyFilters);
+      // The sidebar table search (table-search.ts) only hides table rows, so
+      // just the footer totals need refreshing — no map/filter pass.
+      document.addEventListener('tablesearch', function() {
+        updateSummaryBar();
+        updateGroupTableSummaries();
+      });
       if (onlyIssuesChk) onlyIssuesChk.addEventListener('change', applyFilters);
       hoodInputs.forEach(function(inp) { inp.addEventListener('change', applyFilters); });
 

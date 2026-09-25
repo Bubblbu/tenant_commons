@@ -1,7 +1,8 @@
 """Per-building registered owners from the BC Land Owner Transparency Registry.
 
 A building's registered owners are the LOTR reporting bodies filed against
-its PIDs (bridged to addr_key by pid_address_map.csv). The primary owner holds
+its PIDs (bridged to addr_key by pid_address_map.csv and the PIDs on the
+building records, as for landlord networks). The primary owner holds
 the most of the building's PIDs, ties broken alphabetically. Spelling variants
 of one body ("GLR PROPERTIES LTD" / "GLR PROPERTIES LTD.") count as one owner,
 shown by its most frequent spelling.
@@ -14,7 +15,7 @@ from collections import Counter, defaultdict
 from dataclasses import dataclass
 
 from ..normalize import sanitize_owner
-from .portfolios import _load_pid_to_addr_key, _normalize_pid
+from .portfolios import _normalize_pid, pid_addr_keys
 
 
 @dataclass
@@ -28,7 +29,7 @@ class RegistryOwnership:
 def build_registry_owners(
     conn: sqlite3.Connection, pid_address_map_path: str
 ) -> dict[str, RegistryOwnership]:
-    pid_to_addr_key = _load_pid_to_addr_key(pid_address_map_path)
+    keys_by_pid = pid_addr_keys(conn, pid_address_map_path)
     rows = conn.execute(
         "SELECT pid, reporting_body_name, order_created_date FROM raw_lotr_ownership "
         "WHERE reporting_body_name IS NOT NULL AND pid IS NOT NULL "
@@ -40,16 +41,16 @@ def build_registry_owners(
     filed: dict[str, set[str]] = defaultdict(set)
     retrieved: dict[str, str] = {}
     for pid, name, created in rows:
-        addr_key = pid_to_addr_key.get(_normalize_pid(pid))
-        if addr_key is None:
+        addr_keys = keys_by_pid.get(_normalize_pid(pid))
+        if not addr_keys:
             continue
         name = name.strip()
         body = sanitize_owner(name)
-        body_pids[addr_key][body].add(_normalize_pid(pid))
         spellings[body][name] += 1
-        filed[addr_key].add(pid.strip())
-        if created:
-            day = str(created).split(" ")[0].split("T")[0]
+        day = str(created).split(" ")[0].split("T")[0] if created else ""
+        for addr_key in addr_keys:
+            body_pids[addr_key][body].add(_normalize_pid(pid))
+            filed[addr_key].add(pid.strip())
             if day > retrieved.get(addr_key, ""):
                 retrieved[addr_key] = day
 

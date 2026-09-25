@@ -25,23 +25,24 @@ from ..normalize import addr_key_from_freeform, move_trailing_direction
 from .io import load_polars
 
 
-def run(paths: DataPaths) -> None:
-    addresses_f = paths.vanmaps_addresses
-    property_addresses_f = paths.cov("property-addresses", "geojson")
-    property_tax_f = paths.cov("property-tax-report", "geojson")
-    chinatown_boundary_f = paths.chinatown_boundary
-    properties_f = paths.properties
-    properties_f.parent.mkdir(parents=True, exist_ok=True)
+def resolve_primary_address(addresses: pl.DataFrame) -> pl.DataFrame:
+    """Add `address` and `primary_address` (both addr_keys) to VanMaps rows.
 
-    # --- addresses.geojson: VanMaps primary/secondary address resolution ---
-    print("Loading addresses.geojson (VanMaps) ...")
-    addresses = load_polars(addresses_f)
-    addresses = addresses.with_columns(
+    The recorded primary is followed for every address type, not only
+    "Secondary": a parcel can carry several "Main" addresses that still name
+    another address as primary (512 Campbell Ave is a "Main" address on the
+    500 Campbell Ave parcel). Only the primary matches the property-addresses
+    PID list, so resolving those to themselves left them with no PID.
+    """
+    return addresses.with_columns(
         address=pl.concat_str(
             pl.col("civic_number"), pl.lit(" "), pl.col("std_street")
         ).map_elements(addr_key_from_freeform, return_dtype=pl.Utf8),
     ).with_columns(
-        primary_address=pl.when(pl.col("address_type") == "Secondary")
+        primary_address=pl.when(
+            pl.col("civic_number_primary").is_not_null()
+            & pl.col("std_street_primary").is_not_null()
+        )
         .then(
             pl.concat_str(
                 pl.col("civic_number_primary"),
@@ -52,6 +53,34 @@ def run(paths: DataPaths) -> None:
         .otherwise(pl.col("address"))
         .map_elements(addr_key_from_freeform, return_dtype=pl.Utf8)
     )
+
+
+def attach_property_records(addresses: pl.DataFrame, properties: pl.DataFrame) -> pl.DataFrame:
+    """Join VanMaps addresses against the property-addresses PID list.
+
+    An address with its own address point keeps its own PID. Only an address
+    without one takes its primary address's records: 512 Campbell Ave has no
+    address point and takes 500 Campbell Ave's PID, but 53 W Cordova St has
+    its own parcel even though VanMaps names 23 W Cordova St as its primary.
+    """
+    own = addresses.join(properties, on="address", how="inner")
+    via_primary = addresses.join(
+        properties.select("address").unique(), on="address", how="anti"
+    ).join(properties, left_on="primary_address", right_on="address", how="left")
+    return pl.concat([own, via_primary.select(own.columns)]).unique()
+
+
+def run(paths: DataPaths) -> None:
+    addresses_f = paths.vanmaps_addresses
+    property_addresses_f = paths.cov("property-addresses", "geojson")
+    property_tax_f = paths.cov("property-tax-report", "geojson")
+    chinatown_boundary_f = paths.chinatown_boundary
+    properties_f = paths.properties
+    properties_f.parent.mkdir(parents=True, exist_ok=True)
+
+    # --- addresses.geojson: VanMaps primary/secondary address resolution ---
+    print("Loading addresses.geojson (VanMaps) ...")
+    addresses = resolve_primary_address(load_polars(addresses_f))
     addresses = addresses.select(
         "objectid",
         "propertyviewerid",
@@ -80,12 +109,9 @@ def run(paths: DataPaths) -> None:
         ["civic_number", "std_street", "p_parcel_id", "pcoord", "geo_point_2d", "site_id"]
     )
 
-    # Join VanMaps addresses (primary/secondary resolution) against the
-    # property-addresses PID list, keyed on primary_address.
-    props = (
-        addresses.select("address", "primary_address", "address_type", "address_status")
-        .join(properties, left_on="primary_address", right_on="address", how="left")
-        .unique()
+    props = attach_property_records(
+        addresses.select("address", "primary_address", "address_type", "address_status"),
+        properties,
     )
     print("props after VanMaps join:", props.height)
 

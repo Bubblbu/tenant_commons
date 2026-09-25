@@ -27,6 +27,33 @@ BC_versions = {
 }
 
 
+def attach_licences(housing: pl.DataFrame, bsns_by_address: pl.DataFrame) -> pl.DataFrame:
+    """Left-join per-address licence columns onto housing rows.
+
+    A building's own address wins. A building with no licence there takes
+    the licence filed at its parcel's primary address: Stamp's Place is
+    listed at 512 Campbell Ave, but its rental licence is filed at 500
+    Campbell Ave, the parcel's primary. `bsns_by_address` must be one row
+    per address, so neither join adds rows.
+    """
+    licence_cols = [c for c in bsns_by_address.columns if c != "address"]
+    by_primary = bsns_by_address.rename(
+        {"address": "primary_address", **{c: f"{c}__primary" for c in licence_cols}}
+    )
+    has_own = pl.any_horizontal([pl.col(c).is_not_null() for c in licence_cols])
+    return (
+        housing.join(bsns_by_address, on="address", how="left")
+        .join(by_primary, on="primary_address", how="left")
+        .with_columns(
+            [
+                pl.when(has_own).then(pl.col(c)).otherwise(pl.col(f"{c}__primary")).alias(c)
+                for c in licence_cols
+            ]
+        )
+        .drop([f"{c}__primary" for c in licence_cols])
+    )
+
+
 def run(paths: DataPaths) -> None:
     properties_f = paths.properties
     all_rentals_f = paths.all_rentals
@@ -187,7 +214,7 @@ def run(paths: DataPaths) -> None:
         bsns_subtype=pl.col("bsns_subtype").unique().drop_nulls(),
     )
 
-    buildings = housing.join(bsns_by_address, on="address", how="left").with_columns(
+    buildings = attach_licences(housing, bsns_by_address).with_columns(
         cs.by_dtype(pl.List(pl.Utf8)).list.join(";")
     )
 
