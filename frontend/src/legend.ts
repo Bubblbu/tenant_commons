@@ -10,7 +10,7 @@ import type { FilterConfig, NeighbourhoodSummary, SpecialAreaSummary } from './t
 /**
  * Chinatown / Villages Plan Areas: rendered after a separator, in the same
  * checkbox list and with the same `.filter-neighbourhood-option` class as
- * the real neighbourhoods above (so wiring.js's Select all/Clear all and its
+ * the real neighbourhoods above (so wiring.js's Area Clear and its
  * hoodInputs query pick them up for free) — they're additional area flags a
  * building can carry alongside its local_area, not alternative values of it.
  */
@@ -23,7 +23,7 @@ export function specialAreaTagsHtml(areas: SpecialAreaSummary[] | undefined): st
       const units = groupThousands(Math.trunc(Number(a.units) || 0));
       return (
         `<label class="filter-tag"><input type="checkbox" class="filter-neighbourhood-option" ` +
-        `value="${escapeHtml(String(a.key ?? '').toLowerCase())}" checked> ${escapeHtml(name)} ` +
+        `value="${escapeHtml(String(a.key ?? '').toLowerCase())}"> ${escapeHtml(name)} ` +
         `<span class="filter-tag-count">(${count} bldgs · ${units} units)</span></label>`
       );
     })
@@ -44,7 +44,7 @@ export function hoodTagsHtml(
           const units = groupThousands(Math.trunc(Number(n.units) || 0));
           return (
             `<label class="filter-tag"><input type="checkbox" class="filter-neighbourhood-option" ` +
-            `value="${escapeHtml(name.toLowerCase())}" checked> ${escapeHtml(name)} ` +
+            `value="${escapeHtml(name.toLowerCase())}"> ${escapeHtml(name)} ` +
             `<span class="filter-tag-count">(${count} bldgs · ${units} units)</span></label>`
           );
         })

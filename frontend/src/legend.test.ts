@@ -2,10 +2,10 @@ import { describe, expect, it } from 'vitest';
 import { blockLegendMax, blockTicks, hoodTagsHtml, specialAreaTagsHtml } from './legend';
 
 describe('hoodTagsHtml', () => {
-  it('renders one checked filter tag per neighbourhood, as legends_html did', () => {
+  it('renders one unticked filter tag per neighbourhood (none ticked shows every area)', () => {
     expect(hoodTagsHtml([{ name: 'West End', count: 1234, units: 56789 }])).toBe(
       '<label class="filter-tag"><input type="checkbox" class="filter-neighbourhood-option" ' +
-        'value="west end" checked> West End ' +
+        'value="west end"> West End ' +
         '<span class="filter-tag-count">(1,234 bldgs · 56,789 units)</span></label>',
     );
   });
@@ -21,7 +21,7 @@ describe('hoodTagsHtml', () => {
     expect(html.indexOf('<hr class="filter-tag-separator">')).toBeGreaterThan(html.indexOf('West End'));
     expect(html).toContain(
       '<label class="filter-tag"><input type="checkbox" class="filter-neighbourhood-option" ' +
-        'value="chinatown" checked> Chinatown ' +
+        'value="chinatown"> Chinatown ' +
         '<span class="filter-tag-count">(12 bldgs · 340 units)</span></label>',
     );
   });

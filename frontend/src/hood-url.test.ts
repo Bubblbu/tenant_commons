@@ -24,8 +24,12 @@ describe('readHoodParam', () => {
     expect(readHoodParam(new URLSearchParams('hood=gone'), ALL)).toBeNull();
   });
 
-  it('reads an empty hood param as none selected', () => {
-    expect(readHoodParam(new URLSearchParams('hood='), ALL)).toEqual([]);
+  it('reads an older link\'s empty hood param as the default: none ticked, every area shown', () => {
+    expect(readHoodParam(new URLSearchParams('hood='), ALL)).toBeNull();
+  });
+
+  it('reads an older link listing every area as none ticked', () => {
+    expect(readHoodParam(new URLSearchParams('hood=west+end&hood=downtown&hood=kitsilano'), ALL)).toEqual([]);
   });
 });
 
@@ -42,14 +46,14 @@ describe('writeHoodParam', () => {
     expect(params.getAll('hood')).toEqual(['west end', 'kitsilano']);
   });
 
-  it('writes an empty hood param when none are selected', () => {
-    const params = new URLSearchParams();
+  it('omits the param when none are ticked (every area shown)', () => {
+    const params = new URLSearchParams('hood=downtown&foo=1');
     writeHoodParam(params, [], ALL);
-    expect(params.toString()).toBe('hood=');
+    expect(params.toString()).toBe('foo=1');
   });
 
-  it('round-trips through readHoodParam', () => {
-    for (const checked of [[], ['downtown'], ['west end', 'kitsilano']]) {
+  it('round-trips a narrowed selection through readHoodParam', () => {
+    for (const checked of [['downtown'], ['west end', 'kitsilano']]) {
       const params = new URLSearchParams();
       writeHoodParam(params, checked, ALL);
       expect(readHoodParam(params, ALL)).toEqual(checked);

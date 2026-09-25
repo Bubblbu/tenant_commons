@@ -131,6 +131,8 @@ export function selectionMatches(picked: PickOption[], row: RowKeys): boolean {
 
 export interface LandlordFilter {
   isActive(): boolean;
+  /** Number of picked tiles. */
+  count(): number;
   matches(row: RowKeys): boolean;
   /** Removes every tile and the typed text. */
   clear(): void;
@@ -256,6 +258,7 @@ export function initLandlordPicker(options: PickOption[], els: PickerElements): 
 
   return {
     isActive: () => picked.length > 0,
+    count: () => picked.length,
     matches: (row) => selectionMatches(picked, row),
     clear() {
       const had = picked.length > 0;

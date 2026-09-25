@@ -1,9 +1,11 @@
 /**
- * Mirrors the Filters > Neighbourhoods checkboxes into `?hood=` query params
- * so a filtered view can be shared as a link. One `hood` param per checked
- * value; no param means all checked (the default), and a single empty
- * `hood=` means none. Must run after renderLegend() and before wiring.js
- * starts, so wiring's first applyFilters() pass sees the restored state.
+ * Mirrors the Filter by > Area checkboxes into `?hood=` query params so a
+ * filtered view can be shared as a link. One `hood` param per ticked value;
+ * no param means none ticked, which shows every area (the default). Older
+ * links used a lone empty `hood=` for "none"; with nothing ticked now meaning
+ * everything, it reads as the default. Must run after renderLegend() and
+ * before wiring.js starts, so wiring's first applyFilters() pass sees the
+ * restored state.
  */
 
 const PARAM = 'hood';
@@ -14,16 +16,16 @@ export function readHoodParam(params: URLSearchParams, all: string[]): string[] 
   if (raw.length === 0) return null;
   const wanted = new Set(raw.map((v) => v.trim().toLowerCase()));
   const checked = all.filter((v) => wanted.has(v));
-  // A link whose neighbourhoods have all since disappeared would otherwise
-  // show an empty map; an explicit `hood=` still means none.
-  if (checked.length === 0 && !wanted.has('')) return null;
+  // Also covers a link whose neighbourhoods have all since disappeared.
+  if (checked.length === 0) return null;
+  // Every area ticked (older links spelled "all" out) is the same as none.
+  if (checked.length === all.length) return [];
   return checked;
 }
 
 export function writeHoodParam(params: URLSearchParams, checked: string[], all: string[]): void {
   params.delete(PARAM);
   if (checked.length === all.length) return;
-  if (checked.length === 0) params.append(PARAM, '');
   for (const v of checked) params.append(PARAM, v);
 }
 
@@ -44,9 +46,9 @@ export function initHoodUrlSync(doc: Document = document, win: Window = window):
     win.history.replaceState(win.history.state, '', url);
   };
   doc.getElementById('filter-neighbourhoods')?.addEventListener('change', sync);
-  // Select all / Clear all / Reset set .checked directly, which fires no
-  // change event; their click handlers (wiring.js) run before this deferred sync.
-  for (const id of ['hood-select-all', 'hood-clear', 'filter-reset']) {
+  // Area Clear and Reset set .checked directly, which fires no change
+  // event; their click handlers (wiring.js) run before this deferred sync.
+  for (const id of ['filter-clear-area', 'filter-reset']) {
     doc.getElementById(id)?.addEventListener('click', () => setTimeout(sync));
   }
 }

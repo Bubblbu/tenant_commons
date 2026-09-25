@@ -731,13 +731,6 @@
     <span class="legend-toggle-icon" aria-hidden="true">▾</span>
   </button>
   <div id="legend-cards" class="legend-cards">
-    <div class="legend-card" id="legend-blocks-section">
-      <div class="legend-heading">Blocks — total units</div>
-      <div class="legend-gradient" style="background: linear-gradient(to right, #c7e9c0, #a1d99b, #74c476, #41ab5d, #238b45, #005a32);"></div>
-      <div class="legend-scale" id="block-legend-scale">
-      </div>
-      <div class="legend-note" id="block-legend-note"></div>
-    </div>
     <div class="legend-card" id="legend-building-details-section">
       <div class="legend-heading">Building details</div>
       <div class="legend-key">
@@ -745,7 +738,14 @@
         <div class="legend-key-row"><span class="legend-swatch" style="background:transparent;border:2px solid #d97706;"></span> Co-op (ring)</div>
         <div class="legend-key-row"><span class="legend-swatch" style="background:transparent;border:2px solid #dc2626;"></span> Rental issues (ring)</div>
       </div>
-      <div class="legend-note">Ring colors are toggled in Building Details; the markers themselves always stay on the map.</div>
+      <div class="legend-note">Rings are toggled under Map Display Options &gt; Buildings; the markers themselves always stay on the map.</div>
+    </div>
+    <div class="legend-card" id="legend-blocks-section">
+      <div class="legend-heading">Blocks — total units</div>
+      <div class="legend-gradient" style="background: linear-gradient(to right, #c7e9c0, #a1d99b, #74c476, #41ab5d, #238b45, #005a32);"></div>
+      <div class="legend-scale" id="block-legend-scale">
+      </div>
+      <div class="legend-note" id="block-legend-note"></div>
     </div>
     <div class="legend-card" id="legend-boundaries-section">
       <div class="legend-heading">Boundaries</div>
@@ -783,35 +783,53 @@
     background: #fff;
   }
 
+  /* Spacing scale for the panel: 4 / 8 / 12 / 16 / 20px.
+     Group (h3: Map Summary, Show on map, Filter by) — divided by a full rule.
+     Section (h4: Area, Ownership, …) — divided by a lighter rule.
+     Control label (Units, Housing type, …) — 12px semibold, 4px above its control. */
+  #filters-panel .panel-group {
+    padding: 20px 0;
+    border-top: 1px solid #dde1ea;
+  }
+
+  #filters-panel .panel-group:first-child {
+    padding-top: 0;
+    border-top: none;
+  }
+
+  #filters-panel .panel-group:last-child {
+    padding-bottom: 4px;
+  }
+
   #filters-panel h3 {
     margin: 0 0 12px;
     font-size: 16px;
+    font-weight: 700;
+    line-height: 20px;
     color: #1d2533;
   }
 
   #filters-panel .filter-section {
-    margin-bottom: 18px;
+    padding: 12px 0;
+  }
+
+  #filters-panel h3 + .filter-section {
+    padding-top: 0;
+  }
+
+  #filters-panel .filter-section + .filter-section {
+    border-top: 1px solid #edf0f5;
+  }
+
+  #filters-panel .filter-section:last-child {
+    padding-bottom: 0;
   }
 
   #filters-panel .filter-section h4 {
-    margin: 10px 0 8px;
+    margin: 0 0 8px;
     font-size: 14px;
-    color: #27354a;
-  }
-
-  #filters-panel .filter-subsection {
-    margin-top: 10px;
-    padding-top: 8px;
-    border-top: 1px solid #e6e9f0;
-  }
-
-  #filters-panel .filter-subsection h5 {
-    margin: 0 0 6px;
-    font-size: 11px;
     font-weight: 600;
-    color: #5b6472;
-    text-transform: uppercase;
-    letter-spacing: 0.03em;
+    color: #27354a;
   }
 
   #filters-panel label {
@@ -1019,7 +1037,7 @@
   #filters-panel .coverage {
     border: 1px solid #dde1eb;
     border-radius: 6px;
-    margin: -4px 0 12px;
+    margin: 0;
     font-size: 12px;
     background: #fff;
   }
@@ -1180,12 +1198,11 @@
   }
 
   #filters-panel .filter-tags {
-    border: 1px solid #ddd;
+    border: 1px solid #dde1ea;
     border-radius: 6px;
-    padding: 6px;
+    padding: 6px 8px;
     max-height: 160px;
     overflow: auto;
-    margin-bottom: 10px;
   }
 
   #filters-panel .filter-tag {
@@ -1205,7 +1222,7 @@
 
   /* Separates Chinatown/Villages Plan (boundary overlays) from the real
      neighbourhoods above them in the same checkbox list — same list/class
-     (so Select all/Clear all still cover them), visually set apart since
+     (so the Area Clear button still covers them), visually set apart since
      they're a different kind of "area" a building can belong to. */
   #filters-panel .filter-tag-separator {
     border: none;
@@ -1217,6 +1234,23 @@
     display: flex;
     flex-direction: column;
     gap: 6px;
+  }
+
+  #filters-panel .filter-visual label {
+    margin-bottom: 0;
+  }
+
+  /* Options that only apply while their parent layer is on (display-options.ts). */
+  #filters-panel .display-children {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin: 0 0 6px 22px;
+  }
+
+  #filters-panel .display-children.disabled label {
+    color: #9aa1af;
+    cursor: default;
   }
 
   #filters-panel .filter-actions {
@@ -1239,16 +1273,134 @@
     background: #e6e9f4;
   }
 
+  /* Fixed height: the count badge and Clear link appear without moving anything. */
+  #filters-panel .filter-heading {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    height: 20px;
+    line-height: 20px;
+  }
+
+  #filters-panel .filter-count {
+    min-width: 18px;
+    padding: 0 6px;
+    border-radius: 9px;
+    background: #3b6fd8;
+    color: #fff;
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 18px;
+    text-align: center;
+  }
+
+  #filters-panel .filter-section-clear {
+    margin-left: auto;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: #3b6fd8;
+    font-size: 12px;
+    font-weight: normal;
+    line-height: 20px;
+    cursor: pointer;
+  }
+
+  #filters-panel .filter-section-clear:hover {
+    text-decoration: underline;
+  }
+
+  #filters-panel .filter-count[hidden],
+  #filters-panel .filter-section-clear[hidden] {
+    display: none;
+  }
+
+  #filters-panel .filter-hint {
+    margin: 4px 0 0;
+    color: #6b7080;
+    font-size: 12px;
+  }
+
+  #filters-panel .filter-after-picker {
+    margin-top: 8px;
+  }
+
+  #filters-panel .filter-chips {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 12px;
+  }
+
+  /* Same style as the slider labels (.metric-header). */
+  #filters-panel .filter-chips-label {
+    margin-right: 2px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #27354a;
+  }
+
+  #filters-panel .filter-chip {
+    padding: 3px 10px;
+    border: 1px solid #cdd1dd;
+    border-radius: 12px;
+    background: #fff;
+    color: #1d2129;
+    font-size: 12px;
+    cursor: pointer;
+  }
+
+  #filters-panel .filter-chip:hover {
+    background: #eef1f7;
+  }
+
+  #filters-panel .filter-chip[aria-pressed="true"] {
+    border-color: #3b6fd8;
+    background: #3b6fd8;
+    color: #fff;
+  }
+
+  #filters-panel .filter-collapsible > summary {
+    list-style: none;
+    cursor: pointer;
+  }
+
+  #filters-panel .filter-collapsible:not([open]) > summary h4 {
+    margin-bottom: 0;
+  }
+
+  #filters-panel .filter-collapsible .filter-building {
+    margin-top: 0;
+  }
+
+  #filters-panel .filter-collapsible > summary::-webkit-details-marker {
+    display: none;
+  }
+
+  #filters-panel .filter-collapsible > summary h4::before {
+    content: "▸";
+    display: inline-block;
+    width: 10px;
+    color: #6b7080;
+    transition: transform 0.15s;
+  }
+
+  #filters-panel .filter-collapsible[open] > summary h4::before {
+    transform: rotate(90deg);
+  }
+
   #filters-panel .filter-building {
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: 12px;
+    margin-top: 12px;
   }
 
   /* Craigslist-style distribution sliders: a bin-count histogram sitting
      directly above each metric's dual-handle range slider. */
   #filters-panel .metric-control {
-    margin-bottom: 6px;
+    margin: 0;
   }
 
   #filters-panel .metric-header {
@@ -1434,7 +1586,7 @@
   <button type="button" class="mobile-panel-close" aria-label="Close">×</button>
   <div class="mobile-panel-header">Filters</div>
   <div class="filters-card">
-    <div class="filter-section">
+    <section class="panel-group">
       <h3>Map Summary</h3>
       <div class="summary-actions">
         <button type="button" id="export-visible-csv">Export visible buildings (CSV)</button>
@@ -1462,59 +1614,66 @@
         </tbody>
       </table>
       <div id="map-coverage"></div>
-    </div>
-    <div class="filter-section">
-      <h4>Map Display</h4>
+    </section>
+    <section class="panel-group">
+      <h3>Show on map</h3>
       <div class="filter-visual">
-        <label><input type="checkbox" id="viz-show-buildings" checked> Show buildings</label>
-        <label><input type="checkbox" id="viz-show-blocks" checked> Show blocks</label>
-        <label><input type="checkbox" id="viz-hide-empty-blocks" checked> Hide empty blocks</label>
-        <label><input type="checkbox" id="viz-color-blocks" checked> Color-scale blocks (total units)</label>
-      </div>
-      <div class="filter-subsection">
-        <h5>Boundaries</h5>
-        <div class="filter-visual">
-          <label><input type="checkbox" id="viz-show-neighbourhoods" checked> Neighbourhoods</label>
+        <label><input type="checkbox" id="viz-show-buildings" checked> Buildings</label>
+        <div class="display-children" data-parent="viz-show-buildings">
+          <label><input type="checkbox" id="viz-show-housing-type"> Housing type (SRO, co-op)</label>
+          <label><input type="checkbox" id="viz-show-issues"> Rental issues</label>
+        </div>
+        <label><input type="checkbox" id="viz-show-blocks" checked> Blocks</label>
+        <div class="display-children" data-parent="viz-show-blocks">
+          <label><input type="checkbox" id="viz-color-blocks" checked> Shade by total units</label>
+          <label><input type="checkbox" id="viz-show-empty-blocks"> Include empty blocks</label>
+        </div>
+        <label><input type="checkbox" id="viz-show-neighbourhoods" checked> Neighbourhood boundaries</label>
+        <div class="display-children" data-parent="viz-show-neighbourhoods">
           <label><input type="checkbox" id="viz-show-chinatown" checked> Chinatown</label>
           <label><input type="checkbox" id="viz-show-villages"> Villages Plan</label>
         </div>
       </div>
-    </div>
-    <div class="filter-section">
-      <h4>Building Details</h4>
-      <div class="filter-visual">
-        <label><input type="checkbox" id="viz-show-housing-type"> Show housing type</label>
-        <label><input type="checkbox" id="viz-show-issues"> Show rental issues</label>
+    </section>
+    <section class="panel-group">
+      <h3>Filter by</h3>
+      <div class="filter-section">
+        <h4 class="filter-heading">Area <span class="filter-count" id="filter-count-area" hidden></span><button type="button" class="filter-section-clear" id="filter-clear-area" hidden>Clear</button></h4>
+        <div class="filter-tags" id="filter-neighbourhoods">
+        </div>
+        <p class="filter-hint">None ticked shows every area.</p>
       </div>
-    </div>
-    <h3>Filters</h3>
-    <div class="filter-section">
-      <h4>Landlords</h4>
-      <ul class="picker-tiles" id="owner-tiles" aria-label="Selected landlords" hidden></ul>
-      <div class="search-field landlord-picker">
-        <input type="text" id="owner-search" placeholder="Add landlord or group…" autocomplete="off"
-          role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="owner-suggestions">
-        <button type="button" id="owner-search-clear" class="search-clear" aria-label="Clear landlord search" hidden>&times;</button>
-        <ul class="picker-suggestions" id="owner-suggestions" role="listbox" hidden></ul>
+      <div class="filter-section">
+        <h4 class="filter-heading">Ownership <span class="filter-count" id="filter-count-ownership" hidden></span><button type="button" class="filter-section-clear" id="filter-clear-ownership" hidden>Clear</button></h4>
+        <ul class="picker-tiles" id="owner-tiles" aria-label="Selected landlords" hidden></ul>
+        <div class="search-field landlord-picker">
+          <input type="text" id="owner-search" placeholder="Add landlord or group…" autocomplete="off"
+            role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="owner-suggestions">
+          <button type="button" id="owner-search-clear" class="search-clear" aria-label="Clear landlord search" hidden>&times;</button>
+          <ul class="picker-suggestions" id="owner-suggestions" role="listbox" hidden></ul>
+        </div>
+        <div class="filter-visual filter-after-picker">
+          <label><input type="checkbox" id="filter-only-owned"> Landlord on record</label>
+        </div>
       </div>
-    </div>
-    <div class="filter-section">
-      <h4>Neighbourhoods</h4>
-      <div class="filter-tags" id="filter-neighbourhoods">
+      <div class="filter-section">
+        <h4 class="filter-heading">Building <span class="filter-count" id="filter-count-building" hidden></span><button type="button" class="filter-section-clear" id="filter-clear-building" hidden>Clear</button></h4>
+        <div class="filter-chips" role="group" aria-label="Housing type">
+          <span class="filter-chips-label">Housing type</span>
+          <button type="button" class="filter-chip housing-chip" data-housing="sro" aria-pressed="false">SRO</button>
+          <button type="button" class="filter-chip housing-chip" data-housing="co-op" aria-pressed="false">Co-op</button>
+        </div>
+        <div class="filter-visual">
+          <label><input type="checkbox" id="filter-only-issues"> Has open rental issues</label>
+          <label><input type="checkbox" id="filter-only-units"> Unit count on record</label>
+        </div>
+        <div id="filter-building-section" class="filter-building"></div>
       </div>
-      <div class="filter-actions">
-        <button type="button" id="hood-select-all">Select all</button>
-        <button type="button" id="hood-clear">Clear all</button>
-      </div>
-    </div>
-    <div class="filter-section">
-      <h4>Buildings</h4>
-      <div class="filter-visual">
-        <label><input type="checkbox" id="filter-only-issues"> Only show buildings with issues</label>
-        <label><input type="checkbox" id="filter-only-owned"> Only show buildings with ownership information</label>
-      </div>
-      <div id="filter-building-section" class="filter-building"></div>
-    </div>
+      <details class="filter-section filter-collapsible" id="filter-value-details">
+        <summary><h4 class="filter-heading">Assessed value <span class="filter-count" id="filter-count-value" hidden></span><button type="button" class="filter-section-clear" id="filter-clear-value" hidden>Clear</button></h4></summary>
+        <div id="filter-value-section" class="filter-building"></div>
+      </details>
+    </section>
   </div>
 </div>
 <!-- Mobile responsive overrides, kept in one block placed last so its rules

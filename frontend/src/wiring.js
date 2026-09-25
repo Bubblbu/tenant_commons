@@ -881,19 +881,26 @@ export function startWiring(ctx) {
         row.__checkbox = row.querySelector('.row-select');
         blockRowById[row.getAttribute('data-block')] = row;
       });
-      const hoodSelectAllBtn = document.getElementById('hood-select-all');
-      const hoodClearBtn = document.getElementById('hood-clear');
+      const housingChips = Array.from(document.querySelectorAll('.housing-chip'));
+      const sectionCounts = ['area', 'ownership', 'building', 'value'].reduce(function(acc, sec) {
+        acc[sec] = {
+          count: document.getElementById('filter-count-' + sec),
+          clear: document.getElementById('filter-clear-' + sec),
+        };
+        return acc;
+      }, {});
       const resetBtn = document.getElementById('filter-reset');
       const colorBlocksChk = document.getElementById('viz-color-blocks');
       const showBuildingsChk = document.getElementById('viz-show-buildings');
       const vizBlocksChk = document.getElementById('viz-show-blocks');
-      const hideEmptyBlocksChk = document.getElementById('viz-hide-empty-blocks');
+      const showEmptyBlocksChk = document.getElementById('viz-show-empty-blocks');
       const vizNeighbourhoodsChk = document.getElementById('viz-show-neighbourhoods');
       const vizVillagesChk = document.getElementById('viz-show-villages');
       const vizChinatownChk = document.getElementById('viz-show-chinatown');
       const landlordFilter = ctx.landlordFilter;
       const onlyIssuesChk = document.getElementById('filter-only-issues');
       const onlyOwnedChk = document.getElementById('filter-only-owned');
+      const onlyUnitsChk = document.getElementById('filter-only-units');
       const statusCells = {
         total: {
           units: document.getElementById('status-total-units'),
@@ -1161,6 +1168,22 @@ export function startWiring(ctx) {
         el.style.display = show ? 'block' : 'none';
       }
 
+      function boundaryVisibility() {
+        const neighbourhoods = vizNeighbourhoodsChk ? vizNeighbourhoodsChk.checked : true;
+        return {
+          neighbourhoods: neighbourhoods,
+          chinatown: neighbourhoods && (vizChinatownChk ? vizChinatownChk.checked : true),
+          villages: neighbourhoods && (vizVillagesChk ? vizVillagesChk.checked : false),
+        };
+      }
+
+      function syncBoundaryLayers() {
+        const v = boundaryVisibility();
+        toggleLayerVisibility(layerNeighbourhoods, v.neighbourhoods);
+        toggleLayerVisibility(layerChinatown, v.chinatown);
+        toggleLayerVisibility(layerVillages, v.villages);
+      }
+
       function updateLegendVisibility() {
         const blocksVisible = vizBlocksChk ? vizBlocksChk.checked !== false : true;
         const showBlocksLegend = blocksVisible && blockColorScalingEnabled;
@@ -1173,13 +1196,11 @@ export function startWiring(ctx) {
         }
         setLegendDisplay(legendBlocksEl, showBlocksLegend);
         // Static reference info (ring colors) — only relevant once at least
-        // one Building Details ring toggle is actually on.
+        // one Buildings ring toggle (Housing type / Rental issues) is actually on.
         const showBuildingDetailsLegend = showHousingTypeChecked || showIssuesChecked;
         setLegendDisplay(legendBuildingDetailsEl, showBuildingDetailsLegend);
-        const neighbourhoodsChecked = vizNeighbourhoodsChk ? vizNeighbourhoodsChk.checked !== false : true;
-        const chinatownChecked = vizChinatownChk ? vizChinatownChk.checked !== false : true;
-        const villagesChecked = vizVillagesChk ? vizVillagesChk.checked : false;
-        const showBoundariesLegend = neighbourhoodsChecked || chinatownChecked || villagesChecked;
+        const boundaries = boundaryVisibility();
+        const showBoundariesLegend = boundaries.neighbourhoods || boundaries.chinatown || boundaries.villages;
         setLegendDisplay(legendBoundariesEl, showBoundariesLegend);
         if (legendContainerEl) {
           const shouldShow = (showBlocksLegend && legendBlocksEl) ||
@@ -1479,27 +1500,37 @@ export function startWiring(ctx) {
           // lines up with where the slider actually is at that value.
           const logMin = useLog ? Math.log(positiveMin) : 0;
           const logMax = useLog ? Math.log(Math.max(summary.max, positiveMin)) : 1;
+          // A log_floor (building_metrics.py) collapses everything at or below
+          // it into the first bin, e.g. 0–2 units or $1–$10k. That bin is drawn
+          // as wide as any other bar, so it gets the same share of the track,
+          // mapped linearly from the true min to the floor; the log scale runs
+          // over the rest. Without it every value under the floor shared track
+          // position 0, so a handle could never select, say, 2 units or fewer.
+          const bins = summary.bins || [];
+          const hasFloorBin = useLog && bins.length > 1 && summary.min < positiveMin &&
+            Math.abs(bins[0].end - positiveMin) <= positiveMin * 1e-9;
+          const floorPos = hasFloorBin ? 100 / bins.length : 0;
           const toSlider = useLog && logMax !== logMin
             ? function(value) {
                 if (!Number.isFinite(value)) return 0;
-                if (value <= 0) return 0;
-                const clamped = Math.max(positiveMin, Math.min(Number(value), summary.max));
-                return ((Math.log(clamped) - logMin) / (logMax - logMin)) * 100;
+                const v = Math.max(summary.min, Math.min(Number(value), summary.max));
+                if (hasFloorBin && v <= positiveMin) {
+                  return floorPos * (v - summary.min) / (positiveMin - summary.min);
+                }
+                if (v <= 0) return 0;
+                const clamped = Math.max(positiveMin, v);
+                return floorPos + ((Math.log(clamped) - logMin) / (logMax - logMin)) * (100 - floorPos);
               }
             : function(value) { return Number(value); };
           const fromSlider = useLog && logMax !== logMin
             ? function(pos) {
-                const ratio = Math.min(1, Math.max(0, Number(pos) / 100));
-                // The slider's log floor (positiveMin, from summary.min_positive)
-                // is the *effective* histogram floor — value_land/value_bldg's
-                // log_floor collapses everything at/below it into one bucket
-                // (see building_metrics.py) — which sits above the true
-                // summary.min whenever that floor did any collapsing. Position 0
-                // must still mean "no lower bound", so it always reports the
-                // true min, not the floor.
-                if (ratio === 0) {
-                  return summary.min;
+                const p = Math.min(100, Math.max(0, Number(pos)));
+                // Position 0 always means "no lower bound": the true min, not the floor.
+                if (p === 0) return summary.min;
+                if (hasFloorBin && p <= floorPos) {
+                  return summary.min + (p / floorPos) * (positiveMin - summary.min);
                 }
+                const ratio = (p - floorPos) / (100 - floorPos);
                 return Math.exp(logMin + ratio * (logMax - logMin));
               }
             : function(pos) { return Number(pos); };
@@ -1512,7 +1543,6 @@ export function startWiring(ctx) {
           const hist = document.createElement('div');
           hist.className = 'metric-histogram';
           const bars = [];
-          const bins = summary.bins || [];
           const maxCount = summary.max_count || 1;
           bins.forEach(function(bin) {
             const bar = document.createElement('div');
@@ -1635,18 +1665,38 @@ export function startWiring(ctx) {
           return ctrl;
       }
 
+      const VALUE_METRIC_LABELS = { value_land: 'Land', value_bldg: 'Building' };
+      // Which Filter by section each metric's slider sits in.
+      const metricSection = {};
+
+      // Slider positions are in slider space (log for skewed metrics), not raw values.
+      function resetMetric(metric) {
+        const ctrl = metricControls[metric];
+        if (!ctrl) return;
+        ctrl.minSlider.value = String(ctrl.toSlider(ctrl.summary.min));
+        ctrl.maxSlider.value = String(ctrl.toSlider(ctrl.summary.max));
+        updateMetricLabels(metric);
+      }
+
       function buildMetricControls() {
         Object.keys(metricControls).forEach(function(key) { delete metricControls[key]; });
         metricKeys = [];
 
-        const buildingContainer = document.getElementById('filter-building-section');
-        if (buildingContainer && filterConfig.building_metrics) {
-          buildingContainer.innerHTML = '';
+        const containers = {
+          building: document.getElementById('filter-building-section'),
+          value: document.getElementById('filter-value-section'),
+        };
+        if (containers.building && filterConfig.building_metrics) {
+          Object.keys(containers).forEach(function(sec) { if (containers[sec]) containers[sec].innerHTML = ''; });
           const order = filterConfig.building_metric_order || Object.keys(filterConfig.building_metrics);
           order.forEach(function(metric) {
             const summary = filterConfig.building_metrics[metric];
             if (!summary) return;
-            metricControls[metric] = renderMetricControl(buildingContainer, metric, summary);
+            const section = VALUE_METRIC_LABELS[metric] && containers.value ? 'value' : 'building';
+            metricSection[metric] = section;
+            // Under the Assessed value heading, "Land" says enough.
+            const shown = section === 'value' ? Object.assign({}, summary, { label: VALUE_METRIC_LABELS[metric] }) : summary;
+            metricControls[metric] = renderMetricControl(containers[section], metric, shown);
           });
         }
 
@@ -1658,14 +1708,41 @@ export function startWiring(ctx) {
       updateDatasetStatus();
       updateLegendVisibility();
 
+      // How many filters each Filter by section has on, shown beside its heading.
+      function updateSectionCounts(hoods, housing, thresholds) {
+        const activeMetrics = { building: 0, value: 0 };
+        Object.keys(thresholds).forEach(function(metric) {
+          const t = thresholds[metric];
+          if (t.min !== null || t.max !== null) activeMetrics[metricSection[metric]] += 1;
+        });
+        const counts = {
+          area: hoods,
+          ownership: (landlordFilter ? landlordFilter.count() : 0) + (onlyOwnedChk && onlyOwnedChk.checked ? 1 : 0),
+          building: housing + (onlyIssuesChk && onlyIssuesChk.checked ? 1 : 0) +
+            (onlyUnitsChk && onlyUnitsChk.checked ? 1 : 0) + activeMetrics.building,
+          value: activeMetrics.value,
+        };
+        Object.keys(sectionCounts).forEach(function(sec) {
+          const els = sectionCounts[sec];
+          const n = counts[sec] || 0;
+          if (els.count) {
+            els.count.hidden = n === 0;
+            els.count.textContent = String(n);
+          }
+          if (els.clear) els.clear.hidden = n === 0;
+        });
+      }
+
       function applyFilters() {
         metricKeys.forEach(updateMetricLabels);
         const selectedHoods = hoodInputs
           .filter(function(inp) { return inp.checked; })
           .map(function(inp) { return (inp.value || '').toLowerCase().trim(); });
-        const hasHoodFilter = hoodInputs.length > 0;
-        const restrictHoods = hasHoodFilter && selectedHoods.length > 0;
-        const hideWhenNone = hasHoodFilter && selectedHoods.length === 0;
+        // No area ticked means every area.
+        const restrictHoods = selectedHoods.length > 0;
+        const selectedHousing = housingChips
+          .filter(function(chip) { return chip.getAttribute('aria-pressed') === 'true'; })
+          .map(function(chip) { return chip.getAttribute('data-housing'); });
         // Chinatown/Villages Plan are two more checkboxes in the same list
         // (see legend.ts's specialAreaTagsHtml) but aren't a row's own
         // local_area — a building/block can be in a real neighbourhood *and*
@@ -1720,8 +1797,6 @@ export function startWiring(ctx) {
               row.getAttribute('data-chinatown') === '1',
               row.getAttribute('data-village') === '1',
             );
-          } else if (hideWhenNone) {
-            baseMatches = false;
           }
           if (baseMatches && landlordFilter && landlordFilter.isActive()) {
             baseMatches = landlordFilter.matches({
@@ -1734,6 +1809,15 @@ export function startWiring(ctx) {
             const rawIssues = row.getAttribute('data-n-issues');
             const nIssues = rawIssues === null || rawIssues === '' ? NaN : parseFloat(rawIssues);
             baseMatches = Number.isFinite(nIssues) && nIssues > 0;
+          }
+          if (baseMatches && selectedHousing.length) {
+            // "co-op, sro" is both.
+            const types = (row.getAttribute('data-housing-type') || '').split(',').map(function(t) { return t.trim(); });
+            baseMatches = selectedHousing.some(function(t) { return types.indexOf(t) !== -1; });
+          }
+          if (baseMatches && onlyUnitsChk && onlyUnitsChk.checked) {
+            // Otherwise the Units slider lets buildings with no count through (see below).
+            baseMatches = (row.getAttribute('data-units') || '') !== '';
           }
           if (baseMatches && onlyOwnedChk && onlyOwnedChk.checked) {
             baseMatches = row.getAttribute('data-has-owner') === '1';
@@ -1829,7 +1913,7 @@ export function startWiring(ctx) {
           });
         });
 
-        const hideEmptyBlocks = hideEmptyBlocksChk ? hideEmptyBlocksChk.checked : true;
+        const hideEmptyBlocks = showEmptyBlocksChk ? !showEmptyBlocksChk.checked : true;
         Object.keys(window.blocksIndex).forEach(function(blockId) {
           var ids = window.blockBuildingIndex[blockId] || [];
           var isEmpty = ids.length === 0;
@@ -1853,8 +1937,6 @@ export function startWiring(ctx) {
               row ? row.getAttribute('data-chinatown') === '1' : false,
               row ? row.getAttribute('data-village') === '1' : false,
             );
-          } else if (hideWhenNone) {
-            hoodMatch = false;
           }
           var shouldHide;
           if (isEmpty) {
@@ -1929,10 +2011,11 @@ export function startWiring(ctx) {
         updateMapStatus();
         updateSummaryBar();
         updateGroupTableSummaries();
+        updateSectionCounts(selectedHoods.length, selectedHousing.length, thresholds);
         if (typeof ctx.onFilter === 'function') ctx.onFilter(visibleBids);
       }
 
-      if (hideEmptyBlocksChk) hideEmptyBlocksChk.addEventListener('change', applyFilters);
+      if (showEmptyBlocksChk) showEmptyBlocksChk.addEventListener('change', applyFilters);
       if (landlordFilter) landlordFilter.onChange(scheduleApplyFilters);
       // The sidebar table search (table-search.ts) only hides table rows, so
       // just the footer totals need refreshing — no map/filter pass.
@@ -1942,20 +2025,49 @@ export function startWiring(ctx) {
       });
       if (onlyIssuesChk) onlyIssuesChk.addEventListener('change', applyFilters);
       if (onlyOwnedChk) onlyOwnedChk.addEventListener('change', applyFilters);
+      if (onlyUnitsChk) onlyUnitsChk.addEventListener('change', applyFilters);
       hoodInputs.forEach(function(inp) { inp.addEventListener('change', applyFilters); });
 
-      if (hoodSelectAllBtn) {
-        hoodSelectAllBtn.addEventListener('click', function() {
-          hoodInputs.forEach(function(inp) { inp.checked = true; });
+      housingChips.forEach(function(chip) {
+        chip.addEventListener('click', function() {
+          chip.setAttribute('aria-pressed', chip.getAttribute('aria-pressed') === 'true' ? 'false' : 'true');
           applyFilters();
         });
-      }
-      if (hoodClearBtn) {
-        hoodClearBtn.addEventListener('click', function() {
+      });
+
+      // Per-section Clear: resets that section's controls only.
+      const clearSection = {
+        area: function() {
           hoodInputs.forEach(function(inp) { inp.checked = false; });
+        },
+        ownership: function() {
+          if (landlordFilter) landlordFilter.clear();
+          if (onlyOwnedChk) onlyOwnedChk.checked = false;
+        },
+        building: function() {
+          housingChips.forEach(function(chip) { chip.setAttribute('aria-pressed', 'false'); });
+          if (onlyIssuesChk) onlyIssuesChk.checked = false;
+          if (onlyUnitsChk) onlyUnitsChk.checked = false;
+          metricKeys.forEach(function(metric) {
+            if (metricSection[metric] === 'building') resetMetric(metric);
+          });
+        },
+        value: function() {
+          metricKeys.forEach(function(metric) {
+            if (metricSection[metric] === 'value') resetMetric(metric);
+          });
+        },
+      };
+      Object.keys(sectionCounts).forEach(function(sec) {
+        const btn = sectionCounts[sec].clear;
+        if (!btn) return;
+        btn.addEventListener('click', function(e) {
+          // Inside <summary> (Assessed value), don't also toggle the section.
+          e.preventDefault();
+          clearSection[sec]();
           applyFilters();
         });
-      }
+      });
 
       let searchDebounce = null;
 
@@ -1990,41 +2102,25 @@ export function startWiring(ctx) {
       } else {
         toggleLayerVisibility(layerBlocks, true);
       }
-      if (vizNeighbourhoodsChk) {
-        toggleLayerVisibility(layerNeighbourhoods, vizNeighbourhoodsChk.checked !== false);
-        vizNeighbourhoodsChk.addEventListener('change', function() {
-          toggleLayerVisibility(layerNeighbourhoods, vizNeighbourhoodsChk.checked);
+      // Chinatown and Villages Plan sit under Neighbourhood boundaries in
+      // Show on map: each is drawn only while it and the parent are ticked.
+      syncBoundaryLayers();
+      [vizNeighbourhoodsChk, vizChinatownChk, vizVillagesChk].forEach(function(chk) {
+        if (!chk) return;
+        chk.addEventListener('change', function() {
+          syncBoundaryLayers();
           updateLegendVisibility();
         });
-      } else {
-        toggleLayerVisibility(layerNeighbourhoods, true);
-      }
-      if (vizVillagesChk) {
-        toggleLayerVisibility(layerVillages, vizVillagesChk.checked);
-        vizVillagesChk.addEventListener('change', function() {
-          toggleLayerVisibility(layerVillages, vizVillagesChk.checked);
-          updateLegendVisibility();
-        });
-      } else {
-        toggleLayerVisibility(layerVillages, false);
-      }
-      if (vizChinatownChk) {
-        toggleLayerVisibility(layerChinatown, vizChinatownChk.checked !== false);
-        vizChinatownChk.addEventListener('change', function() {
-          toggleLayerVisibility(layerChinatown, vizChinatownChk.checked);
-          updateLegendVisibility();
-        });
-      } else {
-        toggleLayerVisibility(layerChinatown, true);
-      }
+      });
       applyHousingTypeFilter();
       if (vizShowHousingTypeChk) vizShowHousingTypeChk.addEventListener('change', applyHousingTypeFilter);
       if (vizShowIssuesChk) vizShowIssuesChk.addEventListener('change', applyHousingTypeFilter);
 
       if (resetBtn) {
         resetBtn.addEventListener('click', function() {
-          if (hideEmptyBlocksChk) hideEmptyBlocksChk.checked = true;
-          hoodInputs.forEach(function(inp) { inp.checked = true; });
+          if (showEmptyBlocksChk) showEmptyBlocksChk.checked = false;
+          hoodInputs.forEach(function(inp) { inp.checked = false; });
+          housingChips.forEach(function(chip) { chip.setAttribute('aria-pressed', 'false'); });
           if (colorBlocksChk) {
             colorBlocksChk.checked = true;
             applyBlockColorScaling(true);
@@ -2040,18 +2136,10 @@ export function startWiring(ctx) {
             sendBlocksToBack();
             restackCanvas();
           }
-          if (vizNeighbourhoodsChk) {
-            vizNeighbourhoodsChk.checked = true;
-            toggleLayerVisibility(layerNeighbourhoods, true);
-          }
-          if (vizVillagesChk) {
-            vizVillagesChk.checked = false;
-            toggleLayerVisibility(layerVillages, false);
-          }
-          if (vizChinatownChk) {
-            vizChinatownChk.checked = true;
-            toggleLayerVisibility(layerChinatown, true);
-          }
+          if (vizNeighbourhoodsChk) vizNeighbourhoodsChk.checked = true;
+          if (vizVillagesChk) vizVillagesChk.checked = false;
+          if (vizChinatownChk) vizChinatownChk.checked = true;
+          syncBoundaryLayers();
           if (vizShowHousingTypeChk) vizShowHousingTypeChk.checked = false;
           if (vizShowIssuesChk) vizShowIssuesChk.checked = false;
           applyHousingTypeFilter();
@@ -2062,19 +2150,14 @@ export function startWiring(ctx) {
           if (onlyOwnedChk) {
             onlyOwnedChk.checked = false;
           }
+          if (onlyUnitsChk) onlyUnitsChk.checked = false;
           document.querySelectorAll('.row-select').forEach(function(cb) {
             if (cb.checked) {
               cb.checked = false;
               cb.dispatchEvent(new Event('change', { bubbles: true }));
             }
           });
-          metricKeys.forEach(function(metric) {
-            const ctrl = metricControls[metric];
-            if (!ctrl) return;
-            ctrl.minSlider.value = ctrl.summary.min;
-            ctrl.maxSlider.value = ctrl.summary.max;
-            updateMetricLabels(metric);
-          });
+          metricKeys.forEach(resetMetric);
           applyFilters();
           updateLegendVisibility();
         });

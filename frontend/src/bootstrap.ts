@@ -12,6 +12,7 @@ import './provenance.css';
 import './popup.css';
 import * as L from 'leaflet';
 import { initAboutModal } from './about';
+import { initDisplayOptions } from './display-options';
 import { BASEMAPS, DEFAULT_BASEMAP, DEFAULT_CENTER, DEFAULT_ZOOM, MAX_ZOOM } from './config';
 import { renderCoverage } from './coverage';
 import { loadArtifacts } from './data';
@@ -114,6 +115,8 @@ async function main(): Promise<void> {
     landlordFilter,
     onFilter: (visibleBids) => renderCoverage([...visibleBids].map((bid) => records[bid]).filter((r) => r !== undefined)),
   });
+
+  initDisplayOptions();
 
   const landlordViews = ['networks', 'owners'].map((v) => ({
     button: document.getElementById(`landlord-view-${v}`),
