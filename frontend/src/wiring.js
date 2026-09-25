@@ -793,6 +793,7 @@ export function startWiring(ctx) {
         else if (which === 'blocks') { if (tabK) tabK.classList.add('active'); if (paneK) paneK.classList.add('active'); }
         else if (which === 'neighbourhoods') { if (tabN) tabN.classList.add('active'); if (paneN) paneN.classList.add('active'); }
         else { if (tabL) tabL.classList.add('active'); if (paneL) paneL.classList.add('active'); }
+        refreshStaleGroupRows();
       }
       if (tabB) tabB.addEventListener('click', () => activate('buildings'));
       if (tabK) tabK.addEventListener('click', () => activate('blocks'));
@@ -1054,6 +1055,51 @@ export function startWiring(ctx) {
         // updateGroupTableSummary()'s footer totals sum from these.
         row.setAttribute('data-bldgs', String(m.bldgs));
         row.setAttribute('data-units', String(m.units));
+      }
+
+      // Recounting every Blocks/Landlords/Neighbourhoods row was most of a filter
+      // pass's cost, but only one sidebar tab is on screen at a time. A pass
+      // recounts the visible tab's rows and marks the others stale;
+      // activate() recounts a stale tab when it's opened.
+      const staleGroupRows = { blocks: false, landlords: false, neighbourhoods: false };
+      const groupPanes = { blocks: paneK, landlords: paneL, neighbourhoods: paneN };
+      function blockBuilding(id) { return window.buildingIndex[id]; }
+      function refreshGroupRows(which) {
+        if (which === 'blocks') {
+          blockRows.forEach(function(row) {
+            updateGroupRowValues(row, window.blockBuildingIndex[row.getAttribute('data-block')] || [], blockBuilding);
+          });
+        } else if (which === 'landlords') {
+          ownerRows.forEach(function(row) { updateGroupRowValues(row, window.ownerIndex[row.getAttribute('data-owner')] || []); });
+          networkRows.forEach(function(row) { updateGroupRowValues(row, window.networkIndex[row.getAttribute('data-network')] || []); });
+        } else if (which === 'neighbourhoods') {
+          neighbourhoodRows.forEach(function(row) {
+            updateGroupRowValues(row, window.hoodIndex[(row.getAttribute('data-area') || '').toLowerCase().trim()] || []);
+          });
+        }
+      }
+      // After a filter pass: recount what's on screen, defer the rest.
+      function refreshGroupRowsAfterFilter() {
+        Object.keys(staleGroupRows).forEach(function(which) {
+          const pane = groupPanes[which];
+          if (pane && pane.classList.contains('active')) {
+            refreshGroupRows(which);
+            staleGroupRows[which] = false;
+          } else {
+            staleGroupRows[which] = true;
+          }
+        });
+      }
+      function refreshStaleGroupRows() {
+        let any = false;
+        Object.keys(staleGroupRows).forEach(function(which) {
+          const pane = groupPanes[which];
+          if (!staleGroupRows[which] || !pane || !pane.classList.contains('active')) return;
+          refreshGroupRows(which);
+          staleGroupRows[which] = false;
+          any = true;
+        });
+        if (any) updateGroupTableSummaries();
       }
 
       // Shared footer-summary logic for the Blocks/Landlords/Neighbourhoods tabs,
@@ -1901,7 +1947,6 @@ export function startWiring(ctx) {
               if (layer) layer._selectionRefs = 0;
               setBlockSelectionMarkers(blockId, false);
             }
-            updateGroupRowValues(row, ids, function(id) { return window.buildingIndex[id]; });
           }
           setBlockFiltered(blockId, shouldHide);
         });
@@ -1927,7 +1972,6 @@ export function startWiring(ctx) {
             checkbox.checked = false;
             setOwnerSelection(owner, false);
           }
-          updateGroupRowValues(row, markers);
         });
 
         networkRows.forEach(function(row) {
@@ -1940,7 +1984,6 @@ export function startWiring(ctx) {
             checkbox.checked = false;
             setNetworkSelection(network, false);
           }
-          updateGroupRowValues(row, markers);
         });
 
         neighbourhoodRows.forEach(function(row) {
@@ -1953,8 +1996,8 @@ export function startWiring(ctx) {
             checkbox.checked = false;
             setHoodSelection(hoodKey, false);
           }
-          updateGroupRowValues(row, markers);
         });
+        refreshGroupRowsAfterFilter();
 
         updateDatasetStatus();
         updateMapStatus();
