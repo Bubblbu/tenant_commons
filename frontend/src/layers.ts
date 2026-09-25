@@ -29,10 +29,13 @@ function createBoundaryLayer(
   style: PathOptions,
   labelHtml: (name: string) => string,
   labelName: (props: BoundaryProperties | null | undefined) => string,
+  renderer: L.Renderer,
 ): L.FeatureGroup {
   const group = L.featureGroup();
   for (const feature of fc.features) {
-    const outline = L.geoJSON(feature, { style: () => style }).addTo(group);
+    // Outline-only and popup-less, so non-interactive: clicks fall through to
+    // the blocks/buildings canvas underneath.
+    const outline = L.geoJSON(feature, { style: () => ({ ...style, renderer, interactive: false }) }).addTo(group);
     const centre = outline.getBounds().getCenter();
     L.marker(labelPosition(feature.properties, [centre.lat, centre.lng]), {
       // className 'empty', as Folium's DivIcon: no default white box.
@@ -44,19 +47,36 @@ function createBoundaryLayer(
   return group;
 }
 
-const nameProperty = (props: BoundaryProperties | null | undefined) => String(props?.name ?? '');
+export const BOUNDARY_PANE = 'boundaries';
 
-export function createNeighbourhoodsLayer(fc: BoundaryCollection): L.FeatureGroup {
-  return createBoundaryLayer(fc, NEIGHBOURHOOD_STYLE, neighbourhoodLabelHtml, nameProperty);
+/**
+ * Blocks and building markers share the map's default canvas, where paint
+ * order is insertion order — re-showing a layer or highlighting a block would
+ * push it over the boundary outlines. Boundaries instead draw on their own
+ * canvas in a pane above overlayPane (400) and below markerPane (600, where
+ * the name labels live). The pane ignores pointer events: a canvas on top
+ * would otherwise swallow every click meant for the canvas underneath.
+ */
+export function createBoundaryRenderer(map: L.Map): L.Canvas {
+  const pane = map.createPane(BOUNDARY_PANE);
+  pane.style.zIndex = '450';
+  pane.style.pointerEvents = 'none';
+  return L.canvas({ pane: BOUNDARY_PANE });
 }
 
-export function createVillagesLayer(fc: VillagesCollection): L.FeatureGroup {
-  return createBoundaryLayer(fc, VILLAGE_STYLE, villageLabelHtml, nameProperty);
+const nameProperty = (props: BoundaryProperties | null | undefined) => String(props?.name ?? '');
+
+export function createNeighbourhoodsLayer(fc: BoundaryCollection, renderer: L.Renderer): L.FeatureGroup {
+  return createBoundaryLayer(fc, NEIGHBOURHOOD_STYLE, neighbourhoodLabelHtml, nameProperty, renderer);
+}
+
+export function createVillagesLayer(fc: VillagesCollection, renderer: L.Renderer): L.FeatureGroup {
+  return createBoundaryLayer(fc, VILLAGE_STYLE, villageLabelHtml, nameProperty, renderer);
 }
 
 /** The source file carries no per-feature name, so every feature gets the same fixed label. */
-export function createChinatownLayer(fc: BoundaryCollection): L.FeatureGroup {
-  return createBoundaryLayer(fc, CHINATOWN_STYLE, chinatownLabelHtml, () => CHINATOWN_LABEL);
+export function createChinatownLayer(fc: BoundaryCollection, renderer: L.Renderer): L.FeatureGroup {
+  return createBoundaryLayer(fc, CHINATOWN_STYLE, chinatownLabelHtml, () => CHINATOWN_LABEL, renderer);
 }
 
 export interface BuildingLayers {

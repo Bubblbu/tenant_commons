@@ -17,6 +17,7 @@ import { loadArtifacts } from './data';
 import { initHoodUrlSync } from './hood-url';
 import {
   createBlocksLayer,
+  createBoundaryRenderer,
   createBuildingLayers,
   createChinatownLayer,
   createNeighbourhoodsLayer,
@@ -48,11 +49,12 @@ async function main(): Promise<void> {
   L.tileLayer(basemap.tiles, { attribution: basemap.attribution }).addTo(map);
   if (basemap.labels) L.tileLayer(basemap.labels, { attribution: basemap.attribution }).addTo(map);
 
-  // Same order Folium added them: blocks, neighbourhoods, then buildings.
+  // Blocks, then buildings, share the default canvas; boundaries draw in their own pane above both.
+  const boundaryRenderer = createBoundaryRenderer(map);
   const blocks = createBlocksLayer(artifacts.blocks).addTo(map);
-  const neighbourhoods = createNeighbourhoodsLayer(artifacts.boundaries).addTo(map);
-  const villages = createVillagesLayer(artifacts.villages).addTo(map);
-  const chinatown = createChinatownLayer(artifacts.chinatown).addTo(map);
+  const neighbourhoods = createNeighbourhoodsLayer(artifacts.boundaries, boundaryRenderer).addTo(map);
+  const villages = createVillagesLayer(artifacts.villages, boundaryRenderer).addTo(map);
+  const chinatown = createChinatownLayer(artifacts.chinatown, boundaryRenderer).addTo(map);
   const styled = artifacts.markers.map((m) => ({ ...m, ...markerStyle(m) }));
   const records = artifacts.buildingData.records;
   // Lazy: the markup is built on first open, from the one record the table and filters also read.

@@ -166,6 +166,7 @@ export function startWiring(ctx) {
         if (layer._isFiltered === filtered) return;
         layer._isFiltered = filtered;
         if (filtered) {
+          layer._highlighted = false;
           layer._selectionRefs = 0;
           // Fully hidden, matching setMarkerVisibility()'s treatment of filtered
           // buildings (weight:0/fillOpacity:0) rather than just dimming to a
@@ -178,6 +179,8 @@ export function startWiring(ctx) {
 
       function highlightBlock(layer, on) {
         if (!layer || layer._isFiltered) return;
+        layer._highlighted = on;
+        scheduleRestack();
         if (on) {
           var base = layer._baseStyle || {};
           layer.setStyle({
@@ -186,7 +189,6 @@ export function startWiring(ctx) {
             fillOpacity: Math.min(0.9, (base.fillOpacity || 0.35) + 0.1),
             fillColor: base.fillColor || (layer.options && layer.options.fillColor) || '#c7e9c0'
           });
-          if (layer.bringToFront) layer.bringToFront();
         } else {
           resetBlockStyle(layer);
         }
@@ -289,6 +291,8 @@ export function startWiring(ctx) {
         if (!marker) return;
         ensureMarkerBase(marker);
         if (marker._isFiltered) return;
+        marker._highlighted = on;
+        scheduleRestack();
         var baseOpacity = marker._baseOpacity || 0.35;
         var baseRadius = getScaledRadius(marker);
         var baseColor = marker._baseColor || (marker.options && marker.options.fillColor) || '#9e9e9e';
@@ -344,6 +348,7 @@ export function startWiring(ctx) {
         marker._isFiltered = !visible;
         if (!visible) {
           marker._selectionRefs = 0;
+          marker._highlighted = false;
           if (typeof marker.setStyle === 'function') {
             marker.setStyle({ weight:0, color:null, fillOpacity:0, fillColor: marker._baseColor });
           }
@@ -707,19 +712,39 @@ export function startWiring(ctx) {
         throw new Error('Building markers not ready');
       }
 
-      // Same shared-canvas insertion-order issue sendBlocksToBack() handles
-      // for blocks: toggling "Show buildings" off/on re-inserts
-      // layerBuildings at the end of the canvas draw order, so bring the
-      // building markers back to the front.
-      function sendBuildingsToFront() {
-        Object.keys(window.buildingIndex).forEach(function(key) {
-          const marker = window.buildingIndex[key];
-          if (marker && typeof marker.bringToFront === 'function') {
-            marker.bringToFront();
-          }
+      // Same shared-canvas insertion-order issue sendBlocksToBack() handles,
+      // for everything above the blocks: toggling a layer re-inserts it at the
+      // end of the draw order, and hovering/selecting changes what must sit on
+      // top. One pass restores the full stack — unhighlighted blocks (left at
+      // the back), highlighted blocks, building markers, housing-type rings
+      // (above every marker, as createBuildingLayers() orders them), then
+      // highlighted markers. Boundary outlines are on their own canvas above
+      // all of this (see createBoundaryRenderer), so they never need restacking.
+      function bringLayerToFront(layer) {
+        if (layer && typeof layer.bringToFront === 'function') layer.bringToFront();
+      }
+      function restackCanvas() {
+        const markers = Object.keys(window.buildingIndex).map(function(key) { return window.buildingIndex[key]; });
+        blockLayers.forEach(function(layer) { if (layer._highlighted) bringLayerToFront(layer); });
+        markers.forEach(function(marker) { if (!marker._highlighted) bringLayerToFront(marker); });
+        markers.forEach(function(marker) {
+          (marker._extraRings || []).forEach(function(ring) { bringLayerToFront(ring.marker); });
+        });
+        markers.forEach(function(marker) { if (marker._highlighted) bringLayerToFront(marker); });
+      }
+      // highlightMarker()/highlightBlock() run in loops (owner/network hover,
+      // filter ticks), so they coalesce to one restack per frame. `var`, not
+      // `let`: they can run before this line does (applyMarkerMetadata above).
+      var restackScheduled = false;
+      function scheduleRestack() {
+        if (restackScheduled) return;
+        restackScheduled = true;
+        window.requestAnimationFrame(function() {
+          restackScheduled = false;
+          restackCanvas();
         });
       }
-      sendBuildingsToFront();
+      restackCanvas();
 
       applyZoomScaling();
       // Toggling a FeatureGroup/GeoJSON layer on/off (e.g. "Show buildings",
@@ -1964,7 +1989,7 @@ export function startWiring(ctx) {
         toggleLayerVisibility(layerBuildings, showBuildingsChk.checked !== false);
         showBuildingsChk.addEventListener('change', function() {
           toggleLayerVisibility(layerBuildings, showBuildingsChk.checked !== false);
-          if (showBuildingsChk.checked) sendBuildingsToFront();
+          if (showBuildingsChk.checked) restackCanvas();
           updateLegendVisibility();
         });
       } else {
@@ -1982,7 +2007,7 @@ export function startWiring(ctx) {
         toggleLayerVisibility(layerBlocks, vizBlocksChk.checked !== false);
         vizBlocksChk.addEventListener('change', function() {
           toggleLayerVisibility(layerBlocks, vizBlocksChk.checked);
-          if (vizBlocksChk.checked) sendBlocksToBack();
+          if (vizBlocksChk.checked) { sendBlocksToBack(); restackCanvas(); }
           updateLegendVisibility();
         });
       } else {
@@ -2030,12 +2055,13 @@ export function startWiring(ctx) {
           if (showBuildingsChk) {
             showBuildingsChk.checked = true;
             toggleLayerVisibility(layerBuildings, true);
-            sendBuildingsToFront();
+            restackCanvas();
           }
           if (vizBlocksChk) {
             vizBlocksChk.checked = true;
             toggleLayerVisibility(layerBlocks, true);
             sendBlocksToBack();
+            restackCanvas();
           }
           if (vizNeighbourhoodsChk) {
             vizNeighbourhoodsChk.checked = true;
