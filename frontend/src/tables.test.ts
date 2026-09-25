@@ -18,7 +18,7 @@ describe('buildingRow', () => {
       value_land: 5000000.4, value_bldg: 800000.0, bldg_land_ratio: 0.16, housing_type: 'sro',
     }));
     expect(row).toBe(
-      '<tr data-bid="7" data-owner="example-holdings" data-network="example-group" data-block="3" data-area="West End" ' +
+      '<tr data-bid="7" data-owner="example-holdings" data-network="example-group" data-manager="" data-block="3" data-area="West End" ' +
         'data-chinatown="" data-village="" ' +
         'data-value-land="5000000" data-value-bldg="800000" data-value-ratio="0.16" data-units="40" ' +
         'data-year-built="1965" data-search="12 oak &amp; elm st west end 40 example &quot;holdings&quot; example group sro" ' +

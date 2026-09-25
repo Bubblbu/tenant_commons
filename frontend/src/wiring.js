@@ -889,7 +889,7 @@ export function startWiring(ctx) {
       const vizNeighbourhoodsChk = document.getElementById('viz-show-neighbourhoods');
       const vizVillagesChk = document.getElementById('viz-show-villages');
       const vizChinatownChk = document.getElementById('viz-show-chinatown');
-      const tableSearchInput = document.getElementById('owner-search');
+      const landlordFilter = ctx.landlordFilter;
       const onlyIssuesChk = document.getElementById('filter-only-issues');
       const onlyOwnedChk = document.getElementById('filter-only-owned');
       const statusCells = {
@@ -1688,7 +1688,6 @@ export function startWiring(ctx) {
 
       function applyFilters() {
         metricKeys.forEach(updateMetricLabels);
-        const searchTerm = tableSearchInput ? tableSearchInput.value.trim().toLowerCase() : '';
         const selectedHoods = hoodInputs
           .filter(function(inp) { return inp.checked; })
           .map(function(inp) { return (inp.value || '').toLowerCase().trim(); });
@@ -1752,9 +1751,12 @@ export function startWiring(ctx) {
           } else if (hideWhenNone) {
             baseMatches = false;
           }
-          if (baseMatches && searchTerm) {
-            const haystack = row.getAttribute('data-search') || '';
-            baseMatches = haystack.indexOf(searchTerm) !== -1;
+          if (baseMatches && landlordFilter && landlordFilter.isActive()) {
+            baseMatches = landlordFilter.matches({
+              owner: row.getAttribute('data-owner') || '',
+              network: row.getAttribute('data-network') || '',
+              manager: row.getAttribute('data-manager') || '',
+            });
           }
           if (baseMatches && onlyIssuesChk && onlyIssuesChk.checked) {
             const rawIssues = row.getAttribute('data-n-issues');
@@ -1962,7 +1964,7 @@ export function startWiring(ctx) {
       }
 
       if (hideEmptyBlocksChk) hideEmptyBlocksChk.addEventListener('change', applyFilters);
-      if (tableSearchInput) tableSearchInput.addEventListener('input', scheduleApplyFilters);
+      if (landlordFilter) landlordFilter.onChange(scheduleApplyFilters);
       // The sidebar table search (table-search.ts) only hides table rows, so
       // just the footer totals need refreshing — no map/filter pass.
       document.addEventListener('tablesearch', function() {
@@ -2084,11 +2086,7 @@ export function startWiring(ctx) {
           if (vizShowHousingTypeChk) vizShowHousingTypeChk.checked = false;
           if (vizShowIssuesChk) vizShowIssuesChk.checked = false;
           applyHousingTypeFilter();
-          if (tableSearchInput) {
-            tableSearchInput.value = '';
-            // Lets listeners such as the search field's clear button resync.
-            tableSearchInput.dispatchEvent(new Event('input'));
-          }
+          if (landlordFilter) landlordFilter.clear();
           if (onlyIssuesChk) {
             onlyIssuesChk.checked = false;
           }

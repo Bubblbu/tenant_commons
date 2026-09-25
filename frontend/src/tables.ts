@@ -9,6 +9,7 @@
  */
 import { formatAddress } from './address';
 import { escapeHtml, isMissing, roundHalfEven, sameName } from './html';
+import { managerKey } from './landlord-picker';
 import { EXPLAINERS, networkProvenance, ownerRowProvenance, provenanceIcon, tipPlacement } from './provenance';
 import type { BlocksCollection, BuildingData, BuildingRecord } from './types';
 
@@ -80,7 +81,8 @@ export function buildingRow(r: BuildingRecord): string {
   const village = r.in_village_plan === true ? '1' : '';
   return (
     `<tr data-bid="${bid}" data-owner="${escapeHtml(text(r.owner_key))}" ` +
-    `data-network="${escapeHtml(text(r.network_key))}" data-block="${block}" ` +
+    `data-network="${escapeHtml(text(r.network_key))}" data-manager="${escapeHtml(managerKey(r.managed_by))}" ` +
+    `data-block="${block}" ` +
     `data-area="${a}" data-chinatown="${chinatown}" data-village="${village}" ` +
     `data-value-land="${valLand}" data-value-bldg="${valBldg}" ` +
     `data-value-ratio="${ratioVal}" data-units="${units}" ` +

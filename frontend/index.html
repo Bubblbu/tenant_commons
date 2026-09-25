@@ -860,6 +860,109 @@
     display: none;
   }
 
+  /* Filters > Landlords picker (landlord-picker.ts): picked tiles above the
+     input, suggestions dropping down under it. */
+  #filters-panel .picker-tiles {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    list-style: none;
+    margin: 0 0 6px;
+    padding: 0;
+  }
+
+  #filters-panel .picker-tiles[hidden],
+  #filters-panel .picker-suggestions[hidden] {
+    display: none;
+  }
+
+  #filters-panel .picker-tile {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    max-width: 100%;
+    padding: 2px 2px 2px 6px;
+    border: 1px solid #cdd1dd;
+    border-radius: 12px;
+    background: #eef1f7;
+    font-size: 12px;
+  }
+
+  #filters-panel .picker-tile-label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  #filters-panel .picker-remove {
+    padding: 0 5px;
+    border: 0;
+    border-radius: 50%;
+    background: none;
+    color: #6b7080;
+    font-size: 14px;
+    line-height: 1.2;
+    cursor: pointer;
+  }
+
+  #filters-panel .picker-remove:hover,
+  #filters-panel .picker-remove:focus-visible {
+    background: #d9deea;
+    color: #1f2330;
+  }
+
+  #filters-panel .picker-kind {
+    flex: none;
+    color: #6b7080;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+  }
+
+  #filters-panel .picker-suggestions {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    z-index: 20;
+    max-height: 260px;
+    overflow-y: auto;
+    list-style: none;
+    margin: 2px 0 0;
+    padding: 2px 0;
+    border: 1px solid #cdd1dd;
+    border-radius: 4px;
+    background: #fff;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+  }
+
+  #filters-panel .picker-option {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    padding: 5px 8px;
+    font-size: 12px;
+    cursor: pointer;
+  }
+
+  #filters-panel .picker-option.active,
+  #filters-panel .picker-option:hover {
+    background: #eef1f7;
+  }
+
+  #filters-panel .picker-option-body {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  #filters-panel .picker-option-meta {
+    color: #6b7080;
+    font-size: 11px;
+  }
+
   #filters-panel .filter-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -1380,9 +1483,12 @@
     <h3>Filters</h3>
     <div class="filter-section">
       <h4>Landlords</h4>
-      <div class="search-field">
-        <input type="text" id="owner-search" placeholder="Search landlord or ownership group…">
+      <ul class="picker-tiles" id="owner-tiles" aria-label="Selected landlords" hidden></ul>
+      <div class="search-field landlord-picker">
+        <input type="text" id="owner-search" placeholder="Add landlord or group…" autocomplete="off"
+          role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="owner-suggestions">
         <button type="button" id="owner-search-clear" class="search-clear" aria-label="Clear landlord search" hidden>&times;</button>
+        <ul class="picker-suggestions" id="owner-suggestions" role="listbox" hidden></ul>
       </div>
     </div>
     <div class="filter-section">

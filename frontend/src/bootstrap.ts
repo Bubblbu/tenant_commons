@@ -16,6 +16,7 @@ import { BASEMAPS, DEFAULT_BASEMAP, DEFAULT_CENTER, DEFAULT_ZOOM } from './confi
 import { renderCoverage } from './coverage';
 import { loadArtifacts } from './data';
 import { initHoodUrlSync } from './hood-url';
+import { buildOptions, initLandlordPicker, type LandlordFilter } from './landlord-picker';
 import { areaBounds, selectionBounds } from './initial-view';
 import {
   createBlocksLayer,
@@ -86,6 +87,18 @@ async function main(): Promise<void> {
   renderTables(artifacts.buildingData, artifacts.blocks, document, artifacts.filterConfig.licence_year ?? null);
   initTipDismiss();
 
+  const ownerSearch = document.getElementById('owner-search');
+  const ownerSearchClear = document.getElementById('owner-search-clear');
+  const ownerTiles = document.getElementById('owner-tiles');
+  const ownerSuggestions = document.getElementById('owner-suggestions');
+  let landlordFilter: LandlordFilter | undefined;
+  if (ownerSearch instanceof HTMLInputElement && ownerTiles && ownerSuggestions) {
+    landlordFilter = initLandlordPicker(buildOptions(Object.values(records)), {
+      input: ownerSearch, tiles: ownerTiles, list: ownerSuggestions,
+    });
+    if (ownerSearchClear) initClearButton(ownerSearch, ownerSearchClear);
+  }
+
   startWiring({
     map,
     layers: { blocks, buildings: buildings.buildings, neighbourhoods, villages, chinatown },
@@ -94,12 +107,9 @@ async function main(): Promise<void> {
     filterConfig: artifacts.filterConfig,
     markers: styled,
     buildingData: artifacts.buildingData,
+    landlordFilter,
     onFilter: (visibleBids) => renderCoverage([...visibleBids].map((bid) => records[bid]).filter((r) => r !== undefined)),
   });
-
-  const ownerSearch = document.getElementById('owner-search');
-  const ownerSearchClear = document.getElementById('owner-search-clear');
-  if (ownerSearch instanceof HTMLInputElement && ownerSearchClear) initClearButton(ownerSearch, ownerSearchClear);
 
   const landlordViews = ['networks', 'owners'].map((v) => ({
     button: document.getElementById(`landlord-view-${v}`),
