@@ -15,6 +15,7 @@ import { initAboutModal } from './about';
 import { BASEMAPS, DEFAULT_BASEMAP, DEFAULT_CENTER, DEFAULT_ZOOM } from './config';
 import { loadArtifacts } from './data';
 import { initHoodUrlSync } from './hood-url';
+import { areaBounds, selectionBounds } from './initial-view';
 import {
   createBlocksLayer,
   createBoundaryRenderer,
@@ -71,6 +72,14 @@ async function main(): Promise<void> {
 
   renderLegend(artifacts.filterConfig);
   initHoodUrlSync();
+  // A ?hood= link that narrows the neighbourhoods opens framed on them.
+  const hoodInputs = Array.from(document.querySelectorAll<HTMLInputElement>('.filter-neighbourhood-option'));
+  const selected = selectionBounds(
+    hoodInputs.filter((i) => i.checked).map((i) => i.value),
+    hoodInputs.map((i) => i.value),
+    areaBounds(artifacts.boundaries, artifacts.chinatown, artifacts.villages),
+  );
+  if (selected) map.fitBounds(selected, { padding: [20, 20] });
   initLegendToggle();
   initAboutModal(map);
   renderTables(artifacts.buildingData, artifacts.blocks, document, artifacts.filterConfig.licence_year ?? null);
