@@ -17,6 +17,8 @@ export interface WiringContext {
   filterConfig: FilterConfig;
   markers: StyledMarker[];
   buildingData: BuildingData;
+  /** Called after every filter pass with the b_ids of the buildings that pass. */
+  onFilter?: (visibleBids: Set<string>) => void;
 }
 
 export function startWiring(ctx: WiringContext): void;

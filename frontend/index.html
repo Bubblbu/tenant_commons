@@ -904,6 +904,165 @@
     font-weight: 600;
   }
 
+  #filters-panel .coverage {
+    border: 1px solid #dde1eb;
+    border-radius: 6px;
+    margin: -4px 0 12px;
+    font-size: 12px;
+    background: #fff;
+  }
+
+  #filters-panel .coverage > summary {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 8px;
+    cursor: pointer;
+    list-style: none;
+    background: #f8f9fd;
+    border-radius: 6px;
+    user-select: none;
+  }
+
+  #filters-panel .coverage > summary::-webkit-details-marker {
+    display: none;
+  }
+
+  #filters-panel .coverage > summary::before {
+    content: "";
+    width: 0;
+    height: 0;
+    border-left: 5px solid #6b7280;
+    border-top: 4px solid transparent;
+    border-bottom: 4px solid transparent;
+    transition: transform 0.15s ease;
+  }
+
+  #filters-panel .coverage[open] > summary {
+    border-bottom: 1px solid #dde1eb;
+    border-radius: 6px 6px 0 0;
+  }
+
+  #filters-panel .coverage[open] > summary::before {
+    transform: rotate(90deg);
+  }
+
+  #filters-panel .coverage > summary:hover {
+    background: #f0f2f9;
+  }
+
+  #filters-panel .coverage-title {
+    font-weight: 600;
+    color: #27354a;
+  }
+
+  #filters-panel .coverage-headline {
+    margin-left: auto;
+    color: #6b7280;
+    font-variant-numeric: tabular-nums;
+  }
+
+  #filters-panel .coverage-body {
+    padding: 10px 10px 8px;
+  }
+
+  #filters-panel .coverage-bar {
+    display: flex;
+    height: 10px;
+    border-radius: 5px;
+    overflow: hidden;
+    background: #eef0f5;
+    margin-bottom: 10px;
+  }
+
+  #filters-panel .coverage-seg + .coverage-seg {
+    box-shadow: inset 1px 0 0 #fff;
+  }
+
+  #filters-panel .seg-registry { background: #1f3f7a; }
+  #filters-panel .seg-licence { background: #2f5fb0; }
+  #filters-panel .seg-sro_list { background: #7ea3dc; }
+  #filters-panel .seg-other { background: #a9bde0; }
+  #filters-panel .seg-missing {
+    background: repeating-linear-gradient(135deg, #e3e6ee 0 3px, #f3f4f8 3px 6px);
+  }
+
+  #filters-panel .coverage-list {
+    list-style: none;
+    margin: 0 0 8px;
+    padding: 0;
+  }
+
+  #filters-panel .coverage-list li {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 2px 0;
+    font-variant-numeric: tabular-nums;
+  }
+
+  #filters-panel .coverage-swatch {
+    flex: none;
+    width: 10px;
+    height: 10px;
+    border-radius: 2px;
+  }
+
+  #filters-panel .coverage-swatch.seg-missing {
+    box-shadow: inset 0 0 0 1px #cdd1dd;
+  }
+
+  #filters-panel .coverage-label {
+    flex: 1;
+    color: #374151;
+  }
+
+  #filters-panel .coverage-n {
+    font-weight: 600;
+    color: #27354a;
+  }
+
+  #filters-panel .coverage-list .coverage-pct {
+    width: 3.2em;
+    text-align: right;
+  }
+
+  #filters-panel .coverage-list li.coverage-missing {
+    border-top: 1px dashed #dde1eb;
+    margin-top: 3px;
+    padding-top: 5px;
+  }
+
+  #filters-panel .coverage-list li.coverage-missing .coverage-n {
+    color: #b42318;
+  }
+
+  #filters-panel .coverage-pct {
+    color: #6b7280;
+  }
+
+  #filters-panel .coverage-facts {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 3px 8px;
+    margin: 0;
+    padding-top: 7px;
+    border-top: 1px solid #eef0f5;
+    font-variant-numeric: tabular-nums;
+  }
+
+  #filters-panel .coverage-facts dt {
+    font-weight: 400;
+    color: #374151;
+  }
+
+  #filters-panel .coverage-facts dd {
+    margin: 0;
+    text-align: right;
+    font-weight: 600;
+    color: #27354a;
+  }
+
   #filters-panel .status-table td[data-value="none"] {
     color: #777;
   }
@@ -1192,6 +1351,7 @@
           </tr>
         </tbody>
       </table>
+      <div id="map-coverage"></div>
     </div>
     <div class="filter-section">
       <h4>Map Display</h4>
@@ -1238,6 +1398,7 @@
       <h4>Buildings</h4>
       <div class="filter-visual">
         <label><input type="checkbox" id="filter-only-issues"> Only show buildings with issues</label>
+        <label><input type="checkbox" id="filter-only-owned"> Only show buildings with ownership information</label>
       </div>
       <div id="filter-building-section" class="filter-building"></div>
     </div>

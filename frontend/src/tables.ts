@@ -85,7 +85,7 @@ export function buildingRow(r: BuildingRecord): string {
     `data-value-land="${valLand}" data-value-bldg="${valBldg}" ` +
     `data-value-ratio="${ratioVal}" data-units="${units}" ` +
     `data-year-built="${year}" data-search="${escapeHtml(search)}" ` +
-    `data-housing-type="${h}" data-n-issues="${nIssues}">` +
+    `data-housing-type="${h}" data-n-issues="${nIssues}" data-has-owner="${onRecord ? '1' : ''}">` +
     `<td class="select-cell"><input type="checkbox" class="row-select" ` +
     `data-type="building" data-target="${bid}"></td>` +
     `<td>${escapeHtml(formatAddress(r.address))}</td>` +

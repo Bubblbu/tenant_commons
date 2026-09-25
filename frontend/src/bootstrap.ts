@@ -13,6 +13,7 @@ import './popup.css';
 import * as L from 'leaflet';
 import { initAboutModal } from './about';
 import { BASEMAPS, DEFAULT_BASEMAP, DEFAULT_CENTER, DEFAULT_ZOOM } from './config';
+import { renderCoverage } from './coverage';
 import { loadArtifacts } from './data';
 import { initHoodUrlSync } from './hood-url';
 import { areaBounds, selectionBounds } from './initial-view';
@@ -93,6 +94,7 @@ async function main(): Promise<void> {
     filterConfig: artifacts.filterConfig,
     markers: styled,
     buildingData: artifacts.buildingData,
+    onFilter: (visibleBids) => renderCoverage([...visibleBids].map((bid) => records[bid]).filter((r) => r !== undefined)),
   });
 
   const ownerSearch = document.getElementById('owner-search');

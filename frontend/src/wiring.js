@@ -891,6 +891,7 @@ export function startWiring(ctx) {
       const vizChinatownChk = document.getElementById('viz-show-chinatown');
       const tableSearchInput = document.getElementById('owner-search');
       const onlyIssuesChk = document.getElementById('filter-only-issues');
+      const onlyOwnedChk = document.getElementById('filter-only-owned');
       const statusCells = {
         total: {
           units: document.getElementById('status-total-units'),
@@ -1760,6 +1761,9 @@ export function startWiring(ctx) {
             const nIssues = rawIssues === null || rawIssues === '' ? NaN : parseFloat(rawIssues);
             baseMatches = Number.isFinite(nIssues) && nIssues > 0;
           }
+          if (baseMatches && onlyOwnedChk && onlyOwnedChk.checked) {
+            baseMatches = row.getAttribute('data-has-owner') === '1';
+          }
 
           // Rows with no value for a metric (e.g. SRO/co-op records with no
           // building match have no units/year built) are skipped per-metric
@@ -1954,6 +1958,7 @@ export function startWiring(ctx) {
         updateMapStatus();
         updateSummaryBar();
         updateGroupTableSummaries();
+        if (typeof ctx.onFilter === 'function') ctx.onFilter(visibleBids);
       }
 
       if (hideEmptyBlocksChk) hideEmptyBlocksChk.addEventListener('change', applyFilters);
@@ -1965,6 +1970,7 @@ export function startWiring(ctx) {
         updateGroupTableSummaries();
       });
       if (onlyIssuesChk) onlyIssuesChk.addEventListener('change', applyFilters);
+      if (onlyOwnedChk) onlyOwnedChk.addEventListener('change', applyFilters);
       hoodInputs.forEach(function(inp) { inp.addEventListener('change', applyFilters); });
 
       if (hoodSelectAllBtn) {
@@ -2085,6 +2091,9 @@ export function startWiring(ctx) {
           }
           if (onlyIssuesChk) {
             onlyIssuesChk.checked = false;
+          }
+          if (onlyOwnedChk) {
+            onlyOwnedChk.checked = false;
           }
           document.querySelectorAll('.row-select').forEach(function(cb) {
             if (cb.checked) {
