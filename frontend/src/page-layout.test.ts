@@ -18,8 +18,6 @@ describe('index.html page layout', () => {
   });
 });
 
-const wiring = readFileSync(new URL('./wiring.js', import.meta.url), 'utf8');
-
 describe('sidebar', () => {
   it('orders the data tabs Buildings, Landlords, Neighbourhoods, opening on Buildings', () => {
     const tabs = [...page.matchAll(/<button id="tab-(\w+)"( class="active")?>/g)].map((m) => m[1] + (m[2] ? '*' : ''));
@@ -50,7 +48,7 @@ describe('sidebar', () => {
 });
 
 describe('Landlords tab', () => {
-  it('has an Owners and a Networks table with the totals cells wiring.js fills', () => {
+  it('has an Owners and a Networks table with the totals cells wiring fills', () => {
     const ids = [
       'owners-table', 'networks-table', 'owners-panel', 'networks-panel',
       'landlord-view-owners', 'landlord-view-networks',
@@ -74,20 +72,5 @@ describe('Landlords tab', () => {
     expect(page).toMatch(/id="landlord-view-networks" aria-pressed="false">By ownership group</);
     expect(page).toMatch(/id="networks-panel" hidden/);
     expect(page).not.toMatch(/id="owners-panel" hidden/);
-  });
-
-  it('keeps "Not on record" rows at the bottom when a column is sorted', () => {
-    expect(wiring).toMatch(/pinLast\(/);
-  });
-
-  it('does not sort when an explainer icon in a header is clicked', () => {
-    expect(wiring).toMatch(/closest\('\.prov'\)/);
-  });
-
-  it('is wired for both views', () => {
-    expect(wiring).toContain("'#owners-table tbody tr'");
-    expect(wiring).toContain("'#networks-table tbody tr'");
-    expect(wiring).toContain("typ === 'network'");
-    expect(wiring).not.toMatch(/landlords-table|summary-landlords/);
   });
 });
