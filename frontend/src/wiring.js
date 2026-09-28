@@ -1,7 +1,8 @@
 import { initPaneResize as initPaneGutters } from './pane-resize';
 import { pinLast } from './tables';
+import { createBlockStyler } from './wiring/block-style';
 import { buildMapIndex } from './wiring/indexes';
-import { MAP_THEME } from './wiring/map-theme';
+import { createMarkerStyler, createRestack } from './wiring/marker-style';
 
 export function startWiring(ctx) {
   let filterConfig = {};
@@ -38,358 +39,40 @@ export function startWiring(ctx) {
       }
 
       const index = buildMapIndex(ctx);
-      const BASE_ZOOM = 14;
-      // Thin light stroke so overlapping markers read as distinct dots instead
-      // of blurring into solid blobs at dense blocks (option 1). Per-marker
-      // overrides (housing-type rings) fall back to these via
-      // marker._strokeColor/_strokeWeight, set in buildMapIndex().
-      const MARKER_STROKE_COLOR = MAP_THEME.marker.stroke;
-      const MARKER_STROKE_WEIGHT = MAP_THEME.marker.strokeWeight;
-      let currentZoomScale = 1;
-      let blockColorScalingEnabled = true;
-      let blockColorMin = 0;
-      let blockColorMax = 0;
+      const restack = createRestack(index);
+      const blocks = createBlockStyler(index, document, restack.schedule);
+      const markers = createMarkerStyler(index, restack.schedule);
       let showHousingTypeChecked = false;
       let showIssuesChecked = false;
       // Declared here (not down with the other filter-panel DOM refs) because
-      // syncMarkerAnnotations()/effectiveStrokeColor() — both called from
-      // applyZoomScaling(), which runs early during wireUp() — read these.
-      // Referencing a `const` before its declaration line throws (temporal
-      // dead zone), and since that throw happened inside wireUp()'s top-level
-      // try/catch, it was being silently swallowed and retried forever —
-      // filters and tab-switching never finished wiring up as a result.
+      // applyHousingTypeFilter()/updateLegendVisibility() — both called
+      // early during wireUp() — read these. Referencing a `const` before its
+      // declaration line throws (temporal dead zone), and since that throw
+      // happened inside wireUp()'s top-level try/catch, it was being
+      // silently swallowed and retried forever — filters and tab-switching
+      // never finished wiring up as a result.
       const vizShowHousingTypeChk = document.getElementById('viz-show-housing-type');
       const vizShowIssuesChk = document.getElementById('viz-show-issues');
 
-      function computeZoomScale(zoom) {
-        if (!Number.isFinite(zoom)) return currentZoomScale;
-        const scale = Math.pow(1.2, zoom - BASE_ZOOM);
-        return Math.min(2.4, Math.max(0.35, scale));
-      }
-
-      function getScaledRadius(marker) {
-        const base = marker && marker._baseRadius ? marker._baseRadius : 6;
-        return base * currentZoomScale;
-      }
-
-      function resetBlockStyle(layer) {
-        if (!layer) return;
-        const rawUnits = Number(layer._blockUnits);
-        const units = Number.isFinite(rawUnits) ? rawUnits : 0;
-        const buildingCount = Number(layer._blockBuildings) || 0;
-        let base;
-        if (buildingCount <= 0) {
-          // Empty blocks (no buildings) carry no meaningful data — leave them
-          // transparent rather than painting them into the color scale.
-          base = { weight:1, color:MAP_THEME.block.stroke, fillOpacity:0, fillColor:'transparent' };
-        } else if (!blockColorScalingEnabled || blockColorMax <= 0) {
-          base = { weight:1, color:MAP_THEME.block.stroke, fillOpacity:0.35, fillColor:MAP_THEME.block.unscaledFill };
-        } else {
-          // Scale relative to the currently-visible blocks' own min/max (set by
-          // recomputeBlockColorScale()), not fixed dataset-wide bounds — so
-          // e.g. filtering to one neighbourhood re-stretches the hue range to
-          // that neighbourhood's least/most-dense blocks instead of leaving
-          // everything bunched at the low end of a city-wide scale.
-          const span = blockColorMax - blockColorMin;
-          const ratio = span > 0 ? Math.max(0, Math.min(1, (units - blockColorMin) / span)) : 1;
-          const fill = (ratio <= 0.10) ? MAP_THEME.block.scale[0] :
-                       (ratio <= 0.25) ? MAP_THEME.block.scale[1] :
-                       (ratio <= 0.50) ? MAP_THEME.block.scale[2] :
-                       (ratio <= 0.75) ? MAP_THEME.block.scale[3] :
-                       (ratio <  1.00) ? MAP_THEME.block.scale[4] : MAP_THEME.block.scale[5];
-          base = { weight:1, color:MAP_THEME.block.stroke, fillOpacity:0.7, fillColor:fill };
-        }
-        layer._baseStyle = base;
-        layer.setStyle(base);
-      }
-
-      // Recomputes the block color scale's min/max from whatever blocks are
-      // currently visible (not filtered out by the neighbourhood picker or
-      // other filters) and repaints them + the legend to match. Called once
-      // during initial wireUp (when nothing is filtered yet, so it reflects
-      // the whole dataset) and again at the end of every applyFilters() pass.
-      function recomputeBlockColorScale() {
-        let min = null;
-        let max = 0;
-        index.blockLayers.forEach(function(layer) {
-          if (layer._isFiltered) return;
-          if ((layer._blockBuildings || 0) <= 0) return;
-          const units = Number(layer._blockUnits);
-          if (!Number.isFinite(units)) return;
-          if (min === null || units < min) min = units;
-          if (units > max) max = units;
-        });
-        if (min === null) min = 0;
-        blockColorMin = min;
-        blockColorMax = max;
-        index.blockLayers.forEach(function(layer) {
-          if (layer._isFiltered) return;
-          resetBlockStyle(layer);
-        });
-        updateBlockLegendScale();
-      }
-
-      function updateBlockLegendScale() {
-        const scaleEl = document.getElementById('block-legend-scale');
-        const noteEl = document.getElementById('block-legend-note');
-        if (!scaleEl && !noteEl) return;
-        const min = blockColorMin;
-        const max = blockColorMax;
-        if (scaleEl) {
-          const fractions = [0, 0.2, 0.4, 0.6, 0.8, 1.0];
-          scaleEl.innerHTML = fractions.map(function(frac) {
-            const value = max > min ? Math.round(min + (max - min) * frac) : (frac === 1 ? max : min);
-            return '<span>' + value.toLocaleString() + '</span>';
-          }).join('');
-        }
-        if (noteEl) {
-          if (max <= 0) {
-            noteEl.textContent = 'No visible blocks with unit data.';
-          } else if (max === min) {
-            noteEl.textContent = 'All visible blocks have ' + max.toLocaleString() + ' units.';
-          } else {
-            noteEl.textContent = 'Color scaled to ' + min.toLocaleString() + '–' + max.toLocaleString() + ' units (visible blocks).';
-          }
-        }
-      }
-
-      function setBlockFiltered(blockId, filtered) {
-        var layer = index.blocks[blockId];
-        if (!layer) return;
-        // Called for every one of ~4,600 blocks on every filter tick; skip the
-        // setStyle work when the filtered state isn't actually changing (same
-        // reasoning as setMarkerVisibility above).
-        if (layer._isFiltered === filtered) return;
-        layer._isFiltered = filtered;
-        if (filtered) {
-          layer._highlighted = false;
-          layer._selectionRefs = 0;
-          // Fully hidden, matching setMarkerVisibility()'s treatment of filtered
-          // buildings (weight:0/fillOpacity:0) rather than just dimming to a
-          // faint grey outline.
-          layer.setStyle({ weight:0, color:null, fillOpacity:0, fillColor:MAP_THEME.block.filteredFill });
-        } else {
-          resetBlockStyle(layer);
-        }
-      }
-
-      function highlightBlock(layer, on) {
-        if (!layer || layer._isFiltered) return;
-        layer._highlighted = on;
-        scheduleRestack();
-        if (on) {
-          var base = layer._baseStyle || {};
-          layer.setStyle({
-            weight: MAP_THEME.highlight.blockWeight,
-            color: MAP_THEME.highlight.color,
-            fillOpacity: Math.min(0.9, (base.fillOpacity || 0.35) + 0.1),
-            fillColor: base.fillColor || (layer.options && layer.options.fillColor) || MAP_THEME.block.scale[0]
-          });
-        } else {
-          resetBlockStyle(layer);
-        }
-      }
-
-      function ensureMarkerBase(marker) {
-        if (!marker) return;
-        const opts = marker.options || {};
-        if (marker._baseColor === undefined || marker._baseColor === null) {
-          marker._baseColor = opts.base_color !== undefined ? opts.base_color : (opts.fillColor || MAP_THEME.marker.fill);
-        }
-        if (marker._baseOpacity === undefined || marker._baseOpacity === null) {
-          if (opts.base_opacity !== undefined && opts.base_opacity !== null) {
-            marker._baseOpacity = opts.base_opacity;
-          } else if (typeof opts.fillOpacity === 'number') {
-            marker._baseOpacity = opts.fillOpacity;
-          } else {
-            marker._baseOpacity = 0.35;
-          }
-        }
-        if (marker._baseRadius === undefined || marker._baseRadius === null) {
-          const optRadius = (opts.base_radius !== undefined && opts.base_radius !== null)
-            ? opts.base_radius
-            : (opts.radius !== undefined ? opts.radius : 6);
-          marker._baseRadius = typeof optRadius === 'number' ? optRadius : 6;
-        }
-        if (marker._selectionRefs === undefined) {
-          marker._selectionRefs = 0;
-        }
-        if (marker._isFiltered === undefined) {
-          marker._isFiltered = false;
-        }
-        if (marker._strokeColor === undefined || marker._strokeColor === null) {
-          marker._strokeColor = opts.color || MARKER_STROKE_COLOR;
-        }
-        if (marker._strokeWeight === undefined || marker._strokeWeight === null) {
-          marker._strokeWeight = (typeof opts.weight === 'number') ? opts.weight : MARKER_STROKE_WEIGHT;
-        }
-      }
-
-      // A building matching exactly one housing type has its OWN stroke
-      // overridden to that type's ring color (see add_buildings_layers in
-      // layout.py) — no separate marker. So unchecking "Show housing type"
-      // for that case means reverting the marker's own stroke back to the
-      // plain default, not hiding/showing a child object.
-      // marker._primaryHousingType (set in buildMapIndex) records which
-      // type currently owns the stroke, so these two helpers are the single
-      // source of truth for what color/weight a marker's stroke should
-      // currently render as — used by every setStyle call site below instead
-      // of reading marker._strokeColor/_strokeWeight directly.
-      function effectiveStrokeColor(marker) {
-        if (!marker) return MARKER_STROKE_COLOR;
-        if (marker._primaryHousingType && !showHousingTypeChecked) {
-          return MARKER_STROKE_COLOR;
-        }
-        return marker._strokeColor || MARKER_STROKE_COLOR;
-      }
-
-      function effectiveStrokeWeight(marker) {
-        if (!marker) return MARKER_STROKE_WEIGHT;
-        if (marker._primaryHousingType && !showHousingTypeChecked) {
-          return MARKER_STROKE_WEIGHT;
-        }
-        return marker._strokeWeight || MARKER_STROKE_WEIGHT;
-      }
-
-      // Extra rings (a building that is both SRO and co-op, or has a housing
-      // type plus outstanding issues) are separate child CircleMarkers, so —
-      // unlike the single-type stroke override above — they're shown/hidden
-      // by resizing to/from radius 0, mirroring how setMarkerVisibility
-      // treats a fully-filtered building marker. Called whenever a
-      // building's own visibility changes (from within
-      // setMarkerVisibility/applyZoomScaling) AND whenever the Building
-      // Details checkboxes change (from applyHousingTypeFilter) — a no-op
-      // (single property check) for the ~5,000 markers without extra rings.
-      function syncMarkerAnnotations(marker) {
-        if (!marker) return;
-        var buildingVisible = !marker._isFiltered;
-        if (marker._extraRings) {
-          marker._extraRings.forEach(function(r) {
-            if (!r || !r.marker) return;
-            var typeShown = r.housingType === 'issues' ? showIssuesChecked : showHousingTypeChecked;
-            var visible = buildingVisible && typeShown;
-            if (typeof r.marker.setStyle === 'function') {
-              r.marker.setStyle({ opacity: visible ? 0.9 : 0 });
-            }
-            if (typeof r.marker.setRadius === 'function') {
-              r.marker.setRadius(visible ? getScaledRadius(marker) + 3.0 : 0);
-            }
-          });
-        }
-      }
-
-      function restyleMarkerStroke(marker) {
-        if (!marker || typeof marker.setStyle !== 'function') return;
-        marker.setStyle({ color: effectiveStrokeColor(marker), weight: effectiveStrokeWeight(marker) });
-      }
-
-      function highlightMarker(marker, on) {
-        if (!marker) return;
-        ensureMarkerBase(marker);
-        if (marker._isFiltered) return;
-        marker._highlighted = on;
-        scheduleRestack();
-        var baseOpacity = marker._baseOpacity || 0.35;
-        var baseRadius = getScaledRadius(marker);
-        var baseColor = marker._baseColor || (marker.options && marker.options.fillColor) || MAP_THEME.marker.fill;
-        if (typeof marker.setStyle === 'function') {
-          marker.setStyle(on ? {
-            weight: MAP_THEME.highlight.markerWeight,
-            color: MAP_THEME.highlight.color,
-            fillOpacity: Math.min(0.95, baseOpacity + 0.20),
-            fillColor: baseColor
-          } : {
-            weight: effectiveStrokeWeight(marker),
-            color: effectiveStrokeColor(marker),
-            fillOpacity: baseOpacity,
-            fillColor: baseColor
-          });
-        }
-        if (typeof marker.setRadius === 'function') {
-          const extra = Math.max(1.5, 1.5 * currentZoomScale);
-          marker.setRadius(on ? baseRadius + extra : baseRadius);
-        } else if (!on && typeof marker.setStyle === 'function') {
-          marker.setStyle({ radius: baseRadius });
-        }
-        if (on && marker.bringToFront) marker.bringToFront();
-      }
-
-      function adjustMarkerSelection(marker, delta) {
-        if (!marker) return;
-        marker._selectionRefs = (marker._selectionRefs || 0) + delta;
-        if (marker._selectionRefs < 0) marker._selectionRefs = 0;
-        if (!marker._isFiltered) {
-          highlightMarker(marker, marker._selectionRefs > 0);
-        }
-      }
-
-      function adjustBlockSelection(layer, delta) {
-        if (!layer) return;
-        layer._selectionRefs = (layer._selectionRefs || 0) + delta;
-        if (layer._selectionRefs < 0) layer._selectionRefs = 0;
-        if (!layer._isFiltered) {
-          highlightBlock(layer, layer._selectionRefs > 0);
-        }
-      }
-
-      function setMarkerVisibility(marker, visible) {
-        if (!marker) return;
-        ensureMarkerBase(marker);
-        // Called for every one of ~5,000 buildings on every filter/slider tick;
-        // most buildings' visibility doesn't flip on a given tick, so skip the
-        // setStyle/setRadius work (real canvas redraw cost) entirely when the
-        // state isn't actually changing — this was the main source of slider-
-        // drag jank.
-        if (marker._isFiltered === !visible) return;
-        marker._isFiltered = !visible;
-        if (!visible) {
-          marker._selectionRefs = 0;
-          marker._highlighted = false;
-          if (typeof marker.setStyle === 'function') {
-            marker.setStyle({ weight:0, color:null, fillOpacity:0, fillColor: marker._baseColor });
-          }
-          if (typeof marker.setRadius === 'function') {
-            marker.setRadius(0);
-          }
-        } else {
-          var baseOpacity = marker._baseOpacity || 0.35;
-          var baseRadius = getScaledRadius(marker);
-          if (typeof marker.setStyle === 'function') {
-            marker.setStyle({
-              weight: effectiveStrokeWeight(marker),
-              color: effectiveStrokeColor(marker),
-              fillOpacity: baseOpacity,
-              fillColor: marker._baseColor
-            });
-          }
-          if (typeof marker.setRadius === 'function') {
-            marker.setRadius(baseRadius);
-          }
-          if ((marker._selectionRefs || 0) > 0) {
-            highlightMarker(marker, true);
-          }
-        }
-        syncMarkerAnnotations(marker);
-      }
 
       function setOwnerSelection(ownerKey, selected) {
         var arr = index.owners[ownerKey] || [];
         arr.forEach(function(marker) {
-          adjustMarkerSelection(marker, selected ? +1 : -1);
+          markers.adjustSelection(marker, selected ? +1 : -1);
         });
       }
 
       function setNetworkSelection(networkKey, selected) {
         var arr = index.networks[networkKey] || [];
         arr.forEach(function(marker) {
-          adjustMarkerSelection(marker, selected ? +1 : -1);
+          markers.adjustSelection(marker, selected ? +1 : -1);
         });
       }
 
       function setHoodSelection(hoodKey, selected) {
         var arr = index.hoods[hoodKey] || [];
         arr.forEach(function(marker) {
-          adjustMarkerSelection(marker, selected ? +1 : -1);
+          markers.adjustSelection(marker, selected ? +1 : -1);
         });
       }
 
@@ -398,7 +81,7 @@ export function startWiring(ctx) {
         ids.forEach(function(bid) {
           var marker = index.buildings[String(bid)];
           if (!marker) return;
-          adjustMarkerSelection(marker, selected ? +1 : -1);
+          markers.adjustSelection(marker, selected ? +1 : -1);
         });
       }
 
@@ -438,14 +121,10 @@ export function startWiring(ctx) {
       function applyHousingTypeFilter() {
         showHousingTypeChecked = vizShowHousingTypeChk ? vizShowHousingTypeChk.checked !== false : false;
         showIssuesChecked = vizShowIssuesChk ? vizShowIssuesChk.checked !== false : false;
+        markers.setHousingFlags(showHousingTypeChecked, showIssuesChecked);
         applyFilters();
         updateLegendVisibility();
-        Object.keys(index.buildings).forEach(function(key) {
-          var marker = index.buildings[key];
-          if (!marker) return;
-          if (marker._primaryHousingType) restyleMarkerStroke(marker);
-          if (marker._extraRings) syncMarkerAnnotations(marker);
-        });
+        markers.restyleHousing();
       }
 
       function toggleLayerVisibility(layer, show) {
@@ -458,62 +137,6 @@ export function startWiring(ctx) {
         }
       }
 
-      function buildingHover(bid, on) {
-        var marker = index.buildings[bid];
-        if (!marker || marker._isFiltered) return;
-        if (on) {
-          highlightMarker(marker, true);
-        } else if ((marker._selectionRefs || 0) === 0) {
-          highlightMarker(marker, false);
-        }
-      }
-
-      function blockHover(blockId, on) {
-        var layer = index.blocks[blockId];
-        if (!layer || layer._isFiltered) return;
-        if (on) {
-          highlightBlock(layer, true);
-        } else if ((layer._selectionRefs || 0) === 0) {
-          highlightBlock(layer, false);
-        }
-      }
-
-      function ownerHover(ownerKey, on) {
-        var arr = index.owners[ownerKey] || [];
-        arr.forEach(function(marker) {
-          if (!marker || marker._isFiltered) return;
-          if (on) {
-            highlightMarker(marker, true);
-          } else if ((marker._selectionRefs || 0) === 0) {
-            highlightMarker(marker, false);
-          }
-        });
-      }
-
-      function networkHover(networkKey, on) {
-        var arr = index.networks[networkKey] || [];
-        arr.forEach(function(marker) {
-          if (!marker || marker._isFiltered) return;
-          if (on) {
-            highlightMarker(marker, true);
-          } else if ((marker._selectionRefs || 0) === 0) {
-            highlightMarker(marker, false);
-          }
-        });
-      }
-
-      function neighbourhoodHover(hoodKey, on) {
-        var arr = index.hoods[hoodKey] || [];
-        arr.forEach(function(marker) {
-          if (!marker || marker._isFiltered) return;
-          if (on) {
-            highlightMarker(marker, true);
-          } else if ((marker._selectionRefs || 0) === 0) {
-            highlightMarker(marker, false);
-          }
-        });
-      }
-
       function handleSelectionChange(evt) {
         var cb = evt.target;
         if (!cb.classList.contains('row-select')) return;
@@ -522,9 +145,9 @@ export function startWiring(ctx) {
         var typ = cb.dataset.type;
         var key = cb.dataset.target;
         if (typ === 'building') {
-          adjustMarkerSelection(index.buildings[key], cb.checked ? +1 : -1);
+          markers.adjustSelection(index.buildings[key], cb.checked ? +1 : -1);
         } else if (typ === 'block') {
-          adjustBlockSelection(index.blocks[key], cb.checked ? +1 : -1);
+          blocks.adjustSelection(index.blocks[key], cb.checked ? +1 : -1);
           setBlockSelectionMarkers(key, cb.checked);
         } else if (typ === 'owner') {
           setOwnerSelection(key, cb.checked);
@@ -594,61 +217,18 @@ export function startWiring(ctx) {
 
       // Every layer is still unfiltered at this point in wireUp(), so this
       // paints against the full dataset's min/max; applyFilters() calls
-      // recomputeBlockColorScale() again once neighbourhood/other filters are
+      // blocks.recomputeScale() again once neighbourhood/other filters are
       // known, narrowing it to whatever's actually visible.
-      recomputeBlockColorScale();
+      blocks.recomputeScale();
 
-      // Blocks and building markers share one canvas renderer (prefer_canvas=True
-      // on the map, neither layer sets a custom pane/renderer), so paint order is
-      // just insertion order into that shared canvas — not tied to which was added
-      // to the map first. Toggling a layer off/on re-inserts it at the end (drawn
-      // on top), so re-showing blocks after hiding them can push them in front of
-      // buildings. Pin blocks behind buildings every time blocks become visible.
-      function sendBlocksToBack() {
-        index.blockLayers.forEach(function(layer) {
-          if (layer && typeof layer.bringToBack === 'function') layer.bringToBack();
-        });
-      }
-      sendBlocksToBack();
+      restack.sendBlocksToBack();
 
       Object.values(index.buildings).forEach(function(marker) {
-        ensureMarkerBase(marker);
-        updateMarkerColorAppearance(marker);
+        markers.ensureBase(marker);
+        markers.refreshAppearance(marker);
       });
 
-      // Same shared-canvas insertion-order issue sendBlocksToBack() handles,
-      // for everything above the blocks: toggling a layer re-inserts it at the
-      // end of the draw order, and hovering/selecting changes what must sit on
-      // top. One pass restores the full stack — unhighlighted blocks (left at
-      // the back), highlighted blocks, building markers, housing-type rings
-      // (above every marker, as createBuildingLayers() orders them), then
-      // highlighted markers. Boundary outlines are on their own canvas above
-      // all of this (see createBoundaryRenderer), so they never need restacking.
-      function bringLayerToFront(layer) {
-        if (layer && typeof layer.bringToFront === 'function') layer.bringToFront();
-      }
-      function restackCanvas() {
-        const markers = Object.keys(index.buildings).map(function(key) { return index.buildings[key]; });
-        index.blockLayers.forEach(function(layer) { if (layer._highlighted) bringLayerToFront(layer); });
-        markers.forEach(function(marker) { if (!marker._highlighted) bringLayerToFront(marker); });
-        markers.forEach(function(marker) {
-          (marker._extraRings || []).forEach(function(ring) { bringLayerToFront(ring.marker); });
-        });
-        markers.forEach(function(marker) { if (marker._highlighted) bringLayerToFront(marker); });
-      }
-      // highlightMarker()/highlightBlock() run in loops (owner/network hover,
-      // filter ticks), so they coalesce to one restack per frame. `var`, not
-      // `let`: they can run before this line does (the marker-appearance loop above).
-      var restackScheduled = false;
-      function scheduleRestack() {
-        if (restackScheduled) return;
-        restackScheduled = true;
-        window.requestAnimationFrame(function() {
-          restackScheduled = false;
-          restackCanvas();
-        });
-      }
-      restackCanvas();
+      restack.now();
 
       applyZoomScaling();
       // Toggling a FeatureGroup/GeoJSON layer on/off (e.g. "Show buildings",
@@ -716,32 +296,32 @@ export function startWiring(ctx) {
 
       document.querySelectorAll('#blocks-table tbody tr').forEach(function(row) {
         var id = row.getAttribute('data-block');
-        row.addEventListener('mouseenter', function() { blockHover(id, true); });
-        row.addEventListener('mouseleave', function() { blockHover(id, false); });
+        row.addEventListener('mouseenter', function() { blocks.hover(id, true); });
+        row.addEventListener('mouseleave', function() { blocks.hover(id, false); });
       });
 
       document.querySelectorAll('#buildings-table tbody tr').forEach(function(row) {
         var bid = row.getAttribute('data-bid');
-        row.addEventListener('mouseenter', function() { buildingHover(bid, true); });
-        row.addEventListener('mouseleave', function() { buildingHover(bid, false); });
+        row.addEventListener('mouseenter', function() { markers.hover([index.buildings[bid]], true); });
+        row.addEventListener('mouseleave', function() { markers.hover([index.buildings[bid]], false); });
       });
 
       document.querySelectorAll('#owners-table tbody tr').forEach(function(row) {
         var key = row.getAttribute('data-owner');
-        row.addEventListener('mouseenter', function() { ownerHover(key, true); });
-        row.addEventListener('mouseleave', function() { ownerHover(key, false); });
+        row.addEventListener('mouseenter', function() { markers.hover(index.owners[key] || [], true); });
+        row.addEventListener('mouseleave', function() { markers.hover(index.owners[key] || [], false); });
       });
 
       document.querySelectorAll('#networks-table tbody tr').forEach(function(row) {
         var key = row.getAttribute('data-network');
-        row.addEventListener('mouseenter', function() { networkHover(key, true); });
-        row.addEventListener('mouseleave', function() { networkHover(key, false); });
+        row.addEventListener('mouseenter', function() { markers.hover(index.networks[key] || [], true); });
+        row.addEventListener('mouseleave', function() { markers.hover(index.networks[key] || [], false); });
       });
 
       document.querySelectorAll('#neighbourhoods-table tbody tr').forEach(function(row) {
         var hoodKey = (row.getAttribute('data-area') || '').toLowerCase().trim();
-        row.addEventListener('mouseenter', function() { neighbourhoodHover(hoodKey, true); });
-        row.addEventListener('mouseleave', function() { neighbourhoodHover(hoodKey, false); });
+        row.addEventListener('mouseenter', function() { markers.hover(index.hoods[hoodKey] || [], true); });
+        row.addEventListener('mouseleave', function() { markers.hover(index.hoods[hoodKey] || [], false); });
       });
 
       const hoodInputs = Array.from(document.querySelectorAll('.filter-neighbourhood-option'));
@@ -1089,7 +669,7 @@ export function startWiring(ctx) {
 
       function updateLegendVisibility() {
         const blocksVisible = vizBlocksChk ? vizBlocksChk.checked !== false : true;
-        const showBlocksLegend = blocksVisible && blockColorScalingEnabled;
+        const showBlocksLegend = blocksVisible && blocks.colorScalingEnabled();
         if (legendContainerEl) {
           const sidebarEl = document.getElementById('sidebar-container');
           if (sidebarEl && sidebarEl.offsetWidth) {
@@ -1113,55 +693,14 @@ export function startWiring(ctx) {
         }
       }
 
-      function updateMarkerColorAppearance(marker) {
-        if (!marker) return;
-        ensureMarkerBase(marker);
-        if (marker._isFiltered) {
-          return;
-        }
-        if ((marker._selectionRefs || 0) > 0) {
-          highlightMarker(marker, true);
-        } else {
-          highlightMarker(marker, false);
-        }
-      }
-
       function applyBlockColorScaling(enabled) {
-        blockColorScalingEnabled = enabled !== false;
-        Object.keys(index.blocks).forEach(function(key) {
-          const layer = index.blocks[key];
-          if (!layer) return;
-          if (!layer._isFiltered) {
-            resetBlockStyle(layer);
-          }
-        });
+        blocks.setColorScaling(enabled);
         updateLegendVisibility();
       }
 
       function applyZoomScaling() {
         if (!mapInstance || typeof mapInstance.getZoom !== 'function') return;
-        currentZoomScale = computeZoomScale(mapInstance.getZoom());
-        Object.keys(index.buildings).forEach(function(key) {
-          const marker = index.buildings[key];
-          if (!marker || marker._isFiltered) return;
-          const baseOpacity = marker._baseOpacity || 0.35;
-          const scaledRadius = getScaledRadius(marker);
-          if (typeof marker.setRadius === 'function') {
-            marker.setRadius(scaledRadius);
-          }
-          if (typeof marker.setStyle === 'function') {
-            marker.setStyle({
-              weight: effectiveStrokeWeight(marker),
-              color: effectiveStrokeColor(marker),
-              fillOpacity: baseOpacity,
-              fillColor: marker._baseColor || (marker.options && marker.options.fillColor) || MAP_THEME.marker.fill
-            });
-          }
-          if ((marker._selectionRefs || 0) > 0) {
-            highlightMarker(marker, true);
-          }
-          syncMarkerAnnotations(marker);
-        });
+        markers.applyZoom(mapInstance.getZoom());
       }
 
       // Below the mobile breakpoint (see index.html's @media rule), the
@@ -1779,17 +1318,17 @@ export function startWiring(ctx) {
             if (checkbox && checkbox.checked) {
               const current = marker ? (marker._selectionRefs || 0) : 0;
               checkbox.checked = false;
-              if (marker && current > 0) adjustMarkerSelection(marker, -current);
+              if (marker && current > 0) markers.adjustSelection(marker, -current);
             }
           }
 
           const wasFiltered = marker ? marker._isFiltered : null;
-          setMarkerVisibility(marker, matches);
-          // updateMarkerColorAppearance() re-applies the highlight state via
-          // another setStyle call — only worth doing when this tick actually
-          // flipped the marker's filtered state.
+          markers.setVisible(marker, matches);
+          // refreshAppearance() re-applies the highlight state via another
+          // setStyle call — only worth doing when this tick actually flipped
+          // the marker's filtered state.
           if (marker && wasFiltered !== marker._isFiltered) {
-            updateMarkerColorAppearance(marker);
+            markers.refreshAppearance(marker);
           }
 
           if (matches) {
@@ -1859,14 +1398,14 @@ export function startWiring(ctx) {
               setBlockSelectionMarkers(blockId, false);
             }
           }
-          setBlockFiltered(blockId, shouldHide);
+          blocks.setFiltered(blockId, shouldHide);
         });
 
         // Re-stretch the block color scale to whichever blocks are visible
         // now that this pass's filtering is settled (e.g. narrowing to a
         // single selected neighbourhood re-scales hue to that
         // neighbourhood's own min/max instead of the whole dataset's).
-        recomputeBlockColorScale();
+        blocks.recomputeScale();
 
         // Was a per-row `document.querySelector('...:not(.hidden)')` CSS scan over all
         // building rows for every one of ~1,500 landlords — O(landlords x buildings) via
@@ -1981,7 +1520,7 @@ export function startWiring(ctx) {
         toggleLayerVisibility(layerBuildings, showBuildingsChk.checked !== false);
         showBuildingsChk.addEventListener('change', function() {
           toggleLayerVisibility(layerBuildings, showBuildingsChk.checked !== false);
-          if (showBuildingsChk.checked) restackCanvas();
+          if (showBuildingsChk.checked) restack.now();
           updateLegendVisibility();
         });
       } else {
@@ -1999,7 +1538,7 @@ export function startWiring(ctx) {
         toggleLayerVisibility(layerBlocks, vizBlocksChk.checked !== false);
         vizBlocksChk.addEventListener('change', function() {
           toggleLayerVisibility(layerBlocks, vizBlocksChk.checked);
-          if (vizBlocksChk.checked) { sendBlocksToBack(); restackCanvas(); }
+          if (vizBlocksChk.checked) { restack.sendBlocksToBack(); restack.now(); }
           updateLegendVisibility();
         });
       } else {
@@ -2031,13 +1570,13 @@ export function startWiring(ctx) {
           if (showBuildingsChk) {
             showBuildingsChk.checked = true;
             toggleLayerVisibility(layerBuildings, true);
-            restackCanvas();
+            restack.now();
           }
           if (vizBlocksChk) {
             vizBlocksChk.checked = true;
             toggleLayerVisibility(layerBlocks, true);
-            sendBlocksToBack();
-            restackCanvas();
+            restack.sendBlocksToBack();
+            restack.now();
           }
           if (vizNeighbourhoodsChk) vizNeighbourhoodsChk.checked = true;
           if (vizVillagesChk) vizVillagesChk.checked = false;
