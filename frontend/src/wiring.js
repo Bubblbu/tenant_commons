@@ -3,6 +3,7 @@ import { pinLast } from './tables';
 import { createBlockStyler } from './wiring/block-style';
 import { buildMapIndex } from './wiring/indexes';
 import { createMarkerStyler, createRestack } from './wiring/marker-style';
+import { buildMetricControls } from './wiring/metric-controls';
 
 export function startWiring(ctx) {
   let filterConfig = {};
@@ -402,9 +403,6 @@ export function startWiring(ctx) {
       const legendBuildingDetailsEl = document.getElementById('legend-building-details-section');
       const legendBoundariesEl = document.getElementById('legend-boundaries-section');
 
-      const metricControls = {};
-      let metricKeys = [];
-
       const datasetTotals = (filterConfig && filterConfig.dataset_totals) || null;
       const totalBuildings = datasetTotals && typeof datasetTotals.buildings === 'number' ? datasetTotals.buildings : null;
       const totalUnits = datasetTotals && typeof datasetTotals.units === 'number' ? datasetTotals.units : null;
@@ -766,121 +764,6 @@ export function startWiring(ctx) {
         });
       }
 
-      // Round tick values for a log-scaled axis: powers of ten spanning
-      // [minV, maxV], always anchored at minV itself (the slider/histogram
-      // floor) even when minV isn't an exact power of ten, so the leftmost
-      // tick always matches what the floor bucket actually starts at.
-      function niceLogTicks(minV, maxV) {
-        if (!(minV > 0) || !(maxV > minV)) return [minV];
-        const minExp = Math.ceil(Math.log10(minV) - 1e-9);
-        const maxExp = Math.floor(Math.log10(maxV) + 1e-9);
-        const ticks = [];
-        for (let e = minExp; e <= maxExp; e += 1) {
-          ticks.push(Math.pow(10, e));
-        }
-        if (!ticks.length || Math.abs(ticks[0] - minV) > minV * 1e-6) {
-          ticks.unshift(minV);
-        }
-        const maxTicks = 6;
-        if (ticks.length > maxTicks) {
-          const stride = Math.ceil((ticks.length - 1) / (maxTicks - 1));
-          const kept = [ticks[0]];
-          for (let i = stride; i < ticks.length - 1; i += stride) {
-            kept.push(ticks[i]);
-          }
-          kept.push(ticks[ticks.length - 1]);
-          return kept;
-        }
-        return ticks;
-      }
-
-      function formatWithSummary(summary, value) {
-        if (value === null || value === undefined || Number.isNaN(value)) return '–';
-        if (summary.format === 'currency') {
-          return '$' + Math.round(value).toLocaleString();
-        }
-        if (summary.format === 'year') {
-          return String(Math.round(value));
-        }
-        if (summary.format === 'ratio') {
-          const decimals = summary.decimals ?? 2;
-          return Number(value).toLocaleString(undefined, {minimumFractionDigits: decimals, maximumFractionDigits: decimals});
-        }
-        if (summary.type === 'int') {
-          return Math.round(value).toLocaleString();
-        }
-        const decimals = summary.decimals ?? 2;
-        return Number(value).toLocaleString(undefined, {maximumFractionDigits: decimals});
-      }
-
-      // Axis ticks specifically use compact currency notation ($10K, $1M) —
-      // formatWithSummary's full "$10,000,000" is right for the min/max
-      // readouts next to the sliders (only two numbers, plenty of room) but
-      // collides with its neighbours in a dense row of up to 5 axis ticks.
-      function formatTickValue(summary, value) {
-        if (summary.format === 'currency') {
-          const v = Math.round(value);
-          const abs = Math.abs(v);
-          if (abs >= 1e6) return '$' + (v / 1e6).toFixed(v % 1e6 === 0 ? 0 : 1) + 'M';
-          if (abs >= 1e3) return '$' + (v % 1e3 === 0 ? Math.round(v / 1e3) : (v / 1e3).toFixed(1)) + 'K';
-          return '$' + v.toLocaleString();
-        }
-        return formatWithSummary(summary, value);
-      }
-
-      function formatMetricValue(metric, value) {
-        const ctrl = metricControls[metric];
-        if (!ctrl) return String(value);
-        return formatWithSummary(ctrl.summary, value);
-      }
-
-      function updateMetricLabels(metric) {
-        const ctrl = metricControls[metric];
-        if (!ctrl) return;
-        const summary = ctrl.summary;
-        const fromSlider = ctrl.fromSlider;
-        const toSlider = ctrl.toSlider;
-        const parseSlider = function(slider) {
-          const raw = parseFloat(slider.value);
-          if (!Number.isFinite(raw)) return null;
-          const value = fromSlider(raw);
-          return Number.isFinite(value) ? value : null;
-        };
-        let minVal = parseSlider(ctrl.minSlider);
-        let maxVal = parseSlider(ctrl.maxSlider);
-        if (minVal === null) minVal = summary.min;
-        if (maxVal === null) maxVal = summary.max;
-        minVal = Math.max(summary.min, Math.min(summary.max, minVal));
-        maxVal = Math.max(summary.min, Math.min(summary.max, maxVal));
-        if (minVal > maxVal) {
-          if (ctrl.useLog) {
-            maxVal = minVal;
-          } else {
-            minVal = maxVal;
-          }
-        }
-        if (summary.type === 'int') {
-          minVal = Math.round(minVal);
-          maxVal = Math.round(maxVal);
-        }
-        ctrl.currentMin = minVal;
-        ctrl.currentMax = maxVal;
-        ctrl.minLabel.textContent = formatWithSummary(summary, minVal);
-        ctrl.maxLabel.textContent = formatWithSummary(summary, maxVal);
-        if (ctrl.bars && ctrl.bars.length) {
-          const low = Math.min(minVal, maxVal);
-          const high = Math.max(minVal, maxVal);
-          ctrl.bars.forEach(function(bar) {
-            const start = parseFloat(bar.dataset.start);
-            const end = parseFloat(bar.dataset.end);
-            const active = !(end < low || start > high);
-            bar.classList.toggle('active', active);
-          });
-        }
-        ctrl.minSlider.value = String(toSlider(minVal));
-        ctrl.maxSlider.value = String(toSlider(maxVal));
-      }
-
       // Sliders fire 'input' many times per second while dragging. applyFilters() walks
       // every building/block/landlord row, so calling it synchronously per event is what
       // makes dragging a filter slider feel sluggish. Coalesce to at most once per
@@ -896,257 +779,7 @@ export function startWiring(ctx) {
         });
       }
 
-      function makeSliderHandler(metric, role) {
-        return function() {
-          const ctrl = metricControls[metric];
-          if (!ctrl) return;
-          const fromSlider = ctrl.fromSlider;
-          const toSlider = ctrl.toSlider;
-          const minVal = fromSlider(parseFloat(ctrl.minSlider.value));
-          const maxVal = fromSlider(parseFloat(ctrl.maxSlider.value));
-          if (role === 'min') {
-            if (Number.isFinite(minVal) && Number.isFinite(maxVal) && minVal > maxVal) {
-              ctrl.maxSlider.value = String(toSlider(minVal));
-            }
-          } else if (role === 'max') {
-            if (Number.isFinite(minVal) && Number.isFinite(maxVal) && maxVal < minVal) {
-              ctrl.minSlider.value = String(toSlider(maxVal));
-            }
-          }
-          updateMetricLabels(metric);
-          scheduleApplyFilters();
-        };
-      }
-
-      // Renders one Craigslist-style histogram + dual-handle range slider control
-      // into `container` and returns its bookkeeping object for metricControls[metric].
-      function renderMetricControl(container, metric, summary) {
-          const control = document.createElement('div');
-          control.className = 'metric-control';
-
-          const hasSpread = summary.max > summary.min;
-          const positiveMin = (typeof summary.min_positive === 'number' && summary.min_positive > 0) ? summary.min_positive : null;
-          let useLog = false;
-          if (summary.use_log !== undefined) {
-            useLog = !!summary.use_log;
-          } else {
-            useLog = !!(summary.type !== 'int' && positiveMin !== null && hasSpread && (
-              summary.format === 'currency' || (summary.max / positiveMin) >= 25
-            ));
-          }
-          useLog = useLog && positiveMin !== null && hasSpread;
-
-          // Moved up from beside the sliders (their original position) so the
-          // axis ticks below can share the exact same value<->position
-          // transform the sliders use — the only way to guarantee a tick
-          // lines up with where the slider actually is at that value.
-          const logMin = useLog ? Math.log(positiveMin) : 0;
-          const logMax = useLog ? Math.log(Math.max(summary.max, positiveMin)) : 1;
-          // A log_floor (building_metrics.py) collapses everything at or below
-          // it into the first bin, e.g. 0–2 units or $1–$10k. That bin is drawn
-          // as wide as any other bar, so it gets the same share of the track,
-          // mapped linearly from the true min to the floor; the log scale runs
-          // over the rest. Without it every value under the floor shared track
-          // position 0, so a handle could never select, say, 2 units or fewer.
-          const bins = summary.bins || [];
-          const hasFloorBin = useLog && bins.length > 1 && summary.min < positiveMin &&
-            Math.abs(bins[0].end - positiveMin) <= positiveMin * 1e-9;
-          const floorPos = hasFloorBin ? 100 / bins.length : 0;
-          const toSlider = useLog && logMax !== logMin
-            ? function(value) {
-                if (!Number.isFinite(value)) return 0;
-                const v = Math.max(summary.min, Math.min(Number(value), summary.max));
-                if (hasFloorBin && v <= positiveMin) {
-                  return floorPos * (v - summary.min) / (positiveMin - summary.min);
-                }
-                if (v <= 0) return 0;
-                const clamped = Math.max(positiveMin, v);
-                return floorPos + ((Math.log(clamped) - logMin) / (logMax - logMin)) * (100 - floorPos);
-              }
-            : function(value) { return Number(value); };
-          const fromSlider = useLog && logMax !== logMin
-            ? function(pos) {
-                const p = Math.min(100, Math.max(0, Number(pos)));
-                // Position 0 always means "no lower bound": the true min, not the floor.
-                if (p === 0) return summary.min;
-                if (hasFloorBin && p <= floorPos) {
-                  return summary.min + (p / floorPos) * (positiveMin - summary.min);
-                }
-                const ratio = (p - floorPos) / (100 - floorPos);
-                return Math.exp(logMin + ratio * (logMax - logMin));
-              }
-            : function(pos) { return Number(pos); };
-
-          const header = document.createElement('div');
-          header.className = 'metric-header';
-          header.textContent = summary.label || metric;
-          control.appendChild(header);
-
-          const hist = document.createElement('div');
-          hist.className = 'metric-histogram';
-          const bars = [];
-          const maxCount = summary.max_count || 1;
-          bins.forEach(function(bin) {
-            const bar = document.createElement('div');
-            bar.className = 'metric-hist-bar';
-            const height = maxCount ? Math.max(2, (bin.count / maxCount) * 100) : 2;
-            bar.style.height = height + '%';
-            bar.dataset.start = bin.start;
-            bar.dataset.end = bin.end;
-            const rangeLabel = formatWithSummary(summary, bin.start) + ' – ' + formatWithSummary(summary, bin.end);
-            const countLabel = ' (' + bin.count.toLocaleString() + ')';
-            bar.title = useLog ? rangeLabel + countLabel + ' [log bin]' : rangeLabel + countLabel;
-            hist.appendChild(bar);
-            bars.push(bar);
-          });
-          control.appendChild(hist);
-
-          // Reference ticks under the histogram: the bars themselves are
-          // equal SCREEN width per bin, which is the correct way to draw a
-          // log-scaled histogram (equal ratio steps = equal distance) — but
-          // with no visible value anywhere except a per-bar hover tooltip,
-          // there's no way to tell what a bar's position actually means.
-          // Ticks are placed at their exact value's slider position (not
-          // evenly-spaced fractions), so a tick and the slider always agree
-          // on what a given screen position means. For a log axis the tick
-          // *values* are also snapped to round numbers (powers of ten) —
-          // an evenly-spaced-fraction tick lands on whatever raw value falls
-          // out of the interpolation ($9,847, say), which reads as noise;
-          // decade boundaries ($10K, $100K, $1M...) read as an axis. Note
-          // this intentionally does NOT reuse fromSlider(0)'s special case
-          // (which reports the true min, i.e. "no lower bound", for the
-          // slider's own filter semantics) — the floor bucket is drawn as
-          // one collapsed bar starting at positiveMin, so the leftmost tick
-          // must label that same value, not the tail below it.
-          if (bins.length) {
-            const axis = document.createElement('div');
-            axis.className = 'metric-axis';
-            let tickValues;
-            if (useLog) {
-              tickValues = niceLogTicks(positiveMin, summary.max);
-            } else {
-              tickValues = [];
-              const tickCount = 5;
-              for (let t = 0; t < tickCount; t += 1) {
-                const frac = t / (tickCount - 1);
-                tickValues.push(summary.min + frac * (summary.max - summary.min));
-              }
-            }
-            tickValues.forEach(function(value) {
-              const frac = useLog
-                ? (logMax !== logMin
-                    ? (Math.log(Math.max(positiveMin, Math.min(value, summary.max))) - logMin) / (logMax - logMin)
-                    : 0)
-                : ((value - summary.min) / ((summary.max - summary.min) || 1));
-              const tick = document.createElement('span');
-              tick.className = 'metric-axis-tick';
-              tick.style.left = 'calc(7px + (100% - 14px) * ' + frac + ')';
-              tick.textContent = formatTickValue(summary, value);
-              axis.appendChild(tick);
-            });
-            control.appendChild(axis);
-          }
-
-          const sliders = document.createElement('div');
-          sliders.className = 'metric-sliders';
-          const minSlider = document.createElement('input');
-          minSlider.type = 'range';
-          const maxSlider = document.createElement('input');
-          maxSlider.type = 'range';
-
-          const sliderStep = useLog ? 0.5 : (summary.step || ((summary.max - summary.min) / 200) || 1);
-
-          if (useLog && logMax !== logMin) {
-            minSlider.min = 0;
-            minSlider.max = 100;
-            maxSlider.min = 0;
-            maxSlider.max = 100;
-            minSlider.value = String(toSlider(summary.min));
-            maxSlider.value = String(toSlider(summary.max));
-          } else {
-            minSlider.min = summary.min;
-            minSlider.max = summary.max;
-            maxSlider.min = summary.min;
-            maxSlider.max = summary.max;
-            minSlider.value = String(summary.min);
-            maxSlider.value = String(summary.max);
-          }
-          minSlider.step = sliderStep;
-          maxSlider.step = sliderStep;
-
-          sliders.appendChild(minSlider);
-          sliders.appendChild(maxSlider);
-          control.appendChild(sliders);
-
-          const values = document.createElement('div');
-          values.className = 'metric-values';
-          const minLabel = document.createElement('span');
-          const maxLabel = document.createElement('span');
-          values.appendChild(minLabel);
-          values.appendChild(maxLabel);
-          control.appendChild(values);
-
-          container.appendChild(control);
-
-          const ctrl = {
-            summary: summary,
-            minSlider: minSlider,
-            maxSlider: maxSlider,
-            minLabel: minLabel,
-            maxLabel: maxLabel,
-            bars: bars,
-            useLog: useLog && logMax !== logMin,
-            toSlider: useLog && logMax !== logMin ? toSlider : function(value) { return Number(value); },
-            fromSlider: useLog && logMax !== logMin ? fromSlider : function(value) { return Number(value); },
-            currentMin: summary.min,
-            currentMax: summary.max,
-          };
-
-          minSlider.addEventListener('input', makeSliderHandler(metric, 'min'));
-          maxSlider.addEventListener('input', makeSliderHandler(metric, 'max'));
-          return ctrl;
-      }
-
-      const VALUE_METRIC_LABELS = { value_land: 'Land', value_bldg: 'Building' };
-      // Which Filter by section each metric's slider sits in.
-      const metricSection = {};
-
-      // Slider positions are in slider space (log for skewed metrics), not raw values.
-      function resetMetric(metric) {
-        const ctrl = metricControls[metric];
-        if (!ctrl) return;
-        ctrl.minSlider.value = String(ctrl.toSlider(ctrl.summary.min));
-        ctrl.maxSlider.value = String(ctrl.toSlider(ctrl.summary.max));
-        updateMetricLabels(metric);
-      }
-
-      function buildMetricControls() {
-        Object.keys(metricControls).forEach(function(key) { delete metricControls[key]; });
-        metricKeys = [];
-
-        const containers = {
-          building: document.getElementById('filter-building-section'),
-          value: document.getElementById('filter-value-section'),
-        };
-        if (containers.building && filterConfig.building_metrics) {
-          Object.keys(containers).forEach(function(sec) { if (containers[sec]) containers[sec].innerHTML = ''; });
-          const order = filterConfig.building_metric_order || Object.keys(filterConfig.building_metrics);
-          order.forEach(function(metric) {
-            const summary = filterConfig.building_metrics[metric];
-            if (!summary) return;
-            const section = VALUE_METRIC_LABELS[metric] && containers.value ? 'value' : 'building';
-            metricSection[metric] = section;
-            // Under the Assessed value heading, "Land" says enough.
-            const shown = section === 'value' ? Object.assign({}, summary, { label: VALUE_METRIC_LABELS[metric] }) : summary;
-            metricControls[metric] = renderMetricControl(containers[section], metric, shown);
-          });
-        }
-
-        metricKeys = Object.keys(metricControls);
-        metricKeys.forEach(updateMetricLabels);
-      }
-
-      buildMetricControls();
+      const metrics = buildMetricControls(filterConfig, document, scheduleApplyFilters);
       updateDatasetStatus();
       updateLegendVisibility();
 
@@ -1155,7 +788,7 @@ export function startWiring(ctx) {
         const activeMetrics = { building: 0, value: 0 };
         Object.keys(thresholds).forEach(function(metric) {
           const t = thresholds[metric];
-          if (t.min !== null || t.max !== null) activeMetrics[metricSection[metric]] += 1;
+          if (t.min !== null || t.max !== null) activeMetrics[metrics.controls[metric].section] += 1;
         });
         const counts = {
           area: hoods,
@@ -1176,7 +809,7 @@ export function startWiring(ctx) {
       }
 
       function applyFilters() {
-        metricKeys.forEach(updateMetricLabels);
+        metrics.updateAllLabels();
         const selectedHoods = hoodInputs
           .filter(function(inp) { return inp.checked; })
           .map(function(inp) { return (inp.value || '').toLowerCase().trim(); });
@@ -1197,8 +830,8 @@ export function startWiring(ctx) {
           return false;
         }
         const thresholds = {};
-        metricKeys.forEach(function(metric) {
-          const ctrl = metricControls[metric];
+        metrics.keys.forEach(function(metric) {
+          const ctrl = metrics.controls[metric];
           const summary = ctrl.summary;
           let minVal = ctrl.currentMin;
           let maxVal = ctrl.currentMax;
@@ -1209,18 +842,18 @@ export function startWiring(ctx) {
             summary: summary,
           };
         });
-        // Live histograms (see renderMetricControl): each metric's bars are
-        // recomputed below from the rows that pass every OTHER active
-        // filter — neighbourhood, search, issues-only, and every other
-        // metric's own slider — but not this metric's own threshold. That
-        // answers "how many more would I get if I loosened just this
+        // Live histograms (see metric-controls.ts's renderMetricControl): each
+        // metric's bars are recomputed below from the rows that pass every
+        // OTHER active filter — neighbourhood, search, issues-only, and every
+        // other metric's own slider — but not this metric's own threshold.
+        // That answers "how many more would I get if I loosened just this
         // slider" (the usual faceted-search convention) rather than a
         // metric's own bars shrinking toward whatever range it's already
         // dragged to. Bin edges and the slider's min/max range stay fixed;
         // only bar heights (counts) are live.
         const binCounts = {};
-        metricKeys.forEach(function(metric) {
-          binCounts[metric] = metricControls[metric].bars.map(function() { return 0; });
+        metrics.keys.forEach(function(metric) {
+          binCounts[metric] = metrics.controls[metric].bars.map(function() { return 0; });
         });
 
         const visibleBids = new Set();
@@ -1272,9 +905,9 @@ export function startWiring(ctx) {
           let matches = baseMatches;
           const metricPass = {};
           const metricValue = {};
-          if (baseMatches && metricKeys.length) {
-            for (let i = 0; i < metricKeys.length; i += 1) {
-              const metric = metricKeys[i];
+          if (baseMatches && metrics.keys.length) {
+            for (let i = 0; i < metrics.keys.length; i += 1) {
+              const metric = metrics.keys[i];
               const threshold = thresholds[metric];
               const attrName = 'data-' + threshold.summary.attr;
               const rawValue = row.getAttribute(attrName);
@@ -1292,13 +925,13 @@ export function startWiring(ctx) {
           }
 
           if (baseMatches) {
-            for (let i = 0; i < metricKeys.length; i += 1) {
-              const metric = metricKeys[i];
+            for (let i = 0; i < metrics.keys.length; i += 1) {
+              const metric = metrics.keys[i];
               const value = metricValue[metric];
               if (value === undefined || Number.isNaN(value)) continue;
               let othersPass = true;
-              for (let j = 0; j < metricKeys.length; j += 1) {
-                if (j !== i && !metricPass[metricKeys[j]]) { othersPass = false; break; }
+              for (let j = 0; j < metrics.keys.length; j += 1) {
+                if (j !== i && !metricPass[metrics.keys[j]]) { othersPass = false; break; }
               }
               if (!othersPass) continue;
               const bins = thresholds[metric].summary.bins || [];
@@ -1336,24 +969,7 @@ export function startWiring(ctx) {
           }
         });
 
-        metricKeys.forEach(function(metric) {
-          const ctrl = metricControls[metric];
-          const counts = binCounts[metric];
-          // Rescale to the current view's own tallest bar, not the original
-          // full-dataset one — otherwise every bar reads near-flat once a
-          // filter has narrowed the set well below the original max.
-          const maxCount = Math.max(1, counts.reduce(function(m, c) { return c > m ? c : m; }, 0));
-          ctrl.bars.forEach(function(bar, i) {
-            const count = counts[i] || 0;
-            const height = maxCount ? Math.max(2, (count / maxCount) * 100) : 2;
-            bar.style.height = height + '%';
-            const start = parseFloat(bar.dataset.start);
-            const end = parseFloat(bar.dataset.end);
-            const rangeLabel = formatWithSummary(ctrl.summary, start) + ' – ' + formatWithSummary(ctrl.summary, end);
-            const countLabel = ' (' + count.toLocaleString() + ')';
-            bar.title = ctrl.useLog ? rangeLabel + countLabel + ' [log bin]' : rangeLabel + countLabel;
-          });
-        });
+        metrics.keys.forEach(function(k) { metrics.setBarCounts(k, binCounts[k]); });
 
         const hideEmptyBlocks = showEmptyBlocksChk ? !showEmptyBlocksChk.checked : true;
         Object.keys(index.blocks).forEach(function(blockId) {
@@ -1490,13 +1106,13 @@ export function startWiring(ctx) {
           housingChips.forEach(function(chip) { chip.setAttribute('aria-pressed', 'false'); });
           if (onlyIssuesChk) onlyIssuesChk.checked = false;
           if (onlyUnitsChk) onlyUnitsChk.checked = false;
-          metricKeys.forEach(function(metric) {
-            if (metricSection[metric] === 'building') resetMetric(metric);
+          metrics.keys.forEach(function(metric) {
+            if (metrics.controls[metric].section === 'building') metrics.reset(metric);
           });
         },
         value: function() {
-          metricKeys.forEach(function(metric) {
-            if (metricSection[metric] === 'value') resetMetric(metric);
+          metrics.keys.forEach(function(metric) {
+            if (metrics.controls[metric].section === 'value') metrics.reset(metric);
           });
         },
       };
@@ -1599,7 +1215,7 @@ export function startWiring(ctx) {
               cb.dispatchEvent(new Event('change', { bubbles: true }));
             }
           });
-          metricKeys.forEach(resetMetric);
+          metrics.keys.forEach(metrics.reset);
           applyFilters();
           updateLegendVisibility();
         });
@@ -1655,7 +1271,7 @@ export function startWiring(ctx) {
         exportVisibleBtn.addEventListener('click', exportVisibleBuildingsCsv);
       }
 
-      metricKeys.forEach(updateMetricLabels);
+      metrics.updateAllLabels();
       updateLegendVisibility();
       applyFilters();
     } catch (e) {
