@@ -1,7 +1,7 @@
 /**
  * Block choropleth and popup, ported from layout.py (add_blocks_layer) and
- * colors.py (greens_color). This is the initial paint only: wiring.js's
- * recomputeBlockColorScale() repaints every block against the visible
+ * colors.py (greens_color). This is the initial paint only: wiring/block-style.ts's
+ * recomputeScale() repaints every block against the visible
  * blocks' own range as soon as it starts.
  */
 import type { PathOptions } from 'leaflet';

@@ -10,7 +10,7 @@ import { vi } from 'vitest';
 import { buildOptions, initLandlordPicker, type LandlordFilter } from '../landlord-picker';
 import { renderLegend } from '../legend';
 import { renderTables } from '../tables';
-import { startWiring } from '../wiring.js';
+import { startWiring } from './index';
 import { FIXTURE_BLOCKS, FIXTURE_BUILDING_DATA, FIXTURE_FILTER_CONFIG, FIXTURE_MARKERS } from './fixture';
 
 export const HIGHLIGHT = '#ff1744';
@@ -164,14 +164,9 @@ export function startHarness(): Harness {
     landlordFilter: landlords,
     onFilter: (visible: Set<string>) => { seen.visible = new Set(visible); },
   } as unknown as Parameters<typeof startWiring>[0]);
-  // The old wiring.js waits for 'load' unless the document is already complete; harmless afterwards.
-  window.dispatchEvent(new Event('load'));
   flushFrames();
   if (!seen.visible || document.getElementById('summary-buildings-label')?.textContent !== 'Totals (visible)') {
-    throw new Error(
-      'wiring did not finish starting up. The old wireUp() swallows its own errors and retries: ' +
-      'temporarily log `e` in its catch block to see why (usually a fake here is missing a method).',
-    );
+    throw new Error('wiring did not finish starting up');
   }
 
   const metricControl = (i: number): Element => {

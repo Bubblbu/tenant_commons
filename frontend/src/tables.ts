@@ -1,11 +1,11 @@
 /**
  * Sidebar table rows, ported from sica_mapping/data/tables.py. Attributes,
- * columns, sort keys and rounding follow the Python, because wiring.js reads
+ * columns, sort keys and rounding follow the Python, because wiring/ reads
  * these rows as its filter model: data-* attributes, fixed column indices
- * (wiring.js cacheRowCells) and .row-select checkboxes. Known cosmetic
+ * (wiring/tables-live.ts cacheRowCells) and .row-select checkboxes. Known cosmetic
  * differences, neither affecting sorting or filtering: numeric sort values
  * render as JS numbers (15, not Python's 15.0), and tied rows may order
- * differently. Must render before wiring.js starts; it queries the rows once.
+ * differently. Must render before startWiring(); it queries the rows once.
  */
 import { formatAddress } from './address';
 import { escapeHtml, isMissing, roundHalfEven, sameName } from './html';
@@ -35,7 +35,7 @@ function descMissingLast(a: number | null, b: number | null): number {
  */
 const notOnRecord = (key: unknown): boolean => isMissing(key) || key === 'unknown';
 
-/** Rows in their current order, with data-pin="last" rows moved to the end (wiring.js sorting). */
+/** Rows in their current order, with data-pin="last" rows moved to the end (wiring sorting). */
 export function pinLast<T extends { getAttribute(name: string): string | null }>(rows: T[]): T[] {
   const pinned = (r: T) => r.getAttribute('data-pin') === 'last';
   return [...rows.filter((r) => !pinned(r)), ...rows.filter(pinned)];
@@ -159,7 +159,7 @@ interface Group {
  * Group by key (count address, sum units), then sort by units, buildings desc.
  * One row per key: spellings of the same key ("Chartwell Construction Ltd" /
  * "CHARTWELL CONSTRUCTION LTD.") merge, labelled by the commonest spelling
- * (ties: code-point order), since wiring.js indexes markers by key alone.
+ * (ties: code-point order), since wiring/indexes.ts indexes markers by key alone.
  */
 function aggregate(records: BuildingRecord[], labelOf: (r: BuildingRecord) => string, keyOf: (r: BuildingRecord) => string): Group[] {
   const groups = new Map<string, Group & { labels: Map<string, number> }>();

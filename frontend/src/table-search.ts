@@ -1,9 +1,9 @@
 /**
  * Sidebar table search: hides rows whose visible text doesn't contain every
  * search term. View-only — it never touches the map or the filter panel, and
- * uses its own `search-hidden` class so it composes with wiring.js's `hidden`
+ * uses its own `search-hidden` class so it composes with wiring's `hidden`
  * (filter) class instead of fighting over it. Fires `tablesearch` on the
- * document afterwards so wiring.js can refresh the footer totals.
+ * document afterwards so wiring can refresh the footer totals.
  */
 
 /** Whitespace-separated, lowercased terms; empty query → no terms. */

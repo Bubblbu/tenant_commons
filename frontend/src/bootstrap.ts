@@ -1,7 +1,7 @@
 /**
  * Entry point: load the artifacts once, build the map, render the sidebar
- * rows and legend, then hand everything to wiring.js. Order matters —
- * wiring.js queries the table rows and neighbourhood filter inputs once, so
+ * rows and legend, then hand everything to wiring. Order matters —
+ * wiring queries the table rows and neighbourhood filter inputs once, so
  * those render first.
  */
 import 'leaflet/dist/leaflet.css';
@@ -35,7 +35,7 @@ import { initClearButton } from './search-clear';
 import { initTableSearch } from './table-search';
 import { renderTables } from './tables';
 import { initViewToggle } from './view-toggle';
-import { startWiring } from './wiring.js';
+import { startWiring } from './wiring';
 
 function showLoadError(err: unknown): void {
   console.error('Failed to initialise the map', err);

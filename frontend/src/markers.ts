@@ -2,7 +2,7 @@
  * Marker styling, ported from sica_mapping/frontend/layout.py
  * (marker_radius, add_buildings_layers). Presentation, so it lives here: the
  * artifacts carry the data (units, housing_type), not the styling.
- * Field names match what wiring.js's applyMarkerMetadata() reads.
+ * Field names match what wiring/indexes.ts's buildMapIndex() reads.
  */
 import type { MarkerRecord } from './types';
 import { MAP_THEME } from './wiring/map-theme';

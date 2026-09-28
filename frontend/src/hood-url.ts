@@ -4,7 +4,7 @@
  * no param means none ticked, which shows every area (the default). Older
  * links used a lone empty `hood=` for "none"; with nothing ticked now meaning
  * everything, it reads as the default. Must run after renderLegend() and
- * before wiring.js starts, so wiring's first applyFilters() pass sees the
+ * before startWiring() runs, so wiring's first applyFilters() pass sees the
  * restored state.
  */
 
@@ -47,7 +47,7 @@ export function initHoodUrlSync(doc: Document = document, win: Window = window):
   };
   doc.getElementById('filter-neighbourhoods')?.addEventListener('change', sync);
   // Area Clear and Reset set .checked directly, which fires no change
-  // event; their click handlers (wiring.js) run before this deferred sync.
+  // event; their click handlers (wiring) run before this deferred sync.
   for (const id of ['filter-clear-area', 'filter-reset']) {
     doc.getElementById(id)?.addEventListener('click', () => setTimeout(sync));
   }
