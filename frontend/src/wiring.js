@@ -1,5 +1,6 @@
 import { initPaneResize as initPaneGutters } from './pane-resize';
 import { pinLast } from './tables';
+import { MAP_THEME } from './wiring/map-theme';
 
 export function startWiring(ctx) {
   let filterConfig = {};
@@ -46,8 +47,8 @@ export function startWiring(ctx) {
       // of blurring into solid blobs at dense blocks (option 1). Per-marker
       // overrides (housing-type rings) fall back to these via
       // marker._strokeColor/_strokeWeight, set in applyMarkerMetadata().
-      const MARKER_STROKE_COLOR = '#ffffff';
-      const MARKER_STROKE_WEIGHT = 0.6;
+      const MARKER_STROKE_COLOR = MAP_THEME.marker.stroke;
+      const MARKER_STROKE_WEIGHT = MAP_THEME.marker.strokeWeight;
       let currentZoomScale = 1;
       let blockColorScalingEnabled = true;
       let blockColorMin = 0;
@@ -84,9 +85,9 @@ export function startWiring(ctx) {
         if (buildingCount <= 0) {
           // Empty blocks (no buildings) carry no meaningful data — leave them
           // transparent rather than painting them into the color scale.
-          base = { weight:1, color:'#b8b8b8', fillOpacity:0, fillColor:'transparent' };
+          base = { weight:1, color:MAP_THEME.block.stroke, fillOpacity:0, fillColor:'transparent' };
         } else if (!blockColorScalingEnabled || blockColorMax <= 0) {
-          base = { weight:1, color:'#b8b8b8', fillOpacity:0.35, fillColor:'#f0f0f0' };
+          base = { weight:1, color:MAP_THEME.block.stroke, fillOpacity:0.35, fillColor:MAP_THEME.block.unscaledFill };
         } else {
           // Scale relative to the currently-visible blocks' own min/max (set by
           // recomputeBlockColorScale()), not fixed dataset-wide bounds — so
@@ -95,12 +96,12 @@ export function startWiring(ctx) {
           // everything bunched at the low end of a city-wide scale.
           const span = blockColorMax - blockColorMin;
           const ratio = span > 0 ? Math.max(0, Math.min(1, (units - blockColorMin) / span)) : 1;
-          const fill = (ratio <= 0.10) ? '#c7e9c0' :
-                       (ratio <= 0.25) ? '#a1d99b' :
-                       (ratio <= 0.50) ? '#74c476' :
-                       (ratio <= 0.75) ? '#41ab5d' :
-                       (ratio <  1.00) ? '#238b45' : '#005a32';
-          base = { weight:1, color:'#b8b8b8', fillOpacity:0.7, fillColor:fill };
+          const fill = (ratio <= 0.10) ? MAP_THEME.block.scale[0] :
+                       (ratio <= 0.25) ? MAP_THEME.block.scale[1] :
+                       (ratio <= 0.50) ? MAP_THEME.block.scale[2] :
+                       (ratio <= 0.75) ? MAP_THEME.block.scale[3] :
+                       (ratio <  1.00) ? MAP_THEME.block.scale[4] : MAP_THEME.block.scale[5];
+          base = { weight:1, color:MAP_THEME.block.stroke, fillOpacity:0.7, fillColor:fill };
         }
         layer._baseStyle = base;
         layer.setStyle(base);
@@ -172,7 +173,7 @@ export function startWiring(ctx) {
           // Fully hidden, matching setMarkerVisibility()'s treatment of filtered
           // buildings (weight:0/fillOpacity:0) rather than just dimming to a
           // faint grey outline.
-          layer.setStyle({ weight:0, color:null, fillOpacity:0, fillColor:'#f5f5f5' });
+          layer.setStyle({ weight:0, color:null, fillOpacity:0, fillColor:MAP_THEME.block.filteredFill });
         } else {
           resetBlockStyle(layer);
         }
@@ -185,10 +186,10 @@ export function startWiring(ctx) {
         if (on) {
           var base = layer._baseStyle || {};
           layer.setStyle({
-            weight:4,
-            color:'#ff1744',
+            weight: MAP_THEME.highlight.blockWeight,
+            color: MAP_THEME.highlight.color,
             fillOpacity: Math.min(0.9, (base.fillOpacity || 0.35) + 0.1),
-            fillColor: base.fillColor || (layer.options && layer.options.fillColor) || '#c7e9c0'
+            fillColor: base.fillColor || (layer.options && layer.options.fillColor) || MAP_THEME.block.scale[0]
           });
         } else {
           resetBlockStyle(layer);
@@ -199,7 +200,7 @@ export function startWiring(ctx) {
         if (!marker) return;
         const opts = marker.options || {};
         if (marker._baseColor === undefined || marker._baseColor === null) {
-          marker._baseColor = opts.base_color !== undefined ? opts.base_color : (opts.fillColor || '#9e9e9e');
+          marker._baseColor = opts.base_color !== undefined ? opts.base_color : (opts.fillColor || MAP_THEME.marker.fill);
         }
         if (marker._baseOpacity === undefined || marker._baseOpacity === null) {
           if (opts.base_opacity !== undefined && opts.base_opacity !== null) {
@@ -296,11 +297,11 @@ export function startWiring(ctx) {
         scheduleRestack();
         var baseOpacity = marker._baseOpacity || 0.35;
         var baseRadius = getScaledRadius(marker);
-        var baseColor = marker._baseColor || (marker.options && marker.options.fillColor) || '#9e9e9e';
+        var baseColor = marker._baseColor || (marker.options && marker.options.fillColor) || MAP_THEME.marker.fill;
         if (typeof marker.setStyle === 'function') {
           marker.setStyle(on ? {
-            weight:2,
-            color:'#ff1744',
+            weight: MAP_THEME.highlight.markerWeight,
+            color: MAP_THEME.highlight.color,
             fillOpacity: Math.min(0.95, baseOpacity + 0.20),
             fillColor: baseColor
           } : {
@@ -445,7 +446,7 @@ export function startWiring(ctx) {
           var key = String(meta.b_id);
           window.buildingIndex[key] = marker;
 
-          marker._baseColor = (typeof meta.base_color === 'string' && meta.base_color) || marker._baseColor || (marker.options && marker.options.fillColor) || '#9e9e9e';
+          marker._baseColor = (typeof meta.base_color === 'string' && meta.base_color) || marker._baseColor || (marker.options && marker.options.fillColor) || MAP_THEME.marker.fill;
           marker._baseOpacity = (typeof meta.base_opacity === 'number') ? meta.base_opacity : (marker._baseOpacity || (marker.options && marker.options.fillOpacity) || 0.35);
           marker._baseRadius = (typeof meta.base_radius === 'number') ? meta.base_radius : (marker._baseRadius || (marker.options && marker.options.radius) || 6);
           marker._selectionRefs = 0;
@@ -1251,7 +1252,7 @@ export function startWiring(ctx) {
               weight: effectiveStrokeWeight(marker),
               color: effectiveStrokeColor(marker),
               fillOpacity: baseOpacity,
-              fillColor: marker._baseColor || (marker.options && marker.options.fillColor) || '#9e9e9e'
+              fillColor: marker._baseColor || (marker.options && marker.options.fillColor) || MAP_THEME.marker.fill
             });
           }
           if ((marker._selectionRefs || 0) > 0) {

@@ -7,15 +7,16 @@
 import type { PathOptions } from 'leaflet';
 import { escapeHtml, groupThousands, isMissing, roundHalfEven } from './html';
 import type { BlockProperties, BlocksCollection } from './types';
+import { MAP_THEME } from './wiring/map-theme';
 
 export function greensColor(s: number | null | undefined): string {
   const v = s === null || s === undefined ? 0 : Math.max(0, Math.min(Number(s), 1));
-  if (v <= 0.1) return '#c7e9c0';
-  if (v <= 0.25) return '#a1d99b';
-  if (v <= 0.5) return '#74c476';
-  if (v <= 0.75) return '#41ab5d';
-  if (v < 1.0) return '#238b45';
-  return '#005a32';
+  if (v <= 0.1) return MAP_THEME.block.scale[0];
+  if (v <= 0.25) return MAP_THEME.block.scale[1];
+  if (v <= 0.5) return MAP_THEME.block.scale[2];
+  if (v <= 0.75) return MAP_THEME.block.scale[3];
+  if (v < 1.0) return MAP_THEME.block.scale[4];
+  return MAP_THEME.block.scale[5];
 }
 
 export function maxTotalUnits(fc: BlocksCollection): number {
@@ -31,11 +32,11 @@ export function blockStyle(props: Partial<BlockProperties> | undefined, maxUnits
   const buildings = Math.trunc(Number(props?.buildings ?? 0)) || 0;
   if (buildings <= 0) {
     // Empty blocks carry no data: transparent rather than painted into the scale.
-    return { fillColor: 'transparent', color: '#b8b8b8', weight: 1, fillOpacity: 0 };
+    return { fillColor: 'transparent', color: MAP_THEME.block.stroke, weight: 1, fillOpacity: 0 };
   }
   const units = Number(props?.total_units ?? 0) || 0;
   const scaled = maxUnits > 0 ? Math.min(Math.max(units / maxUnits, 0), 1) : 0;
-  return { fillColor: greensColor(scaled), color: '#b8b8b8', weight: 1, fillOpacity: 0.7 };
+  return { fillColor: greensColor(scaled), color: MAP_THEME.block.stroke, weight: 1, fillOpacity: 0.7 };
 }
 
 const POPUP_FIELDS: [keyof BlockProperties, string][] = [
