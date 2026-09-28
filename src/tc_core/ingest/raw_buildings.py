@@ -58,6 +58,8 @@ RAW_BUILDINGS_COLUMNS = [
     "pid",
     "folio",
     "units",
+    "building_source",
+    "source_licences",
     "year_built",
     "bsns_group",
     "bsns_name",

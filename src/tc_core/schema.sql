@@ -28,6 +28,8 @@ CREATE TABLE raw_buildings (
     pid TEXT,                  -- semicolon-joined list when a building spans multiple PIDs
     folio TEXT,                -- semicolon-joined list, same reason
     units INTEGER,
+    building_source TEXT,      -- which City list it came from: rental inventory / non-market housing list / rental licence
+    source_licences TEXT,      -- rental licence rows: ";"-joined City licence numbers (licencenumber, year = bsns_year)
     year_built INTEGER,
     bsns_group TEXT,
     bsns_name TEXT,
@@ -205,6 +207,7 @@ CREATE TABLE buildings (
     lat REAL,
     lon REAL,
     units INTEGER,
+    building_source TEXT,  -- rental inventory / non-market housing list / rental licence (see raw_buildings)
     year_built INTEGER,
     value_land NUMERIC,
     value_bldg NUMERIC,

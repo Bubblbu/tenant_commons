@@ -92,7 +92,8 @@ def reconstruct_points(
 
     merged = merged[
         [
-            "addr_key", "address", "lat", "lon", "units", "year_built", "n_issues", "issues_details",
+            "addr_key", "address", "lat", "lon", "units", "building_source", "year_built", "n_issues",
+            "issues_details",
             "member_count", "has_vtu_member", "member_share_building",
             "owner_name", "owner_key", "owner_source", "registered_owners", "registry_pids",
             "registry_retrieved", "licence_holder", "managed_by", "network_key", "network_name",
@@ -804,7 +805,7 @@ def _marker_records(points_df: pd.DataFrame) -> list[dict]:
 # claim provenance is public only as source-type counts, never notes.
 BUILDING_RECORD_COLUMNS = [
     "b_id", "address", "building_name", "other_names", "local_area", "block_id", "units",
-    "year_built", "owner_name", "owner_key", "owner_source",
+    "building_source", "year_built", "owner_name", "owner_key", "owner_source",
     "registered_owners", "registry_pids", "registry_retrieved", "licence_holder", "managed_by",
     "network_key", "network_name", "network_source", "network_name_source",
     "network_entities", "network_buildings_on_map", "network_properties_on_title",

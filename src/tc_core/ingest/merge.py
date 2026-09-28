@@ -231,12 +231,19 @@ def _join_buildings_addresses(west: pd.DataFrame, addr_df: pd.DataFrame) -> pd.D
     return joined
 
 
+BUILDING_SOURCE_ORDER = ("rental inventory", "non-market housing list", "rental licence")
+
 def _deduplicate_buildings(df: pd.DataFrame, owner_col: str) -> pd.DataFrame:
     def dedup_group(g: pd.DataFrame) -> pd.Series:
         addr = g["address"].mode().iloc[0] if not g["address"].mode().empty else g["address"].iloc[0]
         lat = g["lat"].dropna().iloc[0] if not g["lat"].dropna().empty else None
         lon = g["lon"].dropna().iloc[0] if not g["lon"].dropna().empty else None
         units = g["units"].max()
+        # A City list beats a licence: "rental licence" only when no source row is listed.
+        sources = set(g["building_source"].dropna()) if "building_source" in g.columns else set()
+        building_source = next(
+            (s for s in BUILDING_SOURCE_ORDER if s in sources), None
+        )
         yb = g["year_built"].median()
         n_issues = g["n_issues"].max() if "n_issues" in g.columns else np.nan
         # The City's rental-standards detail page for whichever row
@@ -285,6 +292,7 @@ def _deduplicate_buildings(df: pd.DataFrame, owner_col: str) -> pd.DataFrame:
                 "lat": lat,
                 "lon": lon,
                 "units": None if pd.isna(units) else float(units),
+                "building_source": building_source,
                 "year_built": None if pd.isna(yb) else float(yb),
                 "n_issues": None if pd.isna(n_issues) else float(n_issues),
                 "issues_details": issues_details,
@@ -386,6 +394,7 @@ def write_buildings(
                 row["lat"],
                 row["lon"],
                 row["units"],
+                row.get("building_source"),
                 row["year_built"],
                 row["value_land"],
                 row["value_bldg"],
@@ -403,10 +412,10 @@ def write_buildings(
         conn.executemany(
             """
             INSERT INTO buildings (
-                addr_key, address, local_area, lat, lon, units, year_built,
+                addr_key, address, local_area, lat, lon, units, building_source, year_built,
                 value_land, value_bldg, bldg_land_ratio, n_issues, issues_details,
                 landlord_id, block_id, source_row_ids, created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             rows,
         )

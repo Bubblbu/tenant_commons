@@ -133,6 +133,32 @@ the raw CSVs.
     in `raw_buildings.py`'s column list as always-null rather than removed.
   - Address keying used to go through `prepare/address.py`'s `clean_address`, which rewrote any word starting with ` str` (e.g. `strathcona` became `stathcona`) via an unguarded substring replace. That module is retired (2026-09) in favor of `tc_core.normalize.addr_key_from_freeform`, used uniformly by `prepare/`, `ingest/`, and membership matching alike — its word-boundary-safe replacement doesn't corrupt `strathcona`, and it keeps punctuation `clean_address` used to strip (apostrophes, hyphens: `lamey's mill rd`, not `lameys mill rd`), while still stripping a trailing `*` footnote marker the FOI rental list uses on some addresses.
   - `bsns_year`: the business-licence `folderyear` this build used, as a four-digit year (the City publishes two digits). Dataset-level — the same on every row. The export publishes it as `filter_config.licence_year` for the popup's licence provenance.
+  - **Licence-only buildings (2026-09-27).** Rows used to come only from the FOI
+    rental inventory and the non-market housing list, with licences attached
+    afterwards, so a licensed rental building missing from the inventory never
+    reached the map (mostly buildings finished since the inventory was compiled).
+    `prepare/buildings.py::licence_only_rentals()` now adds current Long-term
+    Rental licences as buildings when their fees pay for at least 5 dwelling units
+    (summed per address) or they are non-profit housing, and no inventory building
+    is on the same address, the same parcel, or within 20 civic numbers on the same
+    street with the same unit count. `LICENCE_ONLY_EXCLUDED` keeps out non-tenancy
+    cases (serviced suites, a retirement residence, hostels). 253 buildings in the
+    2026 data: 204 with ~10,800 licensed units, the rest non-profit (no count in the fee).
+  - `building_source`: which City list the building came from — `rental inventory`
+    (FOI), `non-market housing list`, or `rental licence` (the licence-only rows
+    above). Carried to `buildings.building_source` and the building records; when
+    several source rows merge into one building, a City list wins over a licence.
+    For `rental licence` rows, `units` is read from the fee by
+    `prepare/licence_fees.py::decode_fee` (rates from the Licence By-law, see
+    `data/raw/cov_bylaws/MANIFEST.md`) and the popup says "licensed units" —
+    except on SROs, where the ingest's SRO fill-in may have set `units` to the
+    registry's room count.
+  - `source_licences` (rental licence rows only): the `;`-joined City licence
+    numbers (`licencenumber`) behind the row, for `bsns_year`'s folderyear.
+    Licence numbers change every year, so they identify rows in the
+    `business-licences.geojson` fetched on the date in
+    `raw/cov_open_data/MANIFEST.md`. Kept in `raw_buildings`; a building reaches it
+    through `buildings.source_row_ids`.
 - **Output location:** `data/derived/buildings.csv`.
 - **Consumed by:** `tc_core` (`ingest/raw_buildings.py`).
 - **Refresh cadence:** rebuilt by `prepare_data.py` after each fetch. Last

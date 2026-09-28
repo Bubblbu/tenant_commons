@@ -14,17 +14,115 @@ the retired Google Sheets push); that history stays in the archive.
 
 from __future__ import annotations
 
+import pandas as pd
 import polars as pl
 import polars.selectors as cs
 
 from ..paths import DataPaths
 from ..normalize import addr_key_from_freeform
 from .io import load_polars
+from .licence_fees import decode_fee
 
 BC_versions = {
     "B C": "BC",
     "B.C.": "BC",
 }
+
+# Licensed rentals the rental inventory doesn't list become buildings of their own when the
+# fee pays for at least this many dwelling units (or the licence is for non-profit housing).
+# Smaller licences are mostly one owner renting a suite, a condo or a house.
+LICENCE_ONLY_MIN_UNITS = 5
+
+# Licensed as Long Term Rental but not ordinary tenancies: furnished/serviced suites,
+# retirement residences with care, hostels. Keyed by addr_key; reason kept for the record.
+LICENCE_ONLY_EXCLUDED = {
+    "855 burrard st": "Sutton Place Grande Residences: serviced suites attached to a hotel",
+    "1128 alberni st": "Carmana Plaza: furnished hotel-style suites",
+    "2799 yew st": "Seasons retirement residence",
+    "1515 discovery st": "HI Vancouver Jericho Beach hostel",
+    "1114 burnaby st": "HI Vancouver Downtown hostel",
+}
+
+
+def _civic_and_street(addr: str) -> tuple[int | None, str]:
+    num, _, street = addr.partition(" ")
+    return (int(num) if num.isdigit() else None), street
+
+
+def licence_only_rentals(
+    licences: pl.DataFrame, rental_units: dict[str, float | None], props: pl.DataFrame
+) -> pl.DataFrame:
+    """Current rental licences with no building in the rental inventory, as rental rows.
+
+    `licences` needs address, feepaid, issueddate, status, bsns_subtype, licencenumber; `rental_units` maps
+    each inventory address to its unit count. A licence counts as already on the map when its
+    address, or any address on the same parcel (same primary_address in `props`), is an
+    inventory address, or when an inventory building on the same street within 20 civic
+    numbers has exactly the licensed unit count (one building on two parcels, e.g. 89 and
+    97 W Georgia St). Units are the dwelling units its fee pays for (only readings without
+    rooms, which are unambiguous); non-profit licences pay a flat fee and carry no unit count.
+    Every row is marked building_source="rental licence", with the numbers of all current
+    licences at its address in source_licences, so it can be traced back to the City's data.
+    """
+    primary_of = dict(props.select("address", "primary_address").unique("address").iter_rows())
+    covered_parcels = {primary_of.get(a, a) for a in rental_units}
+    units_by_street: dict[str, list[tuple[int, float]]] = {}
+    for a, u in rental_units.items():
+        num, street = _civic_and_street(a)
+        if num is not None and u is not None:
+            units_by_street.setdefault(street, []).append((num, u))
+
+    def same_building_nearby(addr: str, units: int) -> bool:
+        num, street = _civic_and_street(addr)
+        return num is not None and any(
+            abs(n - num) <= 20 and u == units for n, u in units_by_street.get(street, [])
+        )
+
+    rows = []
+    cols = ("address", "feepaid", "issueddate", "status", "bsns_subtype", "licencenumber")
+    for r in licences.select(cols).iter_rows(named=True):
+        if not r["address"]:
+            continue
+        issued = pd.to_datetime(r["issueddate"], errors="coerce", utc=True)
+        d = decode_fee(r["feepaid"], issued, r["status"], r["bsns_subtype"])
+        rows.append({
+            "address": r["address"],
+            "dwelling_units": d.get("dwelling_units", 0) if d.get("fee_certain") else 0,
+            "non_profit": bool(d.get("non_profit")),
+            "licencenumber": r["licencenumber"],
+        })
+    if not rows:
+        return pl.DataFrame(schema={"address": pl.Utf8, "units": pl.Int64, "building_source": pl.Utf8,
+                                    "source_licences": pl.Utf8})
+    per_address = (
+        pl.DataFrame(rows)
+        .group_by("address")
+        .agg(
+            pl.col("dwelling_units").sum(),
+            pl.col("non_profit").any(),
+            source_licences=pl.col("licencenumber").drop_nulls().unique().sort().str.join(";"),
+        )
+        .filter((pl.col("dwelling_units") >= LICENCE_ONLY_MIN_UNITS) | pl.col("non_profit"))
+    )
+    known = set(primary_of)
+    keep = [
+        a for a, units in per_address.select("address", "dwelling_units").iter_rows()
+        if a in known
+        and a not in rental_units
+        and primary_of.get(a, a) not in covered_parcels
+        and not same_building_nearby(a, units)
+        and a not in LICENCE_ONLY_EXCLUDED
+    ]
+    return (
+        per_address.filter(pl.col("address").is_in(keep))
+        .select(
+            "address",
+            units=pl.when(pl.col("dwelling_units") > 0).then(pl.col("dwelling_units")).cast(pl.Int64),
+            building_source=pl.lit("rental licence"),
+            source_licences="source_licences",
+        )
+        .sort("address")
+    )
 
 
 def attach_licences(housing: pl.DataFrame, bsns_by_address: pl.DataFrame) -> pl.DataFrame:
@@ -115,7 +213,7 @@ def run(paths: DataPaths) -> None:
     nm_rentals = nm_rentals.sort("occupancy_year").unique(subset="address", keep="last")
     print("nm_rentals:", nm_rentals.shape)
 
-    rentals = rentals.join(
+    rentals = rentals.with_columns(_in_inventory=pl.lit(True)).join(
         nm_rentals.select("address", "name", "occupancy_year", "management", "units"),
         on="address",
         how="full",
@@ -124,45 +222,16 @@ def run(paths: DataPaths) -> None:
         units=pl.when(pl.col("units").is_null())
         .then(pl.col("units_right"))
         .otherwise(pl.col("units")),
+        # Which City list the building came from (licence-only rows below get "rental licence").
+        building_source=pl.when(pl.col("_in_inventory"))
+        .then(pl.lit("rental inventory"))
+        .otherwise(pl.lit("non-market housing list")),
         year_built=pl.when(pl.col("year_built").is_null())
         .then(pl.col("occupancy_year"))
         .otherwise(pl.col("year_built")),
     )
+    rentals = rentals.drop("_in_inventory")
     print("rentals + non-market:", rentals.shape)
-
-    # --- Join with property information ---
-    # NOTE: reconstructs the notebook's undefined `addresses` reference (history
-    # is in the archived vhd scripts) using `props` with geo_local_area -> local_area.
-    addresses_for_join = props.rename({"geo_local_area": "local_area"})
-    housing = (
-        rentals.drop("units_right", "occupancy_year")
-        .join(addresses_for_join, on="address", how="inner")
-        .with_columns(
-            local_area=pl.when(pl.col("local_area").is_null())
-            .then(pl.col("local_area_right"))
-            .otherwise(pl.col("local_area")),
-        )
-        .drop("local_area_right")
-    )
-    print("housing (after property join):", housing.shape)
-
-    # --- Ongoing rental-standards issues ---
-    issues = load_polars(rental_standards_issues_f)
-    issues = issues.with_columns(
-        address=pl.concat_str(
-            pl.col("streetnumber"), pl.lit(" "), pl.col("street")
-        ).map_elements(addr_key_from_freeform, return_dtype=pl.Utf8)
-    )
-    housing = housing.join(
-        issues.select(
-            "address",
-            pl.col("totaloutstanding").alias("n_issues"),
-            pl.col("detailurl").alias("issues_details"),
-        ),
-        on="address",
-        how="left",
-    )
-    print("housing (after issues join):", housing.shape)
 
     # --- Businesses ---
     # bsns_group is the licensee as filed. It used to be renamed through
@@ -201,6 +270,48 @@ def run(paths: DataPaths) -> None:
     businesses = businesses.filter(pl.col("bsns_type") == "Long-term Rental")
     businesses = businesses.filter(pl.col("status").is_in(["Issued", "Pending"]))
     print("businesses (housing-related, active licences):", businesses.shape)
+
+    # --- Licensed rentals the inventory doesn't list ---
+    licence_only = licence_only_rentals(
+        businesses, dict(rentals.select("address", "units").drop_nulls("address").iter_rows()), props
+    )
+    print(f"licence-only rentals added: {licence_only.height} "
+          f"({int(licence_only['units'].sum() or 0)} units from licence fees)")
+    rentals = pl.concat([rentals, licence_only], how="diagonal_relaxed")
+
+    # --- Join with property information ---
+    # NOTE: reconstructs the notebook's undefined `addresses` reference (history
+    # is in the archived vhd scripts) using `props` with geo_local_area -> local_area.
+    addresses_for_join = props.rename({"geo_local_area": "local_area"})
+    housing = (
+        rentals.drop("units_right", "occupancy_year")
+        .join(addresses_for_join, on="address", how="inner")
+        .with_columns(
+            local_area=pl.when(pl.col("local_area").is_null())
+            .then(pl.col("local_area_right"))
+            .otherwise(pl.col("local_area")),
+        )
+        .drop("local_area_right")
+    )
+    print("housing (after property join):", housing.shape)
+
+    # --- Ongoing rental-standards issues ---
+    issues = load_polars(rental_standards_issues_f)
+    issues = issues.with_columns(
+        address=pl.concat_str(
+            pl.col("streetnumber"), pl.lit(" "), pl.col("street")
+        ).map_elements(addr_key_from_freeform, return_dtype=pl.Utf8)
+    )
+    housing = housing.join(
+        issues.select(
+            "address",
+            pl.col("totaloutstanding").alias("n_issues"),
+            pl.col("detailurl").alias("issues_details"),
+        ),
+        on="address",
+        how="left",
+    )
+    print("housing (after issues join):", housing.shape)
 
     # --- Per-building index WITH landlord attribution (buildings.csv) ---
     # (History of this step lives in the archived vhd scripts.)
@@ -256,6 +367,8 @@ def run(paths: DataPaths) -> None:
         "pid",
         "folio",
         "units",
+        "building_source",
+        "source_licences",
         "year_built",
         "zoning",
         "zoning_district",

@@ -31,6 +31,15 @@ describe('renderPopup', () => {
     expect(html).toContain('Assessed $20.1M land · $950K building');
   });
 
+  it('says when the building (and its unit count) comes from the City\'s rental licences', () => {
+    expect(renderPopup({ ...building, units: 316, building_source: 'rental licence' }))
+      .toContain('316 licensed units · built 1974');
+    expect(renderPopup({ ...building, building_source: 'rental inventory' })).toContain('87 units · built 1974');
+    // an SRO's count may be the registry's rooms, not the fee
+    expect(renderPopup({ ...building, units: 21, building_source: 'rental licence', is_sro: true }))
+      .toContain('21 units · built 1974');
+  });
+
   it('carries no membership data (editorial choice, spec §7)', () => {
     // "VTU research" provenance is about ownership claims, not membership.
     expect(renderPopup(building)).not.toMatch(/member/i);

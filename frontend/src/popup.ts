@@ -96,8 +96,12 @@ export function renderPopup(r: BuildingRecord, ctx: PopupContext = {}): string {
   const facts: string[] = [];
   const units = num(r.units);
   const year = num(r.year_built);
+  // Buildings added from the City's rental licences take their count from the licence fee,
+  // except SROs, whose count may be the SRO registry's rooms (overlay fill-in).
+  const fromLicence = str(r.building_source) === 'rental licence' && r.is_sro !== true;
+  const unitsWord = fromLicence ? 'licensed units' : 'units';
   const sizeLine = [
-    units === null ? '' : `${Math.trunc(units).toLocaleString('en-US')} units`,
+    units === null ? '' : `${Math.trunc(units).toLocaleString('en-US')} ${unitsWord}`,
     year === null ? '' : `built ${Math.trunc(year)}`,
   ].filter(Boolean).join(' · ');
   if (sizeLine) facts.push(div('', escapeHtml(sizeLine)));
