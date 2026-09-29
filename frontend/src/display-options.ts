@@ -17,7 +17,7 @@ export function initDisplayOptions(doc: Document = document): void {
     }
   };
   for (const group of groups) doc.getElementById(group.dataset.parent ?? '')?.addEventListener('change', syncAll);
-  // Deferred so wiring.js's own reset handler has set the checkboxes first.
+  // Deferred so wiring's own reset handler has set the checkboxes first.
   doc.getElementById('filter-reset')?.addEventListener('click', () => setTimeout(syncAll));
   syncAll();
 }

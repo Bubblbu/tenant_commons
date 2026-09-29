@@ -1,17 +1,33 @@
 /**
  * Sidebar table rows, ported from sica_mapping/data/tables.py. Attributes,
- * columns, sort keys and rounding follow the Python, because wiring.js reads
+ * columns, sort keys and rounding follow the Python, because wiring/ reads
  * these rows as its filter model: data-* attributes, fixed column indices
- * (wiring.js cacheRowCells) and .row-select checkboxes. Known cosmetic
+ * (wiring/tables-live.ts cacheRowCells) and .row-select checkboxes. Known cosmetic
  * differences, neither affecting sorting or filtering: numeric sort values
  * render as JS numbers (15, not Python's 15.0), and tied rows may order
- * differently. Must render before wiring.js starts; it queries the rows once.
+ * differently. Must render before startWiring(); it queries the rows once.
  */
 import { formatAddress } from './address';
 import { escapeHtml, isMissing, roundHalfEven, sameName } from './html';
 import { managerKey } from './landlord-picker';
 import { EXPLAINERS, networkProvenance, ownerRowProvenance, provenanceIcon, tipPlacement } from './provenance';
 import type { BlocksCollection, BuildingData, BuildingRecord } from './types';
+
+export interface FilterFields {
+  bid: string;
+  /** lowercased, trimmed local_area */
+  area: string;
+  chinatown: boolean;
+  village: boolean;
+  owner: string;
+  network: string;
+  manager: string;
+  housingTypes: string[];
+  nIssues: number | null;
+  hasOwner: boolean;
+  /** Keyed by a metric summary's attr: 'units', 'year-built', 'value-land', 'value-bldg', 'value-ratio'. */
+  metrics: Record<string, number | null>;
+}
 
 const num = (v: unknown): number | null => (typeof v === 'number' && Number.isFinite(v) ? v : null);
 /** Python int() of a present number, else "". */
@@ -35,7 +51,40 @@ function descMissingLast(a: number | null, b: number | null): number {
  */
 const notOnRecord = (key: unknown): boolean => isMissing(key) || key === 'unknown';
 
-/** Rows in their current order, with data-pin="last" rows moved to the end (wiring.js sorting). */
+const truncOrNull = (v: unknown): number | null => {
+  const n = num(v);
+  return n === null ? null : Math.trunc(n);
+};
+const roundOrNull = (v: unknown, digits = 0): number | null => {
+  const n = num(v);
+  return n === null ? null : roundHalfEven(n, digits);
+};
+const attr = (v: number | null): string => (v === null ? '' : String(v));
+
+/** What the filters read about a building. The row's data-* attributes are rendered from this. */
+export function filterFields(r: BuildingRecord): FilterFields {
+  return {
+    bid: String(Math.trunc(Number(r.b_id))),
+    area: text(r.local_area).toLowerCase().trim(),
+    chinatown: r.in_chinatown === true,
+    village: r.in_village_plan === true,
+    owner: text(r.owner_key),
+    network: text(r.network_key),
+    manager: managerKey(r.managed_by),
+    housingTypes: text(r.housing_type).split(',').map((t) => t.trim()).filter((t) => t !== ''),
+    nIssues: truncOrNull(r.n_issues),
+    hasOwner: !notOnRecord(r.owner_key),
+    metrics: {
+      units: truncOrNull(r.units),
+      'year-built': truncOrNull(r.year_built),
+      'value-land': roundOrNull(r.value_land),
+      'value-bldg': roundOrNull(r.value_bldg),
+      'value-ratio': roundOrNull(r.bldg_land_ratio, 3),
+    },
+  };
+}
+
+/** Rows in their current order, with data-pin="last" rows moved to the end (wiring sorting). */
 export function pinLast<T extends { getAttribute(name: string): string | null }>(rows: T[]): T[] {
   const pinned = (r: T) => r.getAttribute('data-pin') === 'last';
   return [...rows.filter((r) => !pinned(r)), ...rows.filter(pinned)];
@@ -47,20 +96,18 @@ function byCodePoint(a: string, b: string): number {
 }
 
 export function buildingRow(r: BuildingRecord): string {
-  const bid = Math.trunc(Number(r.b_id));
+  const f = filterFields(r);
+  const bid = f.bid;
   const block = intStr(r.block_id);
-  const units = intStr(r.units);
-  const year = intStr(r.year_built);
-  const nIssues = intStr(r.n_issues);
-  const land = num(r.value_land);
-  const bldg = num(r.value_bldg);
-  const ratio = num(r.bldg_land_ratio);
-  const valLand = land === null ? '' : String(roundHalfEven(land));
-  const valBldg = bldg === null ? '' : String(roundHalfEven(bldg));
-  const ratioVal = ratio === null ? '' : String(roundHalfEven(ratio, 3));
+  const units = attr(f.metrics.units);
+  const year = attr(f.metrics['year-built']);
+  const nIssues = attr(f.nIssues);
+  const valLand = attr(f.metrics['value-land']);
+  const valBldg = attr(f.metrics['value-bldg']);
+  const ratioVal = attr(f.metrics['value-ratio']);
   const area = text(r.local_area);
   const housing = text(r.housing_type);
-  const onRecord = !notOnRecord(r.owner_key);
+  const onRecord = f.hasOwner;
   const owner = onRecord ? text(r.owner_name) : '';
   const networkName = onRecord && !notOnRecord(r.network_key) ? text(r.network_name) : '';
   const network = sameName(networkName, owner) ? '' : networkName;
@@ -77,11 +124,11 @@ export function buildingRow(r: BuildingRecord): string {
     .join(' ');
   const a = escapeHtml(area);
   const h = escapeHtml(housing);
-  const chinatown = r.in_chinatown === true ? '1' : '';
-  const village = r.in_village_plan === true ? '1' : '';
+  const chinatown = f.chinatown ? '1' : '';
+  const village = f.village ? '1' : '';
   return (
-    `<tr data-bid="${bid}" data-owner="${escapeHtml(text(r.owner_key))}" ` +
-    `data-network="${escapeHtml(text(r.network_key))}" data-manager="${escapeHtml(managerKey(r.managed_by))}" ` +
+    `<tr data-bid="${bid}" data-owner="${escapeHtml(f.owner)}" ` +
+    `data-network="${escapeHtml(f.network)}" data-manager="${escapeHtml(f.manager)}" ` +
     `data-block="${block}" ` +
     `data-area="${a}" data-chinatown="${chinatown}" data-village="${village}" ` +
     `data-value-land="${valLand}" data-value-bldg="${valBldg}" ` +
@@ -159,7 +206,7 @@ interface Group {
  * Group by key (count address, sum units), then sort by units, buildings desc.
  * One row per key: spellings of the same key ("Chartwell Construction Ltd" /
  * "CHARTWELL CONSTRUCTION LTD.") merge, labelled by the commonest spelling
- * (ties: code-point order), since wiring.js indexes markers by key alone.
+ * (ties: code-point order), since wiring/indexes.ts indexes markers by key alone.
  */
 function aggregate(records: BuildingRecord[], labelOf: (r: BuildingRecord) => string, keyOf: (r: BuildingRecord) => string): Group[] {
   const groups = new Map<string, Group & { labels: Map<string, number> }>();

@@ -8,14 +8,17 @@
  */
 import type { PathOptions } from 'leaflet';
 import { escapeHtml } from './html';
+import { MAP_THEME } from './wiring/map-theme';
 
-export const CHINATOWN_STYLE: PathOptions = { color: '#c0392b', weight: 2, opacity: 0.85, fill: false };
+export const CHINATOWN_STYLE: PathOptions = { color: MAP_THEME.boundary.chinatown, weight: 2, opacity: 0.85, fill: false };
 export const CHINATOWN_LABEL = 'Chinatown';
 
 export function chinatownLabelHtml(name: string): string {
+  const c = MAP_THEME.boundary.chinatown;
+  const halo = MAP_THEME.boundary.labelHalo;
   return (
-    '<div style="color:#c0392b;font-weight:700;font-size:11px;' +
-    'text-shadow:-1px -1px 0 #fff,1px -1px 0 #fff,-1px 1px 0 #fff,1px 1px 0 #fff;' +
+    `<div style="color:${c};font-weight:700;font-size:11px;` +
+    `text-shadow:-1px -1px 0 ${halo},1px -1px 0 ${halo},-1px 1px 0 ${halo},1px 1px 0 ${halo};` +
     'white-space:nowrap;pointer-events:none;">' +
     escapeHtml(name) +
     '</div>'

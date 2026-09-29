@@ -2,16 +2,17 @@
  * Marker styling, ported from sica_mapping/frontend/layout.py
  * (marker_radius, add_buildings_layers). Presentation, so it lives here: the
  * artifacts carry the data (units, housing_type), not the styling.
- * Field names match what wiring.js's applyMarkerMetadata() reads.
+ * Field names match what wiring/indexes.ts's buildMapIndex() reads.
  */
 import type { MarkerRecord } from './types';
+import { MAP_THEME } from './wiring/map-theme';
 
-const NEUTRAL_COLOR = '#9e9e9e';
-const COOP_RING_COLOR = '#d97706';
-const SRO_RING_COLOR = '#3182bd';
-const ISSUES_RING_COLOR = '#dc2626';
+const NEUTRAL_COLOR = MAP_THEME.marker.fill;
+const COOP_RING_COLOR = MAP_THEME.marker.rings.coop;
+const SRO_RING_COLOR = MAP_THEME.marker.rings.sro;
+const ISSUES_RING_COLOR = MAP_THEME.marker.rings.issues;
 const RING_STROKE_WEIGHT = 2.2;
-const DEFAULT_STROKE_COLOR = '#ffffff';
+const DEFAULT_STROKE_COLOR = MAP_THEME.marker.stroke;
 const DEFAULT_STROKE_WEIGHT = 0.6;
 
 /** Extra rings (dual-type buildings): each one this much wider than the last. */

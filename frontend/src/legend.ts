@@ -1,7 +1,7 @@
 /**
  * Neighbourhood filter tags and the block legend, ported from layout.py
  * (legends_html). Fills the containers index.html left empty. Must run
- * before wiring.js starts: it queries .filter-neighbourhood-option once.
+ * before startWiring() runs: it queries .filter-neighbourhood-option once.
  */
 import { LEGEND_LEFT_OFFSET, MOBILE_BREAKPOINT_PX } from './config';
 import { escapeHtml, groupThousands } from './html';
@@ -10,7 +10,7 @@ import type { FilterConfig, NeighbourhoodSummary, SpecialAreaSummary } from './t
 /**
  * Chinatown / Villages Plan Areas: rendered after a separator, in the same
  * checkbox list and with the same `.filter-neighbourhood-option` class as
- * the real neighbourhoods above (so wiring.js's Area Clear and its
+ * the real neighbourhoods above (so wiring's Area Clear and its
  * hoodInputs query pick them up for free) — they're additional area flags a
  * building can carry alongside its local_area, not alternative values of it.
  */
@@ -57,7 +57,7 @@ export function blockLegendMax(fc: FilterConfig): number {
   return Number.isFinite(n) && n > 0 ? n : 0;
 }
 
-/** Six ticks, 0 to max. (Python used banker's rounding; wiring.js repaints these with Math.round at start-up anyway.) */
+/** Six ticks, 0 to max. (Python used banker's rounding; wiring/block-style.ts repaints these with Math.round at start-up anyway.) */
 export function blockTicks(max: number): string[] {
   if (max === 0) return Array(6).fill('0');
   return [0, 0.2, 0.4, 0.6, 0.8, 1].map((f) => groupThousands(f === 1 ? max : Math.round(max * f)));
