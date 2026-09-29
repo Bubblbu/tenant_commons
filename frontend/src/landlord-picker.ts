@@ -136,6 +136,9 @@ export interface LandlordFilter {
   matches(row: RowKeys): boolean;
   /** Removes every tile and the typed text. */
   clear(): void;
+  picked(): PickOption[];
+  /** Replaces the tiles; notifies listeners only if the selection changed. */
+  set(picked: PickOption[]): void;
   onChange(listener: () => void): void;
 }
 
@@ -268,6 +271,13 @@ export function initLandlordPicker(options: PickOption[], els: PickerElements): 
       if (document.activeElement !== input) close();
       renderTiles();
       if (had) changed();
+    },
+    picked: () => [...picked],
+    set(next) {
+      const same = next.length === picked.length && next.every((o, i) => sameOption(o, picked[i]));
+      picked.splice(0, picked.length, ...next);
+      renderTiles();
+      if (!same) changed();
     },
     onChange: (listener) => listeners.push(listener),
   };

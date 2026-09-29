@@ -25,6 +25,8 @@ export interface MetricControls {
   updateLabels(metric: string): void;
   updateAllLabels(): void;
   reset(metric: string): void;
+  /** Moves both handles (null = that end of the range) and updates labels. reset(m) = setRange(m, null, null). */
+  setRange(metric: string, min: number | null, max: number | null): void;
   /** Live histogram: bar heights rescaled to the tallest count, titles updated. */
   setBarCounts(metric: string, counts: number[]): void;
 }
@@ -86,12 +88,16 @@ export function buildMetricControls(filterConfig: FilterConfig, doc: Document, o
   }
 
   // Slider positions are in slider space (log for skewed metrics), not raw values.
-  function reset(metric: string): void {
+  function setRange(metric: string, min: number | null, max: number | null): void {
     const ctrl = controls[metric];
     if (!ctrl) return;
-    ctrl.minSlider.value = String(ctrl.toSlider(ctrl.summary.min));
-    ctrl.maxSlider.value = String(ctrl.toSlider(ctrl.summary.max));
+    ctrl.minSlider.value = String(ctrl.toSlider(min ?? ctrl.summary.min));
+    ctrl.maxSlider.value = String(ctrl.toSlider(max ?? ctrl.summary.max));
     updateLabels(metric);
+  }
+
+  function reset(metric: string): void {
+    setRange(metric, null, null);
   }
 
   function setBarCounts(metric: string, counts: number[]): void {
@@ -287,5 +293,5 @@ export function buildMetricControls(filterConfig: FilterConfig, doc: Document, o
   keys = Object.keys(controls);
   keys.forEach(updateLabels);
 
-  return { keys, controls, updateLabels, updateAllLabels, reset, setBarCounts };
+  return { keys, controls, updateLabels, updateAllLabels, reset, setRange, setBarCounts };
 }
