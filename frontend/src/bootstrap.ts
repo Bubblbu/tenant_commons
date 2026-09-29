@@ -74,15 +74,21 @@ async function main(): Promise<void> {
   });
   buildings.buildings.addTo(map);
 
-  const b = artifacts.filterConfig.bounds;
-  if (b) map.fitBounds([[b.lat_min, b.lon_min], [b.lat_max, b.lon_max]]);
-
   renderLegend(artifacts.filterConfig);
   const hoodValues = Array.from(document.querySelectorAll<HTMLInputElement>('.filter-neighbourhood-option')).map((i) => i.value);
   const restored = decodeFilterState(new URLSearchParams(window.location.search), hoodValues);
   // A ?hood= link that narrows the neighbourhoods opens framed on them.
   const selected = selectionBounds(restored.hoods ?? [], hoodValues, areaBounds(artifacts.boundaries, artifacts.chinatown, artifacts.villages));
-  if (selected) map.fitBounds(selected, { padding: [20, 20] });
+  // One call, and animate: false — an animated fitBounds this early races
+  // watchMap()'s own start-up invalidateSize() (wiring/status-export.ts) and
+  // can settle on the wrong center/zoom; there's no prior view worth
+  // animating from anyway.
+  const b = artifacts.filterConfig.bounds;
+  if (selected) {
+    map.fitBounds(selected, { padding: [20, 20], animate: false });
+  } else if (b) {
+    map.fitBounds([[b.lat_min, b.lon_min], [b.lat_max, b.lon_max]], { animate: false });
+  }
   initLegendToggle();
   initAboutModal(map);
   renderTables(artifacts.buildingData, artifacts.blocks, document, artifacts.filterConfig.licence_year ?? null);
