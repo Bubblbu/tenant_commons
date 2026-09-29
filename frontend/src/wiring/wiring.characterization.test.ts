@@ -206,6 +206,21 @@ describe('Clear and Reset', () => {
     expect(document.getElementById('filter-count-ownership')?.hidden).toBe(true);
     expect(h.landlords.isActive()).toBe(false);
   });
+
+  it('Reset and Clear (Ownership) also clear unpicked, typed landlord search text', () => {
+    const h = startHarness();
+    const input = document.getElementById('owner-search') as HTMLInputElement;
+
+    input.value = 'acm';
+    input.dispatchEvent(new Event('input'));
+    h.click('#filter-reset');
+    expect(input.value).toBe('');
+
+    input.value = 'acm';
+    input.dispatchEvent(new Event('input'));
+    h.click('#filter-clear-ownership');
+    expect(input.value).toBe('');
+  });
 });
 
 describe('blocks', () => {

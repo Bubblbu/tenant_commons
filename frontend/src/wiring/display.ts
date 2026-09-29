@@ -120,7 +120,7 @@ export function initDisplay(
   // Housing type (SRO/co-op) and rental-issues toggles only restyle existing
   // markers (stroke color, extra rings) — they never add, remove or hide a
   // marker. (Only show buildings with issues, in the Filters panel, is the
-  // one that actually hides markers — see filter-pass.ts's applyFilters().)
+  // one that actually hides markers — see filter-pass.ts's apply().)
   function applyHousingTypeFilter(): void {
     showHousingTypeChecked = vizShowHousingTypeChk ? vizShowHousingTypeChk.checked !== false : false;
     showIssuesChecked = vizShowIssuesChk ? vizShowIssuesChk.checked !== false : false;

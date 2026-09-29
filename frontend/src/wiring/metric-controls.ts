@@ -120,7 +120,7 @@ export function buildMetricControls(filterConfig: FilterConfig, doc: Document, o
   }
 
   // Sliders fire 'input' many times per second while dragging; onChange
-  // (scheduleApplyFilters in wiring/filter-pass.ts) coalesces the expensive full-row-scan
+  // (filter-pass.ts's schedule()) coalesces the expensive full-row-scan
   // pass to once per animation frame — only the label text below updates
   // synchronously.
   function makeSliderHandler(metric: string, role: 'min' | 'max'): () => void {

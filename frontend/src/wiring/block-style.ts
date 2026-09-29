@@ -76,7 +76,7 @@ export function createBlockStyler(index: MapIndex, doc: Document, scheduleRestac
   // currently visible (not filtered out by the neighbourhood picker or other
   // filters) and repaints them + the legend to match. Called once during
   // initial wireUp (when nothing is filtered yet, so it reflects the whole
-  // dataset) and again at the end of every applyFilters() pass.
+  // dataset) and again at the end of every filter-pass.ts apply().
   function recomputeScale(): void {
     let min: number | null = null;
     let max = 0;

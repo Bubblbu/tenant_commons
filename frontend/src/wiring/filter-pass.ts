@@ -206,6 +206,9 @@ export function initFilterPass(deps: FilterPassDeps, doc: Document): FilterPass 
   });
 
   function clearSection(section: FilterSection): void {
+    // writeFilterState(landlords.set([])) only replaces the tiles; clear()
+    // also empties any typed-but-unpicked search text and closes the list.
+    if (section === 'ownership') controls.landlords?.clear();
     writeFilterState(controls, clearSectionState(readFilterState(controls), section, metricSection));
     apply();
   }
@@ -221,6 +224,7 @@ export function initFilterPass(deps: FilterPassDeps, doc: Document): FilterPass 
 
   function resetFilters(): void {
     if (showEmptyChk) showEmptyChk.checked = false;
+    controls.landlords?.clear();
     writeFilterState(controls, defaultFilterState());
   }
 
