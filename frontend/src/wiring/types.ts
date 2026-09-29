@@ -2,6 +2,7 @@ import type * as L from 'leaflet';
 import type { LandlordFilter } from '../landlord-picker';
 import type { StyledMarker } from '../markers';
 import type { BuildingData, FilterConfig } from '../types';
+import type { FilterState } from './filter-state';
 
 /** A building's CircleMarker plus the state wiring keeps on it. */
 export interface BuildingMarker extends L.CircleMarker {
@@ -68,4 +69,8 @@ export interface WiringContext {
   landlordFilter?: LandlordFilter;
   /** Called after every filter pass with the b_ids of the buildings that pass. */
   onFilter?: (visibleBids: Set<string>) => void;
+  /** Filter state restored from the URL, applied before the first pass. */
+  initialFilter?: Partial<FilterState>;
+  /** Called after every filter pass (bootstrap mirrors it into the URL). */
+  onStateChange?: (state: FilterState) => void;
 }

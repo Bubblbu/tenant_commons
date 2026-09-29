@@ -3,9 +3,11 @@
  * status and export. Everything here runs once, after bootstrap.ts has built
  * the map layers and rendered the sidebar tables.
  */
+import { filterFields } from '../tables';
 import { createBlockStyler } from './block-style';
 import { initDisplay } from './display';
 import { initFilterPass, type FilterPass } from './filter-pass';
+import { readFilterState, writeFilterState } from './filter-state';
 import { buildMapIndex } from './indexes';
 import { createMarkerStyler, createRestack } from './marker-style';
 import { buildMetricControls } from './metric-controls';
@@ -35,7 +37,8 @@ export function startWiring(ctx: WiringContext, doc: Document = document): void 
   let filterPass: FilterPass | undefined;
   const metrics = buildMetricControls(ctx.filterConfig, doc, () => filterPass?.schedule());
   status.updateDataset();
-  const pass = initFilterPass({ ctx, index, markers, blocks, selection, tables, metrics, status }, doc);
+  const fields = Object.values(ctx.buildingData.records).map(filterFields);
+  const pass = initFilterPass({ ctx, index, markers, blocks, selection, tables, metrics, status, fields }, doc);
   filterPass = pass;
   const display = initDisplay(ctx, markers, blocks, restack, pass.apply, doc);
   initCsvExport(index, ctx.map, ctx.buildingData, doc);
@@ -50,5 +53,6 @@ export function startWiring(ctx: WiringContext, doc: Document = document): void 
 
   metrics.updateAllLabels();
   display.updateLegend();
+  if (ctx.initialFilter) writeFilterState(pass.controls, { ...readFilterState(pass.controls), ...ctx.initialFilter });
   pass.apply();
 }

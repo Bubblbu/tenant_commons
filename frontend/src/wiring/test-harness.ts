@@ -10,8 +10,9 @@ import { vi } from 'vitest';
 import { buildOptions, initLandlordPicker, type LandlordFilter } from '../landlord-picker';
 import { renderLegend } from '../legend';
 import { renderTables } from '../tables';
-import { startWiring } from './index';
+import type { FilterState } from './filter-state';
 import { FIXTURE_BLOCKS, FIXTURE_BUILDING_DATA, FIXTURE_FILTER_CONFIG, FIXTURE_MARKERS } from './fixture';
+import { startWiring } from './index';
 
 export const HIGHLIGHT = '#ff1744';
 // `new URL(rel, import.meta.url)` resolves against jsdom's window.location
@@ -95,6 +96,8 @@ export interface Harness {
   barCounts(index: number): number[];
   pickLandlord(query: string): void;
   exportCsv(): string;
+  /** FilterState from the most recent filter pass, or null before the first pass. */
+  lastState(): FilterState | null;
 }
 
 function $<T extends Element = HTMLElement>(selector: string): T {
@@ -103,7 +106,7 @@ function $<T extends Element = HTMLElement>(selector: string): T {
   return el;
 }
 
-export function startHarness(): Harness {
+export function startHarness(opts: { initialFilter?: Partial<FilterState> } = {}): Harness {
   frames = [];
   const raf = (cb: FrameRequestCallback): number => { frames.push(cb); return frames.length; };
   vi.stubGlobal('requestAnimationFrame', raf);
@@ -152,7 +155,7 @@ export function startHarness(): Harness {
   const chinatown = new FakeLayer(paint);
   [blocksLayer, buildingsLayer, neighbourhoods, chinatown].forEach((l) => map.addLayer(l));
 
-  const seen: { visible: Set<string> | null } = { visible: null };
+  const seen: { visible: Set<string> | null; state: FilterState | null } = { visible: null, state: null };
   startWiring({
     map,
     layers: { blocks: blocksLayer, buildings: buildingsLayer, neighbourhoods, villages, chinatown },
@@ -163,6 +166,8 @@ export function startHarness(): Harness {
     buildingData: FIXTURE_BUILDING_DATA,
     landlordFilter: landlords,
     onFilter: (visible: Set<string>) => { seen.visible = new Set(visible); },
+    initialFilter: opts.initialFilter,
+    onStateChange: (s: FilterState) => { seen.state = s; },
   } as unknown as Parameters<typeof startWiring>[0]);
   flushFrames();
   if (!seen.visible || document.getElementById('summary-buildings-label')?.textContent !== 'Totals (visible)') {
@@ -232,5 +237,6 @@ export function startHarness(): Harness {
       }
       return parts.join('');
     },
+    lastState: () => seen.state,
   };
 }

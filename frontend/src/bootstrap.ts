@@ -16,7 +16,6 @@ import { initDisplayOptions } from './display-options';
 import { BASEMAPS, DEFAULT_BASEMAP, DEFAULT_CENTER, DEFAULT_ZOOM, MAX_ZOOM } from './config';
 import { renderCoverage } from './coverage';
 import { loadArtifacts } from './data';
-import { initHoodUrlSync } from './hood-url';
 import { buildOptions, initLandlordPicker, type LandlordFilter } from './landlord-picker';
 import { areaBounds, selectionBounds } from './initial-view';
 import {
@@ -36,6 +35,7 @@ import { initTableSearch } from './table-search';
 import { renderTables } from './tables';
 import { initViewToggle } from './view-toggle';
 import { startWiring } from './wiring';
+import { decodeFilterState, encodeFilterState } from './wiring/filter-state';
 
 function showLoadError(err: unknown): void {
   console.error('Failed to initialise the map', err);
@@ -78,14 +78,10 @@ async function main(): Promise<void> {
   if (b) map.fitBounds([[b.lat_min, b.lon_min], [b.lat_max, b.lon_max]]);
 
   renderLegend(artifacts.filterConfig);
-  initHoodUrlSync();
+  const hoodValues = Array.from(document.querySelectorAll<HTMLInputElement>('.filter-neighbourhood-option')).map((i) => i.value);
+  const restored = decodeFilterState(new URLSearchParams(window.location.search), hoodValues);
   // A ?hood= link that narrows the neighbourhoods opens framed on them.
-  const hoodInputs = Array.from(document.querySelectorAll<HTMLInputElement>('.filter-neighbourhood-option'));
-  const selected = selectionBounds(
-    hoodInputs.filter((i) => i.checked).map((i) => i.value),
-    hoodInputs.map((i) => i.value),
-    areaBounds(artifacts.boundaries, artifacts.chinatown, artifacts.villages),
-  );
+  const selected = selectionBounds(restored.hoods ?? [], hoodValues, areaBounds(artifacts.boundaries, artifacts.chinatown, artifacts.villages));
   if (selected) map.fitBounds(selected, { padding: [20, 20] });
   initLegendToggle();
   initAboutModal(map);
@@ -114,6 +110,14 @@ async function main(): Promise<void> {
     buildingData: artifacts.buildingData,
     landlordFilter,
     onFilter: (visibleBids) => renderCoverage([...visibleBids].map((bid) => records[bid]).filter((r) => r !== undefined)),
+    initialFilter: restored,
+    onStateChange: (state) => {
+      const url = new URL(window.location.href);
+      encodeFilterState(state, url.searchParams, hoodValues);
+      // Only when it changed: this runs on every slider frame, and Safari
+      // throws after 100 replaceState calls in 30 seconds.
+      if (url.href !== window.location.href) window.history.replaceState(window.history.state, '', url);
+    },
   });
 
   initDisplayOptions();

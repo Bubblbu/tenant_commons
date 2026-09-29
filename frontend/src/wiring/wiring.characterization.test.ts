@@ -235,3 +235,19 @@ describe('CSV export', () => {
     ]);
   });
 });
+
+describe('filter state', () => {
+  it('reports the state after every pass', () => {
+    const h = startHarness();
+    h.setChecked(hood('downtown'), true);
+    expect(h.lastState()?.hoods).toEqual(['downtown']);
+    h.click('#filter-clear-area');
+    expect(h.lastState()?.hoods).toEqual([]); // no setTimeout ordering needed any more
+  });
+
+  it('applies a restored state before the first pass', () => {
+    const h = startHarness({ initialFilter: { hoods: ['west end'] } });
+    expect(h.visible()).toEqual(['1', '2', '3']);
+    expect(document.querySelector<HTMLInputElement>(hood('west end'))?.checked).toBe(true);
+  });
+});
