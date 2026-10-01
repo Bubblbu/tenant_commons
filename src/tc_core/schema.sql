@@ -4,6 +4,7 @@
 -- ============================================================
 
 DROP TABLE IF EXISTS building_names;  -- references buildings: drop first
+DROP TABLE IF EXISTS building_listings;  -- references buildings: drop first
 DROP TABLE IF EXISTS vtu_membership;
 DROP TABLE IF EXISTS buildings;
 DROP TABLE IF EXISTS landlords;
@@ -15,7 +16,18 @@ DROP TABLE IF EXISTS raw_sro;
 DROP TABLE IF EXISTS raw_coops;
 DROP TABLE IF EXISTS raw_rezoning;
 DROP TABLE IF EXISTS overlay_housing;
+DROP TABLE IF EXISTS strata_lot_pids;
 DROP VIEW IF EXISTS block_stats;
+
+-- Hand-kept strata lot PID -> strata plan map (ingest/strata_lot_pids.py,
+-- data/curated/strata_lot_pids.csv). Lets a LOTR filing on one lot reach the
+-- building records that carry only the plan number in raw_buildings.pid.
+CREATE TABLE strata_lot_pids (
+    strata_lot_pid_id INTEGER PRIMARY KEY,
+    pid TEXT NOT NULL,          -- dashed, as LOTR writes it
+    strata_plan TEXT NOT NULL,  -- e.g. VAS684
+    note TEXT
+);
 
 CREATE TABLE raw_buildings (
     raw_building_id INTEGER PRIMARY KEY,
@@ -285,6 +297,19 @@ CREATE TABLE building_names (
 );
 CREATE INDEX idx_building_names_building ON building_names(building_id);
 
+-- Usable landlord listings (current, built: manager_listings.usable_listings)
+-- matched to buildings by ingest/building_names.py. The export's `listings`
+-- column and listing-based managed_by read this.
+CREATE TABLE building_listings (
+    building_listing_id INTEGER PRIMARY KEY,
+    building_id INTEGER NOT NULL REFERENCES buildings(building_id),
+    manager TEXT NOT NULL,      -- the feed's company name, verbatim
+    url TEXT,
+    last_seen TEXT NOT NULL,
+    listing_row_id INTEGER NOT NULL
+);
+CREATE INDEX idx_building_listings_building ON building_listings(building_id);
+
 -- ============================================================
 -- PERSISTENT — never dropped by rebuild. Hand-authored, irreplaceable.
 -- Uses CREATE TABLE IF NOT EXISTS only. The ingest/rebuild routine must
@@ -398,6 +423,22 @@ CREATE TABLE IF NOT EXISTS raw_lotr_ownership (
 CREATE INDEX IF NOT EXISTS idx_raw_lotr_ownership_pid ON raw_lotr_ownership(pid);
 CREATE INDEX IF NOT EXISTS idx_raw_lotr_ownership_reporting_body ON raw_lotr_ownership(reporting_body_name);
 
+-- LOTR search log (ingest/raw_lotr_searches.py): one row per PID search,
+-- including searches that found no filing, which raw_lotr_ownership can't
+-- record. Tells "searched, no filing" apart from "never searched".
+-- PERSISTENT for the same reason as raw_lotr_ownership; replaced wholesale
+-- on each scripts/import_lotr_claims.py run. Internal only.
+CREATE TABLE IF NOT EXISTS raw_lotr_searches (
+    raw_lotr_search_id INTEGER PRIMARY KEY,
+    pid TEXT NOT NULL,             -- dashed, as LOTR writes it
+    searched_on TEXT NOT NULL,     -- YYYY-MM-DD
+    result TEXT NOT NULL CHECK (result IN ('no_filing', 'filed')),
+    note TEXT,
+    source_path TEXT NOT NULL,     -- file name under the searches directory
+    ingested_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_raw_lotr_searches_pid ON raw_lotr_searches(pid);
+
 -- Property-manager listings, from dated snapshots of each manager's own
 -- listings (data/raw/property_managers/<manager>/<YYYY-MM-DD>.json, see
 -- ingest/manager_listings.py). PERSISTENT: a listing that disappears is
@@ -411,6 +452,8 @@ CREATE TABLE IF NOT EXISTS raw_manager_listings (
     name TEXT,
     address TEXT,
     url TEXT,
+    status TEXT,     -- the feed's own status ("Now Renting", "In Development"); null when it has none
+    units INTEGER,   -- unit count, when the feed gives one (Wall)
     first_seen TEXT NOT NULL,
     last_seen TEXT NOT NULL,
     UNIQUE (manager, external_id)

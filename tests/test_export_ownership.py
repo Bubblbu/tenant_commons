@@ -62,14 +62,14 @@ def _seed(conn, tmp_path: Path) -> str:
     return str(pid_map)
 
 
-def _export(tmp_path: Path, extra=None) -> Path:
+def _export(tmp_path: Path, extra=None, **kwargs) -> Path:
     conn = sqlite3.connect(":memory:")
     init_db(conn)
     pid_map = _seed(conn, tmp_path)
     if extra:
         extra(conn)
     out = tmp_path / "out"
-    export_artifacts(conn, out, pid_address_map_path=pid_map)
+    export_artifacts(conn, out, pid_address_map_path=pid_map, **kwargs)
     return out
 
 
@@ -166,3 +166,56 @@ def test_claim_source_notes_never_reach_any_artifact(tmp_path):
     out = _export(tmp_path)
     for path in out.iterdir():
         assert "CANARY-7f3a" not in path.read_text(encoding="utf-8"), path.name
+
+
+def test_listings_reach_the_record_under_the_managers_own_name(tmp_path):
+    managers = tmp_path / "property_managers.toml"
+    managers.write_text('[[manager]]\nname = "Tribe Rental Management"\nlisting_names = ["Tribe Rentals"]\n')
+
+    def extra(conn):
+        bid = conn.execute("SELECT building_id FROM buildings WHERE addr_key = '1 solo st'").fetchone()[0]
+        conn.executemany(
+            "INSERT INTO building_listings (building_id, manager, url, last_seen, listing_row_id) VALUES (?, ?, ?, ?, ?)",
+            [(bid, "Tribe Rentals", "https://example.org/1", "2026-09-30", 1),
+             (bid, "Wall Financial Corporation", "https://example.org/w", "2026-09-30", 2)],
+        )
+
+    records = _records(_export(tmp_path, extra, property_managers_path=str(managers)))
+    rec = records["1 solo st"]
+    assert rec["listings"] == [
+        {"by": "Tribe Rental Management", "url": "https://example.org/1", "seen": "2026-09-30"},
+        {"by": "Wall Financial Corporation", "url": "https://example.org/w", "seen": "2026-09-30"},
+    ]
+    assert (rec["managed_by"], rec["managed_by_source"]) == ("Tribe Rental Management", "listing")
+    assert rec["owner_name"] == "Solo Rentals Ltd"
+    # unlisted buildings and overlay records carry an empty list, never null
+    assert records["2 solo st"]["listings"] == [] and records["999 nowhere rd"]["listings"] == []
+    assert records["2 solo st"]["managed_by_source"] is None
+
+
+def test_feed_staff_contacts_never_reach_any_artifact(tmp_path):
+    """Snapshots carry staff contacts; only the company's name, page and date
+    may reach the map (spec 2026-09-30 section 5)."""
+    import json as _json
+
+    from tc_core.ingest.building_names import derive_building_names
+    from tc_core.ingest.manager_listings import ingest_manager_listings
+
+    feeds = tmp_path / "feeds" / "tribe"
+    feeds.mkdir(parents=True)
+    (feeds / "2026-09-30.json").write_text(_json.dumps([{
+        "id": 1, "name": "Solo Place", "permalink": "https://example.org/1",
+        "address": {"address": "1 Solo St", "city": "Vancouver"},
+        "client": {"name": "Tribe Rentals"},
+        "contact": {"name": "CANARY-staff Person", "email": "canary-staff@example.org"},
+    }]))
+
+    def extra(conn):
+        ingest_manager_listings(conn, str(tmp_path / "feeds"))
+        derive_building_names(conn)
+
+    out = _export(tmp_path, extra)
+    for path in out.iterdir():
+        assert "canary-staff" not in path.read_text(encoding="utf-8").lower(), path.name
+    rec = _records(out)["1 solo st"]
+    assert [set(e) for e in rec["listings"]] == [{"by", "url", "seen"}]

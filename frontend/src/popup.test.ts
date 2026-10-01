@@ -209,3 +209,57 @@ describe('helpers', () => {
     expect(safeUrl(null)).toBeNull();
   });
 });
+
+describe('renderPopup listings', () => {
+  const dorset = { by: 'Dorset Realty Group', url: 'https://dorsetrealty.com/properties/residential/ocean-crest/', seen: '2026-09-30' };
+  const wall = { by: 'Wall Financial Corporation', url: 'https://www.wallfinancialcorporation.com/properties/amber-lodge', seen: '2026-09-30' };
+
+  it('links a manager named by its own listing, with the website as provenance', () => {
+    const html = renderPopup({ ...building, managed_by: 'Dorset Realty Group', managed_by_source: 'listing', listings: [dorset] });
+    expect(html).toContain(
+      'Managed by <a href="https://dorsetrealty.com/properties/residential/ocean-crest/" target="_blank" rel="noopener">Dorset Realty Group ↗</a>',
+    );
+    expect(html).toContain('data-tip="Company website, seen 2026-09-30"');
+    expect(html).not.toContain('Listed by');
+  });
+
+  it('keeps the licence provenance when the licence names the manager, and links its listing', () => {
+    const tribe = { by: 'Tribe Rental Management', url: 'https://example.org/1', seen: '2026-09-30' };
+    const html = renderPopup(
+      { ...building, licence_holder: 'Tribe Rental Management', managed_by: 'Tribe Rental Management', managed_by_source: 'licence', listings: [tribe] },
+      { licenceYear: 2026 },
+    );
+    expect(html).toContain('Managed by <a href="https://example.org/1" target="_blank" rel="noopener">Tribe Rental Management ↗</a>');
+    expect(html).toContain('data-tip="City of Vancouver business licence, 2026"');
+  });
+
+  it('shows an owner-operator\'s listing as "Listed by", without a manager', () => {
+    const html = renderPopup({ ...building, listings: [wall] });
+    expect(html).toContain(
+      'Listed by <a href="https://www.wallfinancialcorporation.com/properties/amber-lodge" target="_blank" rel="noopener">Wall Financial Corporation ↗</a>',
+    );
+    expect(html).not.toContain('Managed by');
+  });
+
+  it('lists the company on a not-on-record building too', () => {
+    const html = renderPopup({ b_id: 9, address: '1120 pacific st', owner_name: '(Unknown)', owner_key: 'unknown', listings: [wall] });
+    expect(html).toContain('Landlord not on record');
+    expect(html).toContain('Listed by <a href=');
+  });
+
+  it('never links a listing URL that is not http(s)', () => {
+    const html = renderPopup({ ...building, listings: [{ by: 'Evil Co', url: 'javascript:alert(1)', seen: '2026-09-30' }] });
+    expect(html).toContain('Listed by Evil Co');
+    expect(html).not.toContain('javascript:');
+  });
+
+  it('says a building comes from a company\'s listings, with plain units', () => {
+    const html = renderPopup({
+      b_id: 9, address: '1120 pacific st', owner_name: '(Unknown)', owner_key: 'unknown',
+      building_source: 'manager listing', units: 120, listings: [wall],
+    });
+    expect(html).toContain('120 units');
+    expect(html).not.toContain('licensed units');
+    expect(html).toContain('Added from Wall Financial Corporation&#x27;s listings');
+  });
+});

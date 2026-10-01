@@ -37,6 +37,11 @@ export function licenceProvenance(year: number | null | undefined): string {
   return year ? `City of Vancouver business licence, ${year}` : 'City of Vancouver business licence';
 }
 
+/** A listing on the company's own website, by the date it was last seen there. */
+export function listingProvenance(seen: string): string {
+  return seen ? `Company website, seen ${seen}` : 'Company website';
+}
+
 export function networkProvenance(r: BuildingRecord): string {
   if (str(r.network_source) !== 'claims') return 'Grouped by business licence name';
   const ev = (r.network_evidence ?? {}) as Record<string, unknown>;

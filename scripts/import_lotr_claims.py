@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Import a Samwise (BC Land Owner Transparency Registry) export into
 tc_core: raw rows into raw_lotr_ownership, then derived common_owner
-claims into ownership_claims.
+claims into ownership_claims, then the search log (config `lotr_searches`,
+including searches with no filing) into raw_lotr_searches.
 
 Decoupled from the main tc_core rebuild cadence — like
 scripts/update_claims.py, this deliberately does NOT call init_db(), since
@@ -36,6 +37,7 @@ from tc_core.db import get_connection  # noqa: E402
 from tc_core.ingest import run_source  # noqa: E402
 from tc_core.ingest.lotr_claims import derive_lotr_ownership_claims  # noqa: E402
 from tc_core.ingest.raw_lotr import ingest_raw_lotr  # noqa: E402
+from tc_core.ingest.raw_lotr_searches import ingest_raw_lotr_searches  # noqa: E402
 from tc_core.ingest.tracking import new_run_id  # noqa: E402
 
 
@@ -68,6 +70,11 @@ def main() -> int:
         claim_count = run_source(
             conn, run_id, "lotr_claims", derive_lotr_ownership_claims, conn
         )
+        search_count = None
+        if config.lotr_searches and Path(config.lotr_searches).is_dir():
+            search_count = run_source(
+                conn, run_id, "raw_lotr_searches", ingest_raw_lotr_searches, conn, config.lotr_searches
+            )
     except sqlite3.OperationalError as exc:
         if "no such table" in str(exc):
             parser.error(
@@ -81,6 +88,8 @@ def main() -> int:
         f"{raw_count} raw LOTR row(s) from {lotr_path}, "
         f"{claim_count} common_owner claim(s) derived -> {config.db_path}"
     )
+    if search_count is not None:
+        print(f"{search_count} logged LOTR search(es) from {config.lotr_searches}")
     return 0
 
 

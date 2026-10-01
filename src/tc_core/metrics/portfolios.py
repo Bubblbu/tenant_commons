@@ -87,14 +87,37 @@ def _building_pids(conn: sqlite3.Connection) -> dict[str, set[str]]:
         "SELECT address, pid FROM raw_buildings WHERE address IS NOT NULL AND pid IS NOT NULL"
     ).fetchall()
     mapping: dict[str, set[str]] = {}
+    plans: dict[str, set[str]] = {}
     for address, pids in rows:
         addr_key = addr_key_from_freeform(address)
         if not addr_key:
             continue
         for pid in str(pids).split(";"):
+            if re.search(r"[A-Za-z]", pid):  # a strata plan number, not a PID
+                plans.setdefault(pid.strip().upper(), set()).add(addr_key)
+                continue
             normalized_pid = _normalize_pid(pid)
             if normalized_pid:
                 mapping.setdefault(normalized_pid, set()).add(addr_key)
+    # The City's address points carry the plan too (site_id), which reaches
+    # buildings with no raw_buildings row, such as those added from listings.
+    for civic, street, site_id in conn.execute(
+        "SELECT civic_number, std_street, site_id FROM raw_addresses "
+        "WHERE site_id GLOB '*[A-Za-z]*' AND civic_number IS NOT NULL AND std_street IS NOT NULL"
+    ):
+        civic = str(civic).strip().removesuffix(".0")
+        addr_key = addr_key_from_freeform(f"{civic} {street}")
+        if addr_key:
+            plans.setdefault(str(site_id).strip().upper(), set()).add(addr_key)
+    # A strata building carries its plan number ("VAS684"), not a PID; a
+    # lot PID mapped to that plan (strata_lot_pids) reaches it instead.
+    try:
+        lots = conn.execute("SELECT pid, strata_plan FROM strata_lot_pids").fetchall()
+    except sqlite3.OperationalError:  # a database built before strata_lot_pids existed
+        lots = []
+    for pid, plan in lots:
+        for addr_key in plans.get(plan, ()):
+            mapping.setdefault(_normalize_pid(pid), set()).add(addr_key)
     return mapping
 
 

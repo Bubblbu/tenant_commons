@@ -101,3 +101,49 @@ def test_managers_include_the_managing_side_of_confirmed_managed_by_claims():
     record_claim(conn, entity_a="Maybe Mgmt Ltd", entity_b="Some Owner Ltd",
                  relationship="managed_by", source_type="manual_research", confidence="unconfirmed")
     assert managers_from_claims(conn) == {"tribe-rental-management"}
+
+
+LISTED = [{"by": TRIBE, "url": "https://example.org/1", "seen": "2026-09-30"}]
+
+
+def test_a_licence_named_manager_is_marked_as_coming_from_the_licence():
+    row = _apply(_row(listings=LISTED)).iloc[0]
+    assert (row.managed_by, row.managed_by_source) == (TRIBE, "licence")
+
+
+def test_a_managers_current_listing_names_it_without_touching_the_owner():
+    row = _apply(_row(
+        owner_name="Broadway Properties Ltd.", owner_key="broadway-properties-ltd", owner_source="registry",
+        licence_holder="Broadway Properties Ltd.",
+        network_name="Broadway Properties Ltd.", network_key="broadway-properties-ltd", network_source="registry",
+        listings=LISTED,
+    )).iloc[0]
+    assert (row.managed_by, row.managed_by_source) == (TRIBE, "listing")
+    assert (row.owner_name, row.owner_source) == ("Broadway Properties Ltd.", "registry")
+    assert (row.network_key, row.network_source) == ("broadway-properties-ltd", "registry")
+
+
+def test_a_listing_by_a_company_not_in_the_managers_list_sets_no_manager():
+    row = _apply(_row(
+        owner_name="0888189 B.C. Ltd.", owner_key="0888189-b-c-ltd", owner_source="registry",
+        licence_holder="0888189 BC Ltd", network_key="0888189-b-c-ltd", network_source="registry",
+        listings=[{"by": "Wall Financial Corporation", "url": "https://example.org/w", "seen": "2026-09-30"}],
+    )).iloc[0]
+    assert row.managed_by is None and row.managed_by_source is None
+    assert row.owner_name == "0888189 B.C. Ltd."
+
+
+def test_load_listing_aliases_maps_feed_names_to_the_managers_name(tmp_path):
+    from tc_core.export import load_listing_aliases
+
+    path = tmp_path / "property_managers.toml"
+    path.write_text(
+        '[[manager]]\nname = "Tribe Rental Management"\nlisting_names = ["Tribe Rentals"]\n\n'
+        '[[manager]]\nname = "Dorset Realty Group"\n'
+    )
+    assert load_listing_aliases(str(path)) == {
+        "tribe-rentals": "Tribe Rental Management",
+        "tribe-rental-management": "Tribe Rental Management",
+        "dorset-realty-group": "Dorset Realty Group",
+    }
+    assert load_listing_aliases(None) == {}

@@ -45,6 +45,7 @@ from .block_numbers import ingest_raw_block_numbers
 from .building_names import derive_building_names
 from .blocks import ingest_blocks
 from .manager_listings import ingest_manager_listings
+from .strata_lot_pids import ingest_strata_lot_pids
 from .membership import ingest_membership
 from .merge import run_merge
 from .overlay_write import ingest_overlays
@@ -114,15 +115,20 @@ def run_ingest(conn: sqlite3.Connection, config: IngestConfig) -> dict[str, int]
         counts["raw_rezoning"] = run_source(
             conn, run_id, "raw_rezoning", ingest_raw_rezoning, conn, config.rezoning_applications
         )
+    # Raw inputs the merge reads: listings add buildings (ingest/listing_buildings.py).
+    if config.manager_listings:
+        counts["raw_manager_listings"] = run_source(
+            conn, run_id, "raw_manager_listings", ingest_manager_listings, conn, config.manager_listings
+        )
+    if config.strata_lot_pids:
+        counts["strata_lot_pids"] = run_source(
+            conn, run_id, "strata_lot_pids", ingest_strata_lot_pids, conn, config.strata_lot_pids
+        )
     counts["buildings"] = run_source(conn, run_id, "buildings", run_merge, conn)
     counts["overlays"] = run_source(
         conn, run_id, "overlays", ingest_overlays, conn,
         config.local_area_boundary_geojson,
     )
-    if config.manager_listings:
-        counts["raw_manager_listings"] = run_source(
-            conn, run_id, "raw_manager_listings", ingest_manager_listings, conn, config.manager_listings
-        )
     counts["building_names"] = run_source(
         conn, run_id, "building_names", derive_building_names, conn
     )

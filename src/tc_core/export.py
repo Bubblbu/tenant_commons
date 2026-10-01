@@ -46,6 +46,7 @@ def reconstruct_points(
     now: pd.Timestamp,
     pid_address_map_path: str | None = None,
     property_managers: set[str] | None = None,
+    listing_aliases: dict[str, str] | None = None,
 ) -> pd.DataFrame:
     buildings = pd.read_sql_query("SELECT * FROM buildings", conn)
     landlords = pd.read_sql_query(
@@ -88,6 +89,8 @@ def reconstruct_points(
         build_landlord_portfolios(conn, pid_address_map_path) if pid_address_map_path else {}
     )
     _assign_ownership(merged, registry, portfolios)
+    building_listings = _load_building_listings(conn, listing_aliases or {})
+    merged["listings"] = [building_listings.get(int(b), []) for b in merged["b_id"]]
     apply_property_managers(merged, property_managers or set())
 
     merged = merged[
@@ -96,7 +99,8 @@ def reconstruct_points(
             "issues_details",
             "member_count", "has_vtu_member", "member_share_building",
             "owner_name", "owner_key", "owner_source", "registered_owners", "registry_pids",
-            "registry_retrieved", "licence_holder", "managed_by", "network_key", "network_name",
+            "registry_retrieved", "licence_holder", "managed_by", "managed_by_source", "listings",
+            "network_key", "network_name",
             "network_source", "network_name_source", "network_entities",
             "network_properties_on_title", "network_evidence",
             "member_count_all", "members_payload", "value_land",
@@ -106,6 +110,8 @@ def reconstruct_points(
         ]
     ]
     merged = _append_overlay_housing(conn, merged)
+    # Overlay records have no listings; keep the column a list throughout.
+    merged["listings"] = [v if isinstance(v, list) else [] for v in merged["listings"]]
     fill_owner_from_sro(merged)
     fallback_group_to_owner(merged)
     apply_building_names(merged, _load_building_names(conn))
@@ -212,6 +218,45 @@ def load_property_managers(path: str | None) -> set[str]:
     return {sanitize_owner(m["name"]) for m in data.get("manager", []) if m.get("name")}
 
 
+def load_listing_aliases(path: str | None) -> dict[str, str]:
+    """Feed company name key -> the manager's name in property_managers.toml.
+    A feed may name the company differently ("Tribe Rentals"); an entry lists
+    those names as listing_names = [...]. Each entry's own name maps to itself."""
+    if not path or not Path(path).exists():
+        return {}
+    data = tomllib.loads(Path(path).read_text())
+    aliases: dict[str, str] = {}
+    for m in data.get("manager", []):
+        name = m.get("name")
+        if not name:
+            continue
+        for alias in [name, *m.get("listing_names", [])]:
+            aliases[sanitize_owner(alias)] = name
+    return aliases
+
+
+def _load_building_listings(
+    conn: sqlite3.Connection, aliases: dict[str, str]
+) -> dict[int, list[dict]]:
+    """building_id -> [{by, url, seen}], one entry per company, a known
+    manager under its property_managers.toml name. Public: each is the
+    company's own page. Listing ids stay in the database."""
+    out: dict[int, list[dict]] = {}
+    try:
+        rows = conn.execute(
+            "SELECT building_id, manager, url, last_seen FROM building_listings "
+            "ORDER BY building_id, listing_row_id"
+        ).fetchall()
+    except sqlite3.OperationalError:  # a database built before building_listings existed
+        return out
+    for bid, manager, url, seen in rows:
+        by = aliases.get(sanitize_owner(manager), manager)
+        entries = out.setdefault(int(bid), [])
+        if not any(e["by"] == by for e in entries):
+            entries.append({"by": by, "url": url, "seen": seen})
+    return out
+
+
 def managers_from_claims(conn: sqlite3.Connection) -> set[str]:
     """Keys of the managing side (entity_a) of confirmed, active managed_by claims."""
     rows = conn.execute(
@@ -227,11 +272,15 @@ def apply_property_managers(df: pd.DataFrame, managers: set[str]) -> None:
     Greenbrier Holdings' buildings). In place: records the manager in
     `managed_by`; where the licence was the only source for the landlord,
     the building becomes not on record instead. Registry owners and claims
-    groups are kept.
+    groups are kept. Otherwise a known manager's current listing names the
+    manager (`managed_by_source` "listing") and changes nothing else.
     """
     licence_keys = df["licence_holder"].map(sanitize_owner)
     managed = licence_keys.isin(managers)
     df["managed_by"] = df["licence_holder"].where(managed, None).astype(object)
+    df["managed_by_source"] = pd.Series(
+        np.where(managed, "licence", None), index=df.index, dtype=object
+    )
     owner = managed & (df["owner_source"] == "licence")
     df.loc[owner, ["owner_name", "owner_key"]] = ["(Unknown)", "unknown"]
     df.loc[owner, "owner_source"] = None
@@ -241,6 +290,23 @@ def apply_property_managers(df: pd.DataFrame, managers: set[str]) -> None:
     df.loc[group, "network_name"] = df.loc[group, "owner_name"]
     df.loc[group, "network_key"] = df.loc[group, "owner_key"]
     df.loc[group, "network_source"] = df.loc[group, "owner_source"]
+    if "listings" not in df.columns:
+        return
+    listed = pd.Series(
+        [
+            next(
+                (e["by"] for e in (ls if isinstance(ls, list) else [])
+                 if sanitize_owner(e["by"]) in managers),
+                None,
+            )
+            for ls in df["listings"]
+        ],
+        index=df.index,
+        dtype=object,
+    )
+    fill = df["managed_by"].isna() & listed.notna()
+    df.loc[fill, "managed_by"] = listed[fill]
+    df.loc[fill, "managed_by_source"] = "listing"
 
 
 def _load_building_names(conn: sqlite3.Connection) -> dict[int, list[tuple[str, str]]]:
@@ -665,6 +731,7 @@ def export_artifacts(
     points_df = reconstruct_points(
         conn, now, pid_address_map_path,
         load_property_managers(property_managers_path) | managers_from_claims(conn),
+        load_listing_aliases(property_managers_path),
     )
 
     # Chinatown/Villages Plan Areas double as filterable "special areas"
@@ -807,6 +874,7 @@ BUILDING_RECORD_COLUMNS = [
     "b_id", "address", "building_name", "other_names", "local_area", "block_id", "units",
     "building_source", "year_built", "owner_name", "owner_key", "owner_source",
     "registered_owners", "registry_pids", "registry_retrieved", "licence_holder", "managed_by",
+    "managed_by_source", "listings",
     "network_key", "network_name", "network_source", "network_name_source",
     "network_entities", "network_buildings_on_map", "network_properties_on_title",
     "network_evidence",

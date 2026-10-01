@@ -25,6 +25,7 @@ from tc_core.config import load_ingest_config  # noqa: E402
 from tc_core.db import get_connection, init_db  # noqa: E402
 from tc_core.export import export_artifacts  # noqa: E402
 from tc_core.ingest import run_ingest  # noqa: E402
+from tc_core.ingest.listing_buildings import added_from_listings  # noqa: E402
 
 
 def main() -> int:
@@ -42,6 +43,11 @@ def main() -> int:
         init_db(conn)
         counts = run_ingest(conn, config)
         print(f"Ingest complete: {counts}")
+        added = added_from_listings(conn)
+        if added:
+            print(f"{len(added)} building(s) added from landlord listings; check each is rental housing:")
+            for manager, address in added:
+                print(f"  {manager}: {address}")
 
     print(f"Exporting artifacts to {config.artifacts} ...")
     export_artifacts(

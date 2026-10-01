@@ -95,3 +95,28 @@ def test_every_address_point_of_a_pid_gets_its_owner(tmp_path):
     owners = build_registry_owners(conn, _pid_map(
         tmp_path, [("001000001", "1200 alberni st"), ("001000001", "1202 alberni st")]))
     assert set(owners) == {"1200 alberni st", "1202 alberni st"}
+
+
+def test_a_strata_lot_filing_reaches_the_building_carrying_its_plan(tmp_path):
+    conn = _conn()
+    conn.execute(
+        "INSERT INTO raw_buildings (address, pid, ingested_at) VALUES ('958 Bute St', 'VAS684', 'now')")
+    conn.execute("INSERT INTO strata_lot_pids (pid, strata_plan) VALUES ('004-525-213', 'VAS684')")
+    _lotr(conn, "004-525-213", "STRATA OWNER LTD.")
+    _lotr(conn, "009-999-999", "OTHER LTD.")  # a lot not in the map reaches nothing
+    owners = build_registry_owners(conn, _pid_map(tmp_path, []))
+    assert list(owners) == ["958 bute st"]
+    assert owners["958 bute st"].owners == ["STRATA OWNER LTD."]
+
+
+def test_a_strata_lot_filing_reaches_a_building_whose_address_point_carries_the_plan(tmp_path):
+    # 1120 Pacific St (Whitehouse) comes from a landlord listing: no raw_buildings
+    # row carries VAS267, but the City's address point does.
+    conn = _conn()
+    conn.execute(
+        "INSERT INTO raw_addresses (civic_number, std_street, site_id, ingested_at) "
+        "VALUES ('1120.0', 'PACIFIC ST', 'VAS267', 'now')")
+    conn.execute("INSERT INTO strata_lot_pids (pid, strata_plan) VALUES ('003-786-901', 'VAS267')")
+    _lotr(conn, "003-786-901", "1136 PROPERTIES LTD.")
+    owners = build_registry_owners(conn, _pid_map(tmp_path, []))
+    assert owners["1120 pacific st"].owners == ["1136 PROPERTIES LTD."]

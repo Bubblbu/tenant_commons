@@ -37,6 +37,9 @@ from ..normalize import (
     parse_lat_lon,
     sanitize_owner,
 )
+from .listing_buildings import BUILDING_SOURCE as LISTING_SOURCE, listing_building_rows
+from .manager_listings import usable_listings
+from .overlay_sources import load_secondary_address_index
 
 OWNER_CANDIDATES = [
     "bsns_group",
@@ -231,7 +234,8 @@ def _join_buildings_addresses(west: pd.DataFrame, addr_df: pd.DataFrame) -> pd.D
     return joined
 
 
-BUILDING_SOURCE_ORDER = ("rental inventory", "non-market housing list", "rental licence")
+# Landlord listings come last: they add buildings no City source lists, and never win a merge.
+BUILDING_SOURCE_ORDER = ("rental inventory", "non-market housing list", "rental licence", LISTING_SOURCE)
 
 def _deduplicate_buildings(df: pd.DataFrame, owner_col: str) -> pd.DataFrame:
     def dedup_group(g: pd.DataFrame) -> pd.Series:
@@ -316,12 +320,21 @@ def _deduplicate_buildings(df: pd.DataFrame, owner_col: str) -> pd.DataFrame:
 
 
 def merge_and_dedupe_buildings(
-    raw_buildings: pd.DataFrame, raw_addresses: pd.DataFrame
+    raw_buildings: pd.DataFrame,
+    raw_addresses: pd.DataFrame,
+    listings: list[dict] | None = None,
+    secondary_index: dict[str, str] | None = None,
 ) -> pd.DataFrame:
     addr_df = _prepare_addresses(raw_addresses)
     west, owner_col = _select_buildings(raw_buildings)
     joined = _join_buildings_addresses(west, addr_df)
-    return _deduplicate_buildings(joined, owner_col)
+    buildings = _deduplicate_buildings(joined, owner_col)
+    if listings:
+        known = set(buildings["addr_key"]) if "addr_key" in buildings.columns else set()
+        extra = listing_building_rows(listings, known, secondary_index or {}, addr_df)
+        if not extra.empty:
+            buildings = pd.concat([buildings, extra], ignore_index=True)
+    return buildings
 
 
 def assign_blocks(buildings_df: pd.DataFrame, blocks_df: pd.DataFrame) -> pd.Series:
@@ -424,7 +437,9 @@ def write_buildings(
 
 def run_merge(conn: sqlite3.Connection) -> int:
     raw_buildings, raw_addresses = load_raw_frames(conn)
-    buildings_df = merge_and_dedupe_buildings(raw_buildings, raw_addresses)
+    listings = usable_listings(conn)
+    secondary = load_secondary_address_index(conn) if listings else {}
+    buildings_df = merge_and_dedupe_buildings(raw_buildings, raw_addresses, listings, secondary)
 
     blocks_df = pd.read_sql_query("SELECT block_id, geom FROM blocks", conn)
     block_id_by_index = assign_blocks(buildings_df, blocks_df)

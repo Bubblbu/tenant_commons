@@ -100,3 +100,24 @@ def test_a_rebuild_succeeds_when_building_names_hold_rows():
     derive_building_names(conn)
     init_db(conn)  # drops and recreates buildings; must not trip building_names' foreign key
     assert conn.execute("SELECT count(*) FROM building_names").fetchone()[0] == 0
+
+
+def _listing_row(conn, row_id, address, last_seen, status=None, manager="Tribe Rentals"):
+    conn.execute(
+        "INSERT INTO raw_manager_listings (listing_row_id, manager, external_id, name, address, url, status, "
+        "first_seen, last_seen) VALUES (?, ?, ?, NULL, ?, ?, ?, ?, ?)",
+        (row_id, manager, str(row_id), address, f"https://example.org/{row_id}", status, last_seen, last_seen),
+    )
+
+
+def test_usable_listings_link_to_their_building():
+    conn = _conn()
+    _building(conn, 1, "1220 cardero st", 1)
+    _listing_row(conn, 1, "1220 Cardero Street", "2026-09-30")
+    _listing_row(conn, 2, "1220 Cardero Street", "2026-09-01")                # stale
+    _listing_row(conn, 3, "1220 Cardero Street", "2026-09-30", "In Development")
+    _listing_row(conn, 4, "9 Elsewhere St", "2026-09-30")                     # no building
+    derive_building_names(conn)
+    assert conn.execute(
+        "SELECT building_id, manager, url, last_seen, listing_row_id FROM building_listings"
+    ).fetchall() == [(1, "Tribe Rentals", "https://example.org/1", "2026-09-30", 1)]

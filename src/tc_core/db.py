@@ -15,13 +15,30 @@ def get_connection(path: str | Path) -> sqlite3.Connection:
     return conn
 
 
+# Columns added to PERSISTENT tables after they first shipped. CREATE TABLE IF
+# NOT EXISTS leaves an existing table as it was, so init_db adds them here.
+_ADDED_COLUMNS: dict[str, list[tuple[str, str]]] = {
+    "raw_manager_listings": [("status", "TEXT"), ("units", "INTEGER")],
+}
+
+
+def _add_missing_columns(conn: sqlite3.Connection) -> None:
+    for table, columns in _ADDED_COLUMNS.items():
+        have = {row[1] for row in conn.execute(f"PRAGMA table_info({table})")}
+        for name, decl in columns:
+            if name not in have:
+                conn.execute(f"ALTER TABLE {table} ADD COLUMN {name} {decl}")
+
+
 def init_db(conn: sqlite3.Connection, schema_path: str | Path = SCHEMA_PATH) -> None:
     """Load the schema.
 
     Safe to call repeatedly: every table except `ownership_claims` is dropped
     and recreated (schema.sql's REBUILDABLE section), while `ownership_claims`
     uses `CREATE TABLE IF NOT EXISTS` and is never touched by a rebuild.
+    PERSISTENT tables that gained columns get them added (_ADDED_COLUMNS).
     """
     sql = Path(schema_path).read_text(encoding="utf-8")
     with conn:
         conn.executescript(sql)
+        _add_missing_columns(conn)

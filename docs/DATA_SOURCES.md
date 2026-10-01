@@ -59,6 +59,7 @@ format, cadence, quirks). It stops there.
 | [`sra_housing_combined.csv`](#sra_housing_combinedcsv) | FOI? — unverified ⚠️ | 2026-07-30 (file date) | TODO | `tc_core` |
 | [`rezoning_applications.csv`](#rezoning_applicationscsv) | FOI? — unverified ⚠️ | 2026-07-30 (file date) | TODO | `tc_core` |
 | [`coops_vancouver.csv`](#coops_vancouvercsv) | Third-party online | 2026-08-04 | Periodic (re-run script) | `tc_core` |
+| [Landlord listings](#landlord-listings) | Third-party online (company websites) | 2026-09-30 | Periodic (re-run scripts) | `tc_core` |
 | [`samwise-export.csv`](#samwise-exportcsv) | Third-party online (BC LOTR, via `samwise`) | 2026-09-16 | Ad hoc | `tc_core` |
 | [`membership_full.csv`](#membership_fullcsv) | Internal / organizational | TODO | VTU's own cadence | `tc_core` |
 | [`vtu_members.csv`](#vtu_memberscsv) | Internal / organizational — likely orphaned ⚠️ | — | — | none found |
@@ -376,6 +377,40 @@ not the City's Open Data portal, not FOI, not VTU's own systems.
 - **Refresh cadence:** periodic, re-run by hand
   (`python scripts/fetch_coops.py`) when a refresh is wanted. 117 co-ops as
   of 2026-08-04 (287 province-wide).
+
+### Landlord listings
+
+- **What it is:** property managers' and landlords' own portfolio listings:
+  building name, street address and page URL, plus a status and unit count
+  where the feed has them. Tribe Rentals, Dorset Realty Group and MetCap
+  Living manage for owners; Wall Financial Corporation owns and runs its own
+  buildings.
+- **Origin and access:** each company's public website, snapshotted by
+  hand. Tribe: theliftsystem.com feed, saved manually. Dorset:
+  `scripts/fetch_dorset_listings.py`. Wall: `scripts/fetch_wall_listings.py`.
+  MetCap: `scripts/fetch_metcap_listings.py`. Details per company in
+  `data/raw/property_managers/MANIFEST.md`.
+- **Output location:** `data/raw/property_managers/<company>/<YYYY-MM-DD>.json`
+  (gitignored), all in one feed shape.
+- **Sensitivity:** feeds can carry staff contact details. Only id, name,
+  address, URL, status and unit count are stored (`raw_manager_listings`,
+  persistent, with first/last seen per listing); contacts stay in the raw file.
+- **Consumed by:** `tc_core`, using only *usable* listings: those in the
+  company's latest snapshot and not "In Development"/"Coming Soon"
+  (`ingest/manager_listings.py::usable_listings`).
+  - Building names (`ingest/building_names.py`).
+  - A "Listed by <company> ↗" link on every listed building
+    (`building_listings`, the export's `listings` column).
+  - `managed_by` for companies in `data/curated/property_managers.toml`
+    (`listing_names` maps a feed's name to the toml's). Listings never set
+    the owner.
+  - New buildings: a listing that matches no City-source building but sits on
+    a City address point adds one, with building source "manager listing" and
+    owner "(Unknown)" (`ingest/listing_buildings.py`). The rebuild prints each
+    one for review.
+- **Refresh cadence:** re-run the scripts (and save Tribe's feed) when a
+  refresh is wanted, then rebuild. 2026-09-30: Dorset 50 (39 Vancouver),
+  Wall 18, MetCap 23 Vancouver; 7 buildings added from listings.
 
 ### `samwise-export.csv`
 

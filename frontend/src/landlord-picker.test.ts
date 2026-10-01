@@ -40,6 +40,15 @@ describe('buildOptions', () => {
   });
 });
 
+it('counts a building whose manager comes from its listing under that manager', () => {
+  const options = buildOptions([
+    rec({ owner_key: 'wall', owner_name: 'W', managed_by: 'Dorset Realty Group', managed_by_source: 'listing' }),
+  ]);
+  const manager = options.find((o) => o.kind === 'manager');
+  expect(manager?.label).toBe('Dorset Realty Group');
+  expect(manager?.buildings).toBe(1);
+});
+
 describe('suggest', () => {
   const opts = buildOptions(records);
 

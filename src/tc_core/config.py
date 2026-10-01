@@ -52,6 +52,9 @@ class IngestConfig:
     # imported standalone via scripts/import_lotr_claims.py, decoupled from
     # the main rebuild cadence.
     lotr_ownership: str | None = None
+    # Optional: directory of LOTR search-log CSVs (ingest/raw_lotr_searches.py),
+    # imported alongside lotr_ownership by scripts/import_lotr_claims.py.
+    lotr_searches: str | None = None
     # Optional: PID -> addr_key bridge (scripts/export_pid_address_map.py).
     # Used by portfolios.py to join claims-derived landlord clusters onto
     # buildings for the map export; absent it, export_artifacts() just skips
@@ -79,6 +82,9 @@ class IngestConfig:
     # (data/raw/property_managers/<manager>/<YYYY-MM-DD>.json), accumulated
     # into raw_manager_listings (ingest/manager_listings.py).
     manager_listings: str | None = None
+    # Optional: hand-kept strata lot PID -> strata plan map
+    # (ingest/strata_lot_pids.py), so LOTR filings on a lot reach the building.
+    strata_lot_pids: str | None = None
     # Where export_artifacts() writes the frontend's input (the artifact
     # directory, spec §3/§6). frontend/ reads it via TC_ARTIFACTS_DIR.
     artifacts: str = DEFAULT_ARTIFACTS_DIR
@@ -134,6 +140,7 @@ def load_ingest_config(path: str) -> IngestConfig:
         lotr_ownership=(
             str(flat["lotr_ownership"]) if flat.get("lotr_ownership") else None
         ),
+        lotr_searches=str(flat["lotr_searches"]) if flat.get("lotr_searches") else None,
         pid_address_map=(
             str(flat["pid_address_map"]) if flat.get("pid_address_map") else None
         ),
@@ -156,5 +163,6 @@ def load_ingest_config(path: str) -> IngestConfig:
         manager_listings=(
             str(flat["manager_listings"]) if flat.get("manager_listings") else None
         ),
+        strata_lot_pids=str(flat["strata_lot_pids"]) if flat.get("strata_lot_pids") else None,
         artifacts=str(flat.get("artifacts", DEFAULT_ARTIFACTS_DIR)),
     )

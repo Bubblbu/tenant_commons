@@ -6,6 +6,7 @@ names (raw_buildings.bsns_trade_name, ";"-joined), SRO/co-op names attached
 by the overlay matcher (buildings.housing_name), and property-manager
 listings (raw_manager_listings), matched to buildings the same way co-op
 and SRO addresses are. The map shows one name, `pick_building_name()`.
+Usable listings are also linked to their building in building_listings.
 """
 
 from __future__ import annotations
@@ -15,6 +16,7 @@ import re
 import sqlite3
 
 from .overlay_sources import load_secondary_address_index
+from .manager_listings import usable_listings
 from .overlays import _build_loose_index, _match_key
 
 # Operating names first: the name a building runs under (licence, the
@@ -68,7 +70,9 @@ def derive_building_names(conn: sqlite3.Connection) -> int:
     by_key = {}
     for bid, addr_key, source_ids, housing_name, is_sro, is_coop in buildings:
         by_key[addr_key] = bid
-        for raw_id in json.loads(source_ids or "[]"):
+        ids = json.loads(source_ids or "[]")
+        # A building added from a listing records {"raw_manager_listings": [...]}.
+        for raw_id in ids if isinstance(ids, list) else []:
             foi_name, nm_name, trade = raw.get(raw_id, (None, None, None))
             add(bid, foi_name, "foi_rental_list", "raw_buildings", raw_id)
             add(bid, nm_name, "non_market_list", "raw_buildings", raw_id)
@@ -89,11 +93,26 @@ def derive_building_names(conn: sqlite3.Connection) -> int:
         if key in by_key:
             add(by_key[key], name, "manager_listing", "raw_manager_listings", row_id)
 
+    links = []
+    for listing in usable_listings(conn):
+        if not listing["address"]:
+            continue
+        key = _match_key(listing["address"], known, secondary, loose)
+        if key in by_key:
+            links.append((by_key[key], listing["manager"], listing["url"],
+                          listing["last_seen"], listing["listing_row_id"]))
+
     with conn:
         conn.execute("DELETE FROM building_names")
         conn.executemany(
             "INSERT INTO building_names (building_id, name, source_type, source_table, source_row_id) "
             "VALUES (?, ?, ?, ?, ?)",
             rows,
+        )
+        conn.execute("DELETE FROM building_listings")
+        conn.executemany(
+            "INSERT INTO building_listings (building_id, manager, url, last_seen, listing_row_id) "
+            "VALUES (?, ?, ?, ?, ?)",
+            links,
         )
     return len(rows)

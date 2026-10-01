@@ -7,7 +7,7 @@
  */
 import { escapeHtml, isMissing, sameName } from './html';
 import { formatAddress } from './address';
-import { SRO_INVENTORY, licenceProvenance, networkProvenance, provenanceIcon, registryProvenance } from './provenance';
+import { SRO_INVENTORY, licenceProvenance, listingProvenance, networkProvenance, provenanceIcon, registryProvenance } from './provenance';
 import type { BuildingRecord } from './types';
 
 const str = (v: unknown): string => (isMissing(v) ? '' : String(v).trim());
@@ -41,17 +41,43 @@ export interface PopupContext {
 
 const provenance = (text: string) => provenanceIcon(text);
 
+interface Listing { by: string; url: string | null; seen: string }
+
+/** The building's listings ({by, url, seen}), with any non-http(s) URL dropped. */
+function listingsOf(r: BuildingRecord): Listing[] {
+  if (!Array.isArray(r.listings)) return [];
+  return r.listings.flatMap((v) => {
+    if (!v || typeof v !== 'object') return [];
+    const o = v as Record<string, unknown>;
+    const by = str(o.by);
+    return by ? [{ by, url: safeUrl(o.url), seen: str(o.seen) }] : [];
+  });
+}
+
+const linked = (text: string, url: string | null): string =>
+  url ? `<a href="${escapeHtml(url)}" target="_blank" rel="noopener">${escapeHtml(text)} ↗</a>` : escapeHtml(text);
+
 function ownershipLines(r: BuildingRecord, ctx: PopupContext): string[] {
   const lines: string[] = [];
   const onRecord = !isMissing(r.owner_key) && r.owner_key !== 'unknown' && str(r.owner_name) !== '(Unknown)';
   const owner = onRecord ? str(r.owner_name) : '';
   const ownerSource = str(r.owner_source);
   const manager = str(r.managed_by);
+  const listings = listingsOf(r);
+  // The manager's own listing links from its line instead of a second "Listed by".
+  const own = manager ? listings.find((l) => sameName(l.by, manager)) : undefined;
+  const managerProvenance = str(r.managed_by_source) === 'listing'
+    ? listingProvenance(own?.seen ?? '')
+    : licenceProvenance(ctx.licenceYear);
   const managerLine = () =>
-    div('', escapeHtml(`Managed by ${manager}`) + provenance(licenceProvenance(ctx.licenceYear)));
+    div('', `Managed by ${linked(manager, own?.url ?? null)}` + provenance(managerProvenance));
+  const listedLines = listings
+    .filter((l) => l !== own)
+    .map((l) => div('', `Listed by ${linked(l.by, l.url)}` + provenance(listingProvenance(l.seen))));
   if (!owner) {
     lines.push(div('popup-owner popup-muted', 'Landlord not on record'));
     if (manager) lines.push(managerLine());
+    lines.push(...listedLines);
     return lines;
   }
   {
@@ -68,6 +94,7 @@ function ownershipLines(r: BuildingRecord, ctx: PopupContext): string[] {
   else if (ownerSource === 'registry' && licence && licence !== '(Unknown)' && !sameName(licence, owner)) {
     lines.push(div('', escapeHtml(`Licensed as ${licence}`) + provenance(licenceProvenance(ctx.licenceYear))));
   }
+  lines.push(...listedLines);
   const netSource = str(r.network_source);
   const onMap = num(r.network_buildings_on_map);
   if (netSource === 'claims' || (netSource === 'licence' && onMap !== null && onMap > 1)) {
@@ -105,6 +132,10 @@ export function renderPopup(r: BuildingRecord, ctx: PopupContext = {}): string {
     year === null ? '' : `built ${Math.trunc(year)}`,
   ].filter(Boolean).join(' · ');
   if (sizeLine) facts.push(div('', escapeHtml(sizeLine)));
+  if (str(r.building_source) === 'manager listing') {
+    const by = listingsOf(r)[0]?.by;
+    facts.push(div('popup-muted', escapeHtml(by ? `Added from ${by}'s listings` : "Added from a landlord's listings")));
+  }
   if (str(r.local_area)) facts.push(div('', escapeHtml(str(r.local_area))));
   const land = num(r.value_land);
   const bldg = num(r.value_bldg);
