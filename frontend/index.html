@@ -461,14 +461,19 @@
     display: none;
   }
 
-  td.select-cell,
-  th.select-head {
+  /* table.data scope: outranks `table.data thead th { text-align: left }`. */
+  table.data td.select-cell,
+  table.data th.select-head {
     width: 52px;
     text-align: center;
   }
 
-  td.select-cell input {
+  /* Same box in header and rows, so the header box sits over the row boxes. */
+  td.select-cell input,
+  th.select-head input {
     cursor: pointer;
+    margin: 0;
+    vertical-align: middle;
   }
 
   table.data tfoot {
@@ -502,7 +507,7 @@
         <table class="data" id="neighbourhoods-table">
           <thead>
             <tr>
-              <th class="select-head" data-sort="none">Select</th>
+              <th class="select-head" data-sort="none"><input type="checkbox" class="select-all" aria-label="Select all rows shown" title="Select all rows shown"></th>
               <th data-sort="text">Neighbourhood</th>
               <th data-sort="number">Bldgs</th>
               <th data-sort="number">Units</th>
@@ -529,7 +534,7 @@
         <table class="data" id="blocks-table">
           <thead>
             <tr>
-              <th class="select-head" data-sort="none">Select</th>
+              <th class="select-head" data-sort="none"><input type="checkbox" class="select-all" aria-label="Select all rows shown" title="Select all rows shown"></th>
               <th data-sort="text">Block</th>
               <th data-sort="number">Bldgs</th>
               <th data-sort="number">Units</th>
@@ -557,7 +562,7 @@
         <table class="data" id="buildings-table">
           <thead>
             <tr>
-              <th class="select-head" data-sort="none">Select</th>
+              <th class="select-head" data-sort="none"><input type="checkbox" class="select-all" aria-label="Select all rows shown" title="Select all rows shown"></th>
               <th data-sort="text">Address</th>
               <th data-sort="text">Name</th>
               <th data-sort="text">Neighbourhood</th>
@@ -588,7 +593,7 @@
         <table class="data" id="networks-table">
           <thead>
             <tr>
-              <th class="select-head" data-sort="none">Select</th>
+              <th class="select-head" data-sort="none"><input type="checkbox" class="select-all" aria-label="Select all rows shown" title="Select all rows shown"></th>
               <th data-sort="text" data-explain="network">Ownership group</th>
               <th data-sort="number">Bldgs</th>
               <th data-sort="number">Units</th>
@@ -611,7 +616,7 @@
         <table class="data" id="owners-table">
           <thead>
             <tr>
-              <th class="select-head" data-sort="none">Select</th>
+              <th class="select-head" data-sort="none"><input type="checkbox" class="select-all" aria-label="Select all rows shown" title="Select all rows shown"></th>
               <th data-sort="text" data-explain="owner">Landlord</th>
               <th data-sort="number">Bldgs</th>
               <th data-sort="number">Units</th>

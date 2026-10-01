@@ -10,6 +10,8 @@ export interface Selection {
   blockMarkers(blockId: string, on: boolean): void;
   /** Reset's "untick every row" loop (dispatches change so counts follow). */
   clearAll(): void;
+  /** Brings every table's select-all box in line with its shown rows (after a filter pass). */
+  syncSelectAll(): void;
 }
 
 /** Wires row checkboxes and row hover for all five tables. */
@@ -38,9 +40,8 @@ export function initSelection(index: MapIndex, markers: MarkerStyler, blocks: Bl
     });
   }
 
-  function handleSelectionChange(evt: Event): void {
-    const cb = evt.target as HTMLInputElement;
-    if (!cb.classList.contains('row-select')) return;
+  /** Applies one row checkbox's state to its row and the map (no summaries). */
+  function applyRow(cb: HTMLInputElement): void {
     const row = cb.closest('tr');
     if (row) row.classList.toggle('selected', cb.checked);
     const typ = cb.dataset.type;
@@ -57,13 +58,61 @@ export function initSelection(index: MapIndex, markers: MarkerStyler, blocks: Bl
     } else if (typ === 'neighbourhood') {
       hood(key.toLowerCase().trim(), cb.checked);
     }
+  }
+
+  const rowShown = (cb: HTMLInputElement): boolean => {
+    const row = cb.closest('tr');
+    return !!row && !row.classList.contains('hidden') && !row.classList.contains('search-hidden');
+  };
+  const rowBoxes = (table: Element): HTMLInputElement[] =>
+    Array.from(table.querySelectorAll<HTMLInputElement>('tbody input.row-select'));
+
+  /** The header box: ticked when every shown row is, partial when some are. */
+  function syncSelectAll(table: Element | null): void {
+    const head = table?.querySelector<HTMLInputElement>('thead input.select-all');
+    if (!table || !head) return;
+    const shown = rowBoxes(table).filter(rowShown);
+    const on = shown.filter((cb) => cb.checked).length;
+    head.checked = shown.length > 0 && on === shown.length;
+    head.indeterminate = on > 0 && on < shown.length;
+  }
+
+  function handleSelectionChange(evt: Event): void {
+    const cb = evt.target as HTMLInputElement;
+    if (!cb.classList.contains('row-select')) return;
+    applyRow(cb);
     tables.updateSummaryBar();
     tables.updateGroupTableSummaries();
+    syncSelectAll(cb.closest('table'));
+  }
+
+  /** Ticking selects every row the filters and search leave shown; unticking clears the table. */
+  function handleSelectAll(evt: Event): void {
+    const head = evt.target as HTMLInputElement;
+    const table = head.closest('table');
+    if (!table) return;
+    rowBoxes(table)
+      .filter((cb) => (head.checked ? rowShown(cb) && !cb.checked : cb.checked))
+      .forEach((cb) => {
+        cb.checked = head.checked;
+        applyRow(cb);
+      });
+    tables.updateSummaryBar();
+    tables.updateGroupTableSummaries();
+    syncSelectAll(table);
   }
 
   doc.querySelectorAll('.row-select').forEach((cb) => {
     cb.addEventListener('change', handleSelectionChange);
   });
+  doc.querySelectorAll('input.select-all').forEach((cb) => {
+    cb.addEventListener('change', handleSelectAll);
+  });
+  function syncAllHeaders(): void {
+    doc.querySelectorAll('input.select-all').forEach((cb) => syncSelectAll(cb.closest('table')));
+  }
+  // Search hides rows without a change event; keep the header boxes honest.
+  doc.addEventListener('tablesearch', syncAllHeaders);
 
   doc.querySelectorAll('#blocks-table tbody tr').forEach((row) => {
     const id = String(row.getAttribute('data-block'));
@@ -105,5 +154,5 @@ export function initSelection(index: MapIndex, markers: MarkerStyler, blocks: Bl
     });
   }
 
-  return { owner, network, hood, blockMarkers, clearAll };
+  return { owner, network, hood, blockMarkers, clearAll, syncSelectAll: syncAllHeaders };
 }

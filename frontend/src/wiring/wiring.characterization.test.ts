@@ -184,6 +184,53 @@ describe('selection and hover', () => {
   });
 });
 
+describe('select all', () => {
+  const head = (table: string) => document.querySelector<HTMLInputElement>(`#${table} thead input.select-all`)!;
+  const ticked = (table: string) =>
+    Array.from(document.querySelectorAll<HTMLInputElement>(`#${table} tbody input.row-select`)).filter((cb) => cb.checked).length;
+
+  it('ticks every visible row of its table and highlights their buildings', () => {
+    const h = startHarness();
+    h.setChecked(hood('west end'), true); // leaves buildings 1, 2, 3
+    h.setChecked('#buildings-table thead input.select-all', true);
+    expect(ticked('buildings-table')).toBe(3);
+    expect([1, 2, 3].map((b) => h.markerHighlighted(b))).toEqual([true, true, true]);
+    expect(h.markerHighlighted(4)).toBe(false);
+    expect(ticked('owners-table')).toBe(0);
+  });
+
+  it('unticks every selected row of its table', () => {
+    const h = startHarness();
+    h.setChecked('#owners-table thead input.select-all', true);
+    expect(ticked('owners-table')).toBeGreaterThan(1);
+    h.setChecked('#owners-table thead input.select-all', false);
+    expect(ticked('owners-table')).toBe(0);
+    expect(h.markerHighlighted(1)).toBe(false);
+  });
+
+  it('shows a partial selection, and a full one when every visible row is ticked', () => {
+    const h = startHarness();
+    h.setChecked(`${bRow(4)} input.row-select`, true);
+    expect(head('buildings-table').indeterminate).toBe(true);
+    expect(head('buildings-table').checked).toBe(false);
+    h.setChecked('#buildings-table thead input.select-all', true);
+    expect(head('buildings-table').indeterminate).toBe(false);
+    expect(head('buildings-table').checked).toBe(true);
+    h.setChecked(`${bRow(4)} input.row-select`, false);
+    expect(head('buildings-table').indeterminate).toBe(true);
+  });
+
+  it('follows the filters: rows they bring back are not ticked', () => {
+    const h = startHarness();
+    h.setChecked(hood('west end'), true);
+    h.setChecked('#buildings-table thead input.select-all', true);
+    expect(head('buildings-table').checked).toBe(true);
+    h.click('#filter-clear-area');
+    expect(head('buildings-table').checked).toBe(false);
+    expect(head('buildings-table').indeterminate).toBe(true);
+  });
+});
+
 describe('Clear and Reset', () => {
   it('clears one section, and Reset clears everything', () => {
     const h = startHarness();

@@ -166,6 +166,7 @@ export function initFilterPass(deps: FilterPassDeps, doc: Document): FilterPass 
     hideEmptyGroups(tables.networkRows, 'data-network', index.networks, selection.network, false);
     hideEmptyGroups(tables.neighbourhoodRows, 'data-area', index.hoods, selection.hood, true);
     tables.refreshAfterFilter();
+    selection.syncSelectAll();
 
     status.updateDataset();
     status.updateMapView();
