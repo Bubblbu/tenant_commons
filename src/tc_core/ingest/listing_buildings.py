@@ -2,9 +2,9 @@
 
 A usable listing (manager_listings.usable_listings) adds a building only
 when no building from the City's sources matches it, by the same matching
-building names use (overlays._match_key, so a street-type typo or a
-secondary entrance still lands on the City's building), and its address is
-a City address point, which places it. Listings never name an owner: the
+building names use (normalize.AddressMatcher, so a street-type typo or a
+secondary entrance still lands on the City's building), and its address
+matches a City address point the same way, which places it. Listings never name an owner: the
 building's owner is "(Unknown)" until the registry or a licence says more.
 """
 
@@ -12,8 +12,7 @@ from __future__ import annotations
 
 import pandas as pd
 
-from ..normalize import address_key_variants, sanitize_owner
-from .overlays import _build_loose_index, _match_key
+from ..normalize import AddressMatcher, sanitize_owner
 
 BUILDING_SOURCE = "manager listing"
 
@@ -33,20 +32,21 @@ def listing_building_rows(
     """New building rows, shaped like merge._deduplicate_buildings' output.
     addr_points is merge._prepare_addresses' frame (addr_key, lat, lon,
     geo_local_area). Listings at one address make one building."""
-    loose = _build_loose_index(known_keys)
+    buildings = AddressMatcher(known_keys, aliases=secondary_index)
     points = (
         addr_points.dropna(subset=["lat", "lon"])
         .drop_duplicates("addr_key")
         .set_index("addr_key")
     )
+    address_points = AddressMatcher(points.index)
     found: dict[str, dict] = {}
     for listing in listings:
         address = listing.get("address")
         if not address:
             continue
-        if _match_key(address, known_keys, secondary_index, loose) in known_keys:
+        if buildings.match(address) is not None:
             continue
-        key = next((k for k in address_key_variants(address) if k in points.index), None)
+        key = address_points.match(address)
         if key is None:
             continue
         rec = found.setdefault(key, {"ids": [], "units": []})

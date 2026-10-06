@@ -90,7 +90,8 @@ def test_unmatched_coop_becomes_an_unmatched_record(tmp_path):
     assert rec["lat"] == 49.3
 
 
-def test_matched_sro_fills_null_units_from_registered_rooms(tmp_path):
+def test_matched_sro_leaves_a_null_unit_count_null(tmp_path):
+    # Registered rooms are not dwelling units; they stay in sro_registered_rooms.
     conn = sqlite3.connect(":memory:")
     init_db(conn)
     conn.execute(
@@ -103,7 +104,8 @@ def test_matched_sro_fills_null_units_from_registered_rooms(tmp_path):
 
     result = match_overlays(conn, buildings, _boundary(tmp_path))
 
-    assert result.matched.iloc[0]["units"] == 42
+    assert pd.isna(result.matched.iloc[0]["units"])
+    assert result.matched.iloc[0]["sro_registered_rooms"] == "42"
 
 
 def test_matched_sro_does_not_overwrite_a_reported_unit_count(tmp_path):
@@ -122,7 +124,7 @@ def test_matched_sro_does_not_overwrite_a_reported_unit_count(tmp_path):
     assert result.matched.iloc[0]["units"] == 80
 
 
-def test_unmatched_sro_carries_a_units_fallback_from_registered_rooms(tmp_path):
+def test_unmatched_sro_has_no_units_fallback(tmp_path):
     conn = sqlite3.connect(":memory:")
     init_db(conn)
     conn.execute(
@@ -134,7 +136,8 @@ def test_unmatched_sro_carries_a_units_fallback_from_registered_rooms(tmp_path):
     result = match_overlays(conn, _buildings(), _boundary(tmp_path))
 
     assert len(result.unmatched) == 1
-    assert result.unmatched[0]["units"] == 60
+    assert result.unmatched[0].get("units") is None
+    assert result.unmatched[0]["sro_registered_rooms"] == "60"
 
 
 def test_unmatched_coop_has_no_units_fallback(tmp_path):

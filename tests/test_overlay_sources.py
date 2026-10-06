@@ -134,3 +134,26 @@ def test_boundary_feature_collection_reads_geojson(tmp_path):
     )
     fc = load_boundary_feature_collection(str(p))
     assert fc["features"][0]["properties"]["name"] == "Downtown"
+
+
+def test_a_secondary_address_two_buildings_share_is_left_out():
+    # 1255 and 1281 Kingsway are separate buildings on one parcel, so both
+    # list the parcel's other addresses. Which building "1265 kingsway"
+    # belongs to is unknown: picking one (formerly the first, i.e. the
+    # largest) would quietly misplace whatever matches it.
+    conn = _conn()
+    conn.executemany(
+        "INSERT INTO raw_buildings (address, secondary_addresses, ingested_at) VALUES (?, ?, 'now')",
+        [
+            ("1255 kingsway", "1265 kingsway;1281 kingsway;1259 kingsway"),
+            ("1281 kingsway", "1255 kingsway;1265 kingsway"),
+        ],
+    )
+    conn.commit()
+    idx = load_secondary_address_index(conn)
+    assert "1265 kingsway" not in idx
+    assert idx["1259 kingsway"] == "1255 kingsway"  # only one building lists it
+    # Each building is listed as the other's secondary; the buildings' own
+    # keys are matched exactly before any alias, so these entries are moot.
+    assert idx["1281 kingsway"] == "1255 kingsway"
+    assert idx["1255 kingsway"] == "1281 kingsway"

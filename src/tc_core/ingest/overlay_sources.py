@@ -67,11 +67,16 @@ def load_secondary_address_index(conn: sqlite3.Connection) -> dict[str, str]:
     raw_buildings' source). Keys go through the same addr_key_from_freeform
     the matcher uses elsewhere, split on ";" only. Feeds the co-op/SRO
     fallback for buildings the source lists under a different entrance.
+
+    secondary_addresses is parcel-wide, so on a parcel with several
+    buildings each lists the same addresses. An address claimed by more than
+    one building is left out: which building it belongs to is unknown, and
+    matching it to one of them would be a guess.
     """
     df = pd.read_sql_query(
         "SELECT address, secondary_addresses FROM raw_buildings", conn
     )
-    index: dict[str, str] = {}
+    claims: dict[str, set[str]] = {}
     for primary, secs in zip(df["address"], df["secondary_addresses"]):
         if secs is None or (isinstance(secs, float) and pd.isna(secs)):
             continue
@@ -83,11 +88,8 @@ def load_secondary_address_index(conn: sqlite3.Connection) -> dict[str, str]:
             sec_addr = sec_addr.strip()
             if not sec_addr:
                 continue
-            # First building to claim a given secondary address wins; a
-            # genuine collision is a data question, not something to silently
-            # pick a "better" side of here.
-            index.setdefault(addr_key_from_freeform(sec_addr), primary_key)
-    return index
+            claims.setdefault(addr_key_from_freeform(sec_addr), set()).add(primary_key)
+    return {sec: next(iter(owners)) for sec, owners in claims.items() if len(owners) == 1}
 
 
 def load_boundary_feature_collection(path: str | Path) -> dict:

@@ -17,7 +17,8 @@ import sqlite3
 
 from .overlay_sources import load_secondary_address_index
 from .manager_listings import usable_listings
-from .overlays import _build_loose_index, _match_key
+from ..normalize import AddressMatcher
+from .overlays import _match_key
 
 # Operating names first: the name a building runs under (licence, the
 # manager's own listing) before the names on City lists.
@@ -83,13 +84,13 @@ def derive_building_names(conn: sqlite3.Connection) -> int:
 
     known = set(by_key)
     secondary = load_secondary_address_index(conn)
-    loose = _build_loose_index(known)
+    matcher = AddressMatcher(known, aliases=secondary)
     for row_id, name, address in conn.execute(
         "SELECT listing_row_id, name, address FROM raw_manager_listings"
     ):
         if not address:
             continue
-        key = _match_key(address, known, secondary, loose)
+        key = _match_key(address, matcher)
         if key in by_key:
             add(by_key[key], name, "manager_listing", "raw_manager_listings", row_id)
 
@@ -97,7 +98,7 @@ def derive_building_names(conn: sqlite3.Connection) -> int:
     for listing in usable_listings(conn):
         if not listing["address"]:
             continue
-        key = _match_key(listing["address"], known, secondary, loose)
+        key = _match_key(listing["address"], matcher)
         if key in by_key:
             links.append((by_key[key], listing["manager"], listing["url"],
                           listing["last_seen"], listing["listing_row_id"]))

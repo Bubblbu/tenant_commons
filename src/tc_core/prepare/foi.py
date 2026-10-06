@@ -14,7 +14,7 @@ from pathlib import Path
 
 import polars as pl
 
-from ..normalize import addr_key_from_freeform
+from ..normalize import addr_key_from_freeform, split_trailing_name
 
 COMBINED_COLS = [
     "_norm_address",
@@ -27,6 +27,18 @@ COMBINED_COLS = [
     "Currentuse",
     "foi_release",
 ]
+
+
+def _split_names(df: pl.DataFrame) -> pl.DataFrame:
+    """Moves a building name appended to the address ("1005 JERVIS ST Mathew
+    Court", as the 2024 extract writes it) into Name, unless Name is already
+    set. Without this the address never keys like its 2023 row, both rows
+    survive the de-dup, and the older one wins downstream."""
+    parts = [split_trailing_name(a) for a in df["Address"].to_list()]
+    return df.with_columns(
+        Address=pl.Series([a for a, _ in parts], dtype=pl.Utf8),
+        Name=pl.coalesce(pl.col("Name"), pl.Series([n for _, n in parts], dtype=pl.Utf8)),
+    )
 
 
 def merge_foi_releases(extract_2023: Path, extract_2024: Path, out: Path) -> int:
@@ -58,6 +70,12 @@ def merge_foi_releases(extract_2023: Path, extract_2024: Path, out: Path) -> int
         Name=pl.lit(None, dtype=pl.Utf8), Currentuse=pl.lit(None, dtype=pl.Utf8)
     ).select(COMBINED_COLS)
     new_aligned = new.select(COMBINED_COLS)
+    old_aligned, new_aligned = (
+        _split_names(df).with_columns(
+            _norm_address=pl.col("Address").map_elements(addr_key_from_freeform, return_dtype=pl.Utf8)
+        )
+        for df in (old_aligned, new_aligned)
+    )
 
     merged = pl.concat([new_aligned, old_aligned]).unique(
         subset="_norm_address", keep="first"

@@ -19,7 +19,7 @@ import polars as pl
 import polars.selectors as cs
 
 from ..paths import DataPaths
-from ..normalize import addr_key_from_freeform
+from ..normalize import AddressMatcher, addr_key_from_freeform
 from .io import load_polars
 from .licence_fees import decode_fee
 
@@ -162,12 +162,16 @@ def run(paths: DataPaths) -> None:
     ct_properties_f = paths.ct_properties
     buildings_f.parent.mkdir(parents=True, exist_ok=True)
 
-    CLEAN = lambda col: pl.col(col).map_elements(addr_key_from_freeform, return_dtype=pl.Utf8)
-
     pl.Config.set_tbl_rows(10)
 
     # --- Datasets ---
     props = pl.read_csv(properties_f)
+    # Source addresses resolve to a property address (normalize.AddressMatcher:
+    # ranges, unit prefixes, appended building names, missing street types),
+    # falling back to the plain key so an unmatched row keeps its own address.
+    matcher = AddressMatcher(props["address"].drop_nulls().to_list())
+    to_key = lambda a: matcher.match(a) or addr_key_from_freeform(a)
+    CLEAN = lambda col: pl.col(col).map_elements(to_key, return_dtype=pl.Utf8)
 
     # --- Chinatown properties ---
     ct_props = (
@@ -247,7 +251,7 @@ def run(paths: DataPaths) -> None:
 
     businesses = businesses.with_columns(
         address=pl.concat_str(pl.col("house"), pl.lit(" "), pl.col("street")).map_elements(
-            addr_key_from_freeform, return_dtype=pl.Utf8
+            to_key, return_dtype=pl.Utf8
         ),
     )
     businesses = businesses.with_columns(
@@ -300,7 +304,7 @@ def run(paths: DataPaths) -> None:
     issues = issues.with_columns(
         address=pl.concat_str(
             pl.col("streetnumber"), pl.lit(" "), pl.col("street")
-        ).map_elements(addr_key_from_freeform, return_dtype=pl.Utf8)
+        ).map_elements(to_key, return_dtype=pl.Utf8)
     )
     housing = housing.join(
         issues.select(
