@@ -116,6 +116,17 @@ that street? does B?). Measured on 2026-10-06 across every source's "A-B" addres
 | `ingest/building_names.py`, `ingest/listing_buildings.py` | buildings (and, for placing a listing, the City's address points) | secondary addresses |
 | `ingest/membership.py` | buildings | secondary addresses: a member at "488 W 41st Ave" belongs to the building at 458 W 41st Ave on the same parcel |
 
+**Secondary addresses (aliases)** come from `load_secondary_address_index()`. A
+building's `secondary_addresses` are all the other addresses on its parcel. When a
+parcel holds several buildings (36 parcels, 78 buildings as of 2026-10-06), they all
+list the same addresses. An address listed by more than one building is left out of
+the alias map, so a record there stays unmatched instead of going to whichever building
+came first. Example: 1255 and 1281 Kingsway share the parcel whose primary is
+1265 Kingsway, so "1265 Kingsway" matches neither. At the time this cost 7 member links
+on four such parcels, one co-op (Fraserview Towers, listed at 2855 E Kent Ave N, a
+parcel holding 2833 and 2777 E Kent Ave N), and one listing name. Assigning contested
+addresses to the nearest building by coordinates would recover them; that isn't built.
+
 Everything else (`metrics/portfolios.py`, `prepare/properties.py`, `merge.py`,
 `scripts/export_pid_address_map.py`) still uses the plain `addr_key_from_freeform()`
 and gets the canonical rules C1–C8 only.
