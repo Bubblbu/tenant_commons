@@ -110,6 +110,7 @@ that street? does B?). Measured on 2026-10-06 across every source's "A-B" addres
 
 | Call site | Known keys | Aliases |
 |---|---|---|
+| `prepare/foi.py`: merging the 2023 and 2024 FOI releases | none, because it runs before `properties.csv` exists. It uses `split_trailing_name()` only (the M2 cut point on the source text): "1005 JERVIS ST Mathew Court" becomes Address "1005 JERVIS ST" plus Name "Mathew Court", unless Name is already set, so the 2024 row matches its 2023 row and wins. | — |
 | `prepare/buildings.py`: FOI inventory, non-market list, rental licences, rental-standards issues | property addresses (`properties.csv`) | — |
 | `ingest/overlays.py`: co-ops, SRO/SRA, rezoning | buildings | secondary addresses |
 | `ingest/building_names.py`, `ingest/listing_buildings.py` | buildings (and, for placing a listing, the City's address points) | secondary addresses |
@@ -128,6 +129,12 @@ and gets the canonical rules C1–C8 only.
 | Licence-only buildings | 253 | 231: licences that duplicated an inventory building now land on it |
 | Members linked to a building | 1,790 | 2,384: about 300 from C1/C2 and the matcher, about 290 from secondary-address aliases |
 | Buildings flagged co-op / SRO / rezoning | 93 / 68 / 43 | 98 / 70 / 91 |
+
+A follow-up fix the same day split the building names out of the 2024 FOI addresses
+before the two releases are merged. That removed 145 duplicate 2023/2024 rows, so the
+2024 data now wins as intended. It also added 146 FOI building names (802 → 948), and
+two build years now come from 2024 (3683 E Hastings St 1977 → 2013, 2272 W 7th Ave
+1964 → 2021).
 
 Unmatched source rows by source: FOI 332 → 141, non-market 59 → 24, licences 44 → 11,
 co-ops 72 → 31, SRO 108 → 104, rezoning 333 → 284, listings 15 → 14.

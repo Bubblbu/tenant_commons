@@ -209,3 +209,22 @@ def test_loose_key_drops_only_the_final_street_type():
     assert loose_key("1415 st georges ave") == "1415 st georges"
     assert loose_key("2898 kingsway") == "2898 kingsway"
 
+
+from tc_core.normalize import split_trailing_name
+
+
+@pytest.mark.parametrize("raw, expected", [
+    ("1005 JERVIS ST Mathew Court", ("1005 JERVIS ST", "Mathew Court")),
+    ("1095 BUTE ST St James Court", ("1095 BUTE ST", "St James Court")),
+    ("410 W 12TH AVE The Golden Court", ("410 W 12TH AVE", "The Golden Court")),
+    ("1209 E BROADWAY Plaza", ("1209 E BROADWAY", "Plaza")),
+    # nothing that's a name: leave the address whole
+    ("1005 JERVIS ST", ("1005 JERVIS ST", None)),
+    ("962 16TH AVE E", ("962 16TH AVE E", None)),        # trailing direction
+    ("309 E CORDOVA ST St", ("309 E CORDOVA ST St", None)),  # doubled type (C7)
+    ("1415 St Georges Ave", ("1415 St Georges Ave", None)),  # leading Saint
+    ("100 Main Mall", ("100 Main Mall", None)),
+    ("", ("", None)),
+])
+def test_split_trailing_name(raw, expected):
+    assert split_trailing_name(raw) == expected

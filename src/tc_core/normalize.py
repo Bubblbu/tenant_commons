@@ -211,6 +211,27 @@ def _drop_trailing_name(key: str) -> str | None:
     return None if i is None else f"{m.group(1)} {' '.join(tokens[: i + 1])}"
 
 
+def split_trailing_name(address: Any) -> tuple[str, str | None]:
+    """'1005 JERVIS ST Mathew Court' -> ('1005 JERVIS ST', 'Mathew Court').
+
+    Same cut point as AddressMatcher's M2, but on the source text, keeping
+    its spelling. Returns (address, None) when no name follows the street.
+    For sources that put a building name in the address field (the 2024 FOI
+    extract) and need it split off before any known-keys index exists.
+    """
+    raw = re.sub(r"\s+", " ", str(address)).strip()
+    tokens = raw.split(" ")
+    if len(tokens) < 3 or not tokens[0][:1].isdigit():
+        return raw, None
+    street = tokens[1:]
+    norm = [normalize_street(t) for t in street]
+    i = _name_cut(norm)
+    # Only street types left over ("309 E CORDOVA ST St") is no name.
+    if i is None or all(t in _STREET_TYPES or t in _DIRECTIONS for t in norm[i + 1:]):
+        return raw, None
+    return " ".join(tokens[: i + 2]), " ".join(street[i + 1:])
+
+
 class AddressMatcher:
     """Resolves source addresses to one of a fixed set of known addr_keys.
 
