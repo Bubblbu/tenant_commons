@@ -10,7 +10,7 @@ separately as candidate `overlay_housing` rows. Unmatched rezoning records
 stay in the body's own `unmatched_records` list; rezoning isn't shown on the
 map for now, but its matching is kept as-is.
 
-Matching is address-key only (`tc_core.normalize.addr_key_from_freeform`), no
+Matching is address-key only (`tc_core.normalize.AddressMatcher`), no
 lat/lon proximity fallback — a deliberate precision-over-recall choice. Each
 source needs different preprocessing before it produces a clean key:
 
@@ -52,7 +52,7 @@ import numpy as np
 import pandas as pd
 from shapely.geometry import Point, shape
 
-from ..normalize import addr_key_from_freeform, address_key_variants
+from ..normalize import AddressMatcher, address_key_variants
 from .overlay_sources import (
     load_boundary_feature_collection,
     load_coops_frame,
@@ -117,45 +117,12 @@ def _resolve_local_area(lat, lon, boundary_polys: list[tuple[str, object]]) -> s
     return ""
 
 
-_STREET_TYPE_RE = re.compile(r"^(\d+ .+?)(?: (?:st|ave|rd|dr|blvd|pl|ct|hwy))?$")
-
-
-def _loose_key(key: str) -> str:
-    """addr_key without its street type ("404 hawks av" ~ "404 hawks st")."""
-    m = _STREET_TYPE_RE.match(key)
-    return m.group(1) if m else key
-
-
-def _build_loose_index(known_keys: set[str]) -> dict[str, str]:
-    """loose key -> building key, only where exactly one building has it."""
-    seen: dict[str, set[str]] = {}
-    for key in known_keys:
-        seen.setdefault(_loose_key(key), set()).add(key)
-    return {loose: next(iter(keys)) for loose, keys in seen.items() if len(keys) == 1}
-
-
-def _match_key(
-    street: str,
-    known_keys: set[str],
-    secondary_index: dict[str, str],
-    loose_index: dict[str, str],
-) -> str:
-    """The first variant that hits a building (directly, or via a secondary
-    address), then the first that hits one ignoring street type ("St" vs
-    "Av" typos, only when that number+street is unambiguous); otherwise the
+def _match_key(street: str, matcher: AddressMatcher) -> str:
+    """The building key AddressMatcher resolves `street` to; otherwise the
     most-stripped variant, so unmatched records for different units of one
     building end up sharing a key (and one marker).
     """
-    variants = address_key_variants(street)
-    for key in variants:
-        if key in known_keys:
-            return key
-        if key in secondary_index:
-            return secondary_index[key]
-    for key in variants:
-        if _loose_key(key) in loose_index:
-            return loose_index[_loose_key(key)]
-    return variants[-1]
+    return matcher.match(street) or address_key_variants(street)[-1]
 
 
 def _coop_street(address) -> str:
@@ -165,10 +132,9 @@ def _coop_street(address) -> str:
 _REZONING_NAME_SPLIT_RE = re.compile(r"\s+and\s+|\s*&\s*|;")
 
 
-def _rezoning_addr_key(name) -> str:
+def _rezoning_street(name) -> str:
     s = str(name).split("(")[0]
-    s = _REZONING_NAME_SPLIT_RE.split(s, maxsplit=1)[0].strip()
-    return addr_key_from_freeform(s)
+    return _REZONING_NAME_SPLIT_RE.split(s, maxsplit=1)[0].strip()
 
 
 def _add_extra_housing(
@@ -214,7 +180,7 @@ def match_overlays(
     addr_keys = set(df["addr_key"])
     boundary_polys = _build_boundary_polys(load_boundary_feature_collection(boundary_path))
     secondary_index = load_secondary_address_index(conn)
-    loose_index = _build_loose_index(addr_keys)
+    matcher = AddressMatcher(addr_keys, aliases=secondary_index)
     coops = load_coops_frame(conn)
     sro = load_sro_frame(conn)
     rezoning = load_rezoning_frame(conn)
@@ -256,7 +222,7 @@ def match_overlays(
     if coops is not None:
         coops = coops.copy()
         coops["addr_key"] = coops["address"].apply(
-            lambda a: _match_key(_coop_street(a), addr_keys, secondary_index, loose_index)
+            lambda a: _match_key(_coop_street(a), matcher)
         )
         matched_mask = coops["addr_key"].isin(addr_keys)
         matched = coops[matched_mask].drop_duplicates("addr_key")
@@ -304,7 +270,7 @@ def match_overlays(
     if sro is not None:
         sro = sro.copy()
         sro["addr_key"] = sro["address"].apply(
-            lambda a: _match_key(str(a), addr_keys, secondary_index, loose_index)
+            lambda a: _match_key(str(a), matcher)
         )
         matched_mask = sro["addr_key"].isin(addr_keys)
         matched = sro[matched_mask].drop_duplicates("addr_key")
@@ -370,7 +336,9 @@ def match_overlays(
     # ---- Rezoning applications ----
     if rezoning is not None:
         rezoning = rezoning.copy()
-        rezoning["addr_key"] = rezoning["name"].apply(_rezoning_addr_key)
+        rezoning["addr_key"] = rezoning["name"].apply(
+            lambda n: _match_key(_rezoning_street(n), matcher)
+        )
         matched_mask = rezoning["addr_key"].isin(addr_keys)
         matched = rezoning[matched_mask].drop_duplicates("addr_key")
         unmatched = rezoning[~matched_mask]
