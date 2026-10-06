@@ -187,7 +187,7 @@ CREATE TABLE overlay_housing (
     sro_ownership_group TEXT,
     sro_occupancy_status TEXT,
     sro_registered_rooms TEXT,
-    units INTEGER,  -- fallback for unmatched SRO records: registered_rooms, a room still houses a tenant
+    units INTEGER,  -- dwelling units only; SRO registered rooms are not units (see sro_registered_rooms)
     source_row_ids TEXT,   -- lineage hook (CLAUDE.md Q8c): JSON {"raw_coops": [ids], "raw_sro": [ids]}
     ingested_at TEXT NOT NULL
 );

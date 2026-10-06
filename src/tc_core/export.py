@@ -352,11 +352,9 @@ def _append_overlay_housing(
     ingest/overlay_write.py). They carry coordinates, a name and a housing
     type and little else — no year built, assessed values or owner — so they
     are tagged with a real `source` value rather than being passed off as
-    buildings. The one exception is `units`: unmatched SRO records carry a
-    registered-room count as a units fallback (a room still houses a tenant;
-    see overlay_write.py), so those rows are not blank on the individual
-    marker/popup/table. They're still excluded from the building-only
-    aggregates in reconstruct_filter_config (dataset totals, block/
+    buildings. They have no `units` (an SRO's registered rooms stay in
+    sro_registered_rooms, never counted as units). They're excluded from the
+    building-only aggregates in reconstruct_filter_config (dataset totals, block/
     neighbourhood unit sums, the units filter histogram) since they remain
     unverified, non-deduplicated points, not confirmed buildings.
     b_id continues from the buildings table's maximum so the two

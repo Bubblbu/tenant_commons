@@ -85,7 +85,7 @@ def test_unmatched_record_lands_in_overlay_housing(tmp_path):
     assert row[3] == "Downtown"
 
 
-def test_matched_sro_backfills_a_null_unit_count(tmp_path):
+def test_matched_sro_does_not_backfill_units_from_rooms(tmp_path):
     conn = sqlite3.connect(":memory:")
     init_db(conn)
     _seed_building(conn)
@@ -100,10 +100,10 @@ def test_matched_sro_backfills_a_null_unit_count(tmp_path):
     row = conn.execute(
         "SELECT units FROM buildings WHERE addr_key = '100 main st'"
     ).fetchone()
-    assert row[0] == 42
+    assert row[0] is None
 
 
-def test_unmatched_sro_gets_a_units_fallback_in_overlay_housing(tmp_path):
+def test_unmatched_sro_has_no_units_in_overlay_housing(tmp_path):
     conn = sqlite3.connect(":memory:")
     init_db(conn)
     _seed_building(conn)
@@ -115,8 +115,9 @@ def test_unmatched_sro_gets_a_units_fallback_in_overlay_housing(tmp_path):
 
     ingest_overlays(conn, _boundary(tmp_path))
 
-    row = conn.execute("SELECT units FROM overlay_housing WHERE is_sro = 1").fetchone()
-    assert row[0] == 60
+    row = conn.execute("SELECT units, sro_registered_rooms FROM overlay_housing WHERE is_sro = 1").fetchone()
+    assert row[0] is None
+    assert row[1] == "60"
 
 
 def test_buildings_count_is_unaffected_by_unmatched_records(tmp_path):
