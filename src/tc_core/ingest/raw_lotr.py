@@ -17,11 +17,11 @@ Samwise export is safe to repeat.
 from __future__ import annotations
 
 import sqlite3
-from datetime import datetime, timezone
 
-import pandas as pd
+import polars as pl
 
 from ..io import normalize_cols, read_any_csv
+from .raw_table import conform_columns, insert_rows
 
 RAW_LOTR_COLUMNS = [
     "pid",
@@ -71,35 +71,15 @@ RAW_LOTR_COLUMNS = [
 ]
 
 
-def load_raw_lotr_frame(path: str) -> pd.DataFrame:
-    df = normalize_cols(read_any_csv(path))
-
-    unexpected = set(df.columns) - set(RAW_LOTR_COLUMNS)
-    if unexpected:
-        raise RuntimeError(
-            f"Samwise LOTR export has columns with no raw_lotr_ownership mapping: "
-            f"{sorted(unexpected)}. Add them to RAW_LOTR_COLUMNS/schema.sql, don't drop silently."
-        )
-
-    for col in RAW_LOTR_COLUMNS:
-        if col not in df.columns:
-            df[col] = None
-    return df[RAW_LOTR_COLUMNS]
+def load_raw_lotr_frame(path: str) -> pl.DataFrame:
+    return conform_columns(
+        normalize_cols(read_any_csv(path)),
+        RAW_LOTR_COLUMNS,
+        source="Samwise LOTR export",
+        table="raw_lotr_ownership",
+        columns_name="RAW_LOTR_COLUMNS",
+    )
 
 
 def ingest_raw_lotr(conn: sqlite3.Connection, path: str) -> int:
-    df = load_raw_lotr_frame(path)
-    ingested_at = datetime.now(timezone.utc).isoformat()
-    rows = [
-        (*(None if pd.isna(v) else v for v in row), ingested_at)
-        for row in df.itertuples(index=False)
-    ]
-    placeholders = ", ".join(["?"] * (len(RAW_LOTR_COLUMNS) + 1))
-    columns_sql = ", ".join(RAW_LOTR_COLUMNS + ["ingested_at"])
-    with conn:
-        conn.execute("DELETE FROM raw_lotr_ownership")
-        conn.executemany(
-            f"INSERT INTO raw_lotr_ownership ({columns_sql}) VALUES ({placeholders})",
-            rows,
-        )
-    return len(rows)
+    return insert_rows(conn, "raw_lotr_ownership", load_raw_lotr_frame(path), replace=True)

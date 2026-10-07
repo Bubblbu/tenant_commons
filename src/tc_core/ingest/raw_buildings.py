@@ -20,11 +20,11 @@ nothing.
 from __future__ import annotations
 
 import sqlite3
-from datetime import datetime, timezone
 
-import pandas as pd
+import polars as pl
 
 from ..io import normalize_cols, read_any_csv
+from .raw_table import conform_columns, insert_rows
 
 # Raw CSV header -> raw_buildings column, for the handful that don't already
 # match after normalize_cols() (lowercase + spaces->underscores).
@@ -88,51 +88,31 @@ def _stringify_money(v: object) -> object:
     """Normalize a value_land/value_bldg cell to a clean TEXT-storage string.
 
     Accepts either historical shape (a "$35,407,000.00"-style string, or a
-    plain number that pandas has already parsed to int/float) and returns a
-    clean string with no currency formatting and no trailing ".0" on whole
-    numbers. None/NaN passes through as None.
+    plain number already parsed to int/float) and returns a clean string with
+    no currency formatting and no trailing ".0" on whole numbers. None passes
+    through as None.
     """
-    if v is None or (isinstance(v, float) and pd.isna(v)):
+    if v is None:
         return None
     if isinstance(v, (int, float)):
         return str(int(v)) if float(v).is_integer() else str(v)
     return str(v).strip()
 
 
-def load_raw_buildings_frame(path: str) -> pd.DataFrame:
-    df = normalize_cols(read_any_csv(path))
-    df = df.rename(columns=RENAME_MAP)
-    df = df.drop(columns=[c for c in IGNORED_COLUMNS if c in df.columns])
-
-    unexpected = set(df.columns) - set(RAW_BUILDINGS_COLUMNS)
-    if unexpected:
-        raise RuntimeError(
-            f"buildings.csv has columns with no raw_buildings mapping: {sorted(unexpected)}. "
-            "Add them to RAW_BUILDINGS_COLUMNS/schema.sql or IGNORED_COLUMNS, don't drop silently."
-        )
-
-    for col in ("value_land", "value_bldg"):
-        if col in df.columns:
-            df[col] = df[col].apply(_stringify_money)
-
-    for col in RAW_BUILDINGS_COLUMNS:
-        if col not in df.columns:
-            df[col] = None
-    return df[RAW_BUILDINGS_COLUMNS]
+def load_raw_buildings_frame(path: str) -> pl.DataFrame:
+    df = conform_columns(
+        normalize_cols(read_any_csv(path)),
+        RAW_BUILDINGS_COLUMNS,
+        source="buildings.csv",
+        table="raw_buildings",
+        columns_name="RAW_BUILDINGS_COLUMNS",
+        rename=RENAME_MAP,
+        ignored=IGNORED_COLUMNS,
+    )
+    return df.with_columns(
+        pl.col("value_land", "value_bldg").map_elements(_stringify_money, return_dtype=pl.String)
+    )
 
 
 def ingest_raw_buildings(conn: sqlite3.Connection, path: str) -> int:
-    df = load_raw_buildings_frame(path)
-    ingested_at = datetime.now(timezone.utc).isoformat()
-    rows = [
-        (*(None if pd.isna(v) else v for v in row), ingested_at)
-        for row in df.itertuples(index=False)
-    ]
-    placeholders = ", ".join(["?"] * (len(RAW_BUILDINGS_COLUMNS) + 1))
-    columns_sql = ", ".join(RAW_BUILDINGS_COLUMNS + ["ingested_at"])
-    with conn:
-        conn.executemany(
-            f"INSERT INTO raw_buildings ({columns_sql}) VALUES ({placeholders})",
-            rows,
-        )
-    return len(rows)
+    return insert_rows(conn, "raw_buildings", load_raw_buildings_frame(path))
