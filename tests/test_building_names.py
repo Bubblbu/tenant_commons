@@ -80,18 +80,18 @@ def test_no_names_means_no_name():
 
 
 def test_export_names_buildings_from_the_table_and_overlays_from_their_own_name():
-    import pandas as pd
+    import polars as pl
 
     from tc_core.export import apply_building_names
 
-    df = pd.DataFrame([
+    df = pl.DataFrame([
         {"b_id": 1, "source": "building", "housing_name": None},
         {"b_id": 2, "source": "building", "housing_name": None},
         {"b_id": 1, "source": "overlay_sro", "housing_name": "Hotel Example"},  # overlay ids can repeat building ids' range
     ])
-    apply_building_names(df, {1: [("Maple Apartments", "manager_listing"), ("Maple", "foi_rental_list")]})
-    assert df["building_name"].tolist() == ["Maple Apartments", None, "Hotel Example"]
-    assert df["other_names"].tolist() == [["Maple"], [], []]
+    df = apply_building_names(df, {1: [("Maple Apartments", "manager_listing"), ("Maple", "foi_rental_list")]})
+    assert df["building_name"].to_list() == ["Maple Apartments", None, "Hotel Example"]
+    assert df["other_names"].to_list() == [["Maple"], [], []]
 
 
 def test_a_rebuild_succeeds_when_building_names_hold_rows():
