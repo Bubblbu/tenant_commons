@@ -97,7 +97,7 @@ export function initLiveTables(index: MapIndex, doc: Document): LiveTables {
       return direction === 'asc' ? cmp : -cmp;
     });
     // "Not on record" (data-pin="last") stays at the bottom in either direction.
-    pinLast(rowsWithIndex.map((item) => item.row)).forEach((row) => {
+    pinLast(rowsWithIndex.map((item) => item.row), rows).forEach((row) => {
       tbody.appendChild(row);
     });
   }

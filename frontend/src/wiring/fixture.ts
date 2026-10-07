@@ -10,7 +10,7 @@ import type { BlocksCollection, BuildingData, BuildingRecord, FilterConfig, Mark
 interface B {
   id: number; area: string; owner: string; units: number | null; year: number | null;
   housing: string; issues: number; block: number | null;
-  chinatown?: boolean; village?: boolean; manager?: string;
+  chinatown?: boolean; village?: boolean; manager?: string; searched?: string;
 }
 
 const OWNERS: Record<string, { name: string; network: string; networkName: string }> = {
@@ -26,7 +26,7 @@ const BUILDINGS: B[] = [
   { id: 5, area: 'Downtown', owner: 'unknown', units: 30, year: 1930, housing: '', issues: 1, block: 201, chinatown: true, manager: 'Tribe Management' },
   { id: 6, area: 'Downtown', owner: 'unknown', units: null, year: 1912, housing: 'co-op', issues: 0, block: 201 },
   { id: 7, area: 'Strathcona', owner: 'acme', units: 6, year: 1908, housing: '', issues: 3, block: 301 },
-  { id: 8, area: 'Strathcona', owner: 'unknown', units: 16, year: 1975, housing: '', issues: 0, block: 301 },
+  { id: 8, area: 'Strathcona', owner: 'unknown', units: 16, year: 1975, housing: '', issues: 0, block: 301, searched: '2026-10-06' },
   { id: 9, area: 'Strathcona', owner: 'birch', units: 60, year: 2015, housing: '', issues: 0, block: 301 },
   { id: 10, area: 'Downtown', owner: 'acme', units: 4, year: 1999, housing: '', issues: 0, block: 301 },
 ];
@@ -47,6 +47,7 @@ function record(b: B): BuildingRecord {
     network_key: o ? o.network : 'unknown',
     network_name: o ? o.networkName : '',
     managed_by: b.manager ?? '',
+    registry_no_filing: b.searched ?? null,
     housing_type: b.housing,
     n_issues: b.issues,
     block_id: b.block,

@@ -14,6 +14,8 @@ export interface Coverage {
   withOwner: number;
   withOwnerUnits: number;
   /** Buildings with an owner, by where the owner came from (owner_source). */
+  /** Buildings with no landlord whose registry search found no filing. */
+  searched: number;
   bySource: Record<string, number>;
   /** Buildings whose landlord group was assembled from ownership claims. */
   grouped: number;
@@ -29,13 +31,16 @@ const SOURCE_LABELS: [string, string][] = [
 export const hasOwner = (r: BuildingRecord): boolean => !isMissing(r.owner_key) && r.owner_key !== 'unknown';
 
 export function computeCoverage(records: BuildingRecord[]): Coverage {
-  const c: Coverage = { buildings: 0, units: 0, withOwner: 0, withOwnerUnits: 0, bySource: {}, grouped: 0 };
+  const c: Coverage = { buildings: 0, units: 0, withOwner: 0, withOwnerUnits: 0, searched: 0, bySource: {}, grouped: 0 };
   for (const r of records) {
     if (r.source !== 'building') continue;
     const units = typeof r.units === 'number' && Number.isFinite(r.units) ? r.units : 0;
     c.buildings += 1;
     c.units += units;
-    if (!hasOwner(r)) continue;
+    if (!hasOwner(r)) {
+      if (!isMissing(r.registry_no_filing) && r.registry_no_filing !== '') c.searched += 1;
+      continue;
+    }
     c.withOwner += 1;
     c.withOwnerUnits += units;
     const src = isMissing(r.owner_source) ? 'other' : String(r.owner_source);
@@ -63,7 +68,9 @@ export function coverageHtml(c: Coverage): string {
   ]
     .filter(([k]) => c.bySource[k])
     .map(([k, label]) => ({ cls: known.has(k) ? `seg-${k}` : 'seg-other', label, n: c.bySource[k] }));
-  parts.push({ cls: 'seg-missing', label: 'Landlord missing', n: missing });
+  // A searched building is a known gap in the registry; an unsearched one is a research gap.
+  if (c.searched > 0) parts.push({ cls: 'seg-searched', label: 'Missing, no registry filing', n: c.searched });
+  parts.push({ cls: 'seg-missing', label: 'Missing, not yet searched', n: missing - c.searched });
 
   const bar = parts
     .filter((p) => p.n > 0)
@@ -72,7 +79,7 @@ export function coverageHtml(c: Coverage): string {
   const items = parts
     .map(
       (p) =>
-        `<li${p.cls === 'seg-missing' ? ' class="coverage-missing"' : ''}>` +
+        `<li${p.cls === 'seg-missing' ? ' class="coverage-missing"' : p.cls === 'seg-searched' ? ' class="coverage-searched"' : ''}>` +
         `<span class="coverage-swatch ${p.cls}"></span><span class="coverage-label">${escapeHtml(p.label)}</span>` +
         `<span class="coverage-n">${fmt(p.n)}</span><span class="coverage-pct">${pct(p.n, c.buildings)}</span></li>`,
     )

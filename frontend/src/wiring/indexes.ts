@@ -1,3 +1,4 @@
+import { groupKey } from '../tables';
 import { MAP_THEME } from './map-theme';
 import type { BlockLayer, BuildingMarker, MapIndex, WiringContext } from './types';
 
@@ -71,13 +72,17 @@ export function buildMapIndex(ctx: WiringContext): MapIndex {
       marker._extraRings = rings.map((r) => ({ housingType: r.housing_type, marker: r.marker }));
     }
 
-    const ownerKey = meta.owner_key;
+    // Keyed as the landlord tables group them, so a "searched, no registry
+    // filing" row selects its own buildings and not the other not-on-record ones.
+    const rec = ctx.buildingData?.records[key];
+    const grouped = (k: string | null) => (k && rec ? groupKey(k, rec) : k);
+    const ownerKey = grouped(meta.owner_key);
     if (ownerKey) {
       if (!owners[ownerKey]) owners[ownerKey] = [];
       if (owners[ownerKey].indexOf(marker) === -1) owners[ownerKey].push(marker);
     }
 
-    const networkKey = meta.network_key;
+    const networkKey = grouped(meta.network_key);
     if (networkKey) {
       if (!networks[networkKey]) networks[networkKey] = [];
       if (networks[networkKey].indexOf(marker) === -1) networks[networkKey].push(marker);

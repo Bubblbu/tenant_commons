@@ -9,7 +9,7 @@ describe('computeCoverage', () => {
     rec(1, { units: 100, owner_key: 'a', owner_source: 'registry', network_source: 'claims' }),
     rec(2, { units: 50, owner_key: 'b', owner_source: 'licence', network_source: 'licence' }),
     rec(3, { units: 30, owner_key: 'unknown', owner_source: null }),
-    rec(4, { units: null, owner_key: null }),
+    rec(4, { units: null, owner_key: null, registry_no_filing: '2026-10-06' }),
     rec(5, { units: 20, owner_key: 'c', owner_source: 'sro_list', source: 'overlay_sro' }),
   ];
 
@@ -19,6 +19,7 @@ describe('computeCoverage', () => {
       units: 180,
       withOwner: 2,
       withOwnerUnits: 150,
+      searched: 1,
       bySource: { registry: 1, licence: 1 },
       grouped: 1,
     });
@@ -32,7 +33,9 @@ describe('computeCoverage', () => {
     expect(html).toContain('class="coverage-seg seg-registry" style="width:25.00%"');
     expect(html).toContain('Land title registry</span><span class="coverage-n">1</span>');
     expect(html).not.toContain('SRO inventory');
-    expect(html).toContain('Landlord missing</span><span class="coverage-n">2</span><span class="coverage-pct">50%</span>');
+    expect(html).toContain('Missing, no registry filing</span><span class="coverage-n">1</span><span class="coverage-pct">25%</span>');
+    expect(html).toContain('Missing, not yet searched</span><span class="coverage-n">1</span><span class="coverage-pct">25%</span>');
+    expect(html).toContain('class="coverage-seg seg-searched"');
     expect(html).toContain('<dd>83% <span class="coverage-pct">· 30 missing</span></dd>');
   });
 

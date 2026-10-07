@@ -1121,6 +1121,7 @@
   #filters-panel .seg-missing {
     background: repeating-linear-gradient(135deg, #e3e6ee 0 3px, #f3f4f8 3px 6px);
   }
+  #filters-panel .seg-searched { background: #c3c9d6; }
 
   #filters-panel .coverage-list {
     list-style: none;
@@ -1162,10 +1163,18 @@
     text-align: right;
   }
 
-  #filters-panel .coverage-list li.coverage-missing {
+  #filters-panel .coverage-list li.coverage-missing,
+  #filters-panel .coverage-list li.coverage-searched {
     border-top: 1px dashed #dde1eb;
     margin-top: 3px;
     padding-top: 5px;
+  }
+
+  /* The two missing rows read as one block under a single rule. */
+  #filters-panel .coverage-list li.coverage-searched + li.coverage-missing {
+    border-top: none;
+    margin-top: 0;
+    padding-top: 2px;
   }
 
   #filters-panel .coverage-list li.coverage-missing .coverage-n {

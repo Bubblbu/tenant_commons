@@ -44,6 +44,18 @@ describe('buildingRow', () => {
     expect(owned).toContain('<td>GREENBRIER HOLDINGS LTD.<div class="cell-sub">Managed by Tribe Rental Management</div></td>');
   });
 
+  it('says when a building was searched in the registry without a filing', () => {
+    const none = buildingRow(rec({ owner_name: '(Unknown)', owner_key: 'unknown', network_key: 'unknown', registry_no_filing: '2026-10-06' }));
+    expect(none).toContain('<td class="not-on-record">Not on record<div class="cell-sub">No registry filing · searched 2026-10-06</div></td>');
+    expect(none).toContain('data-owner="unknown-searched" data-network="unknown-searched"');
+    expect(none).toContain('data-has-owner=""');
+    const licensed = buildingRow(rec({ owner_name: 'Solo', owner_key: 'solo', network_name: 'Solo', network_key: 'solo', owner_source: 'licence', registry_no_filing: '2026-10-06' }));
+    expect(licensed).toContain('<td>Solo<div class="cell-sub">No registry filing · searched 2026-10-06</div></td>');
+    expect(licensed).toContain('data-owner="solo"');
+    const registry = buildingRow(rec({ owner_source: 'registry', registry_no_filing: '2026-10-06' }));
+    expect(registry).not.toContain('No registry filing');
+  });
+
   it('shows the building name, and finds it by any of its names', () => {
     const row = buildingRow(rec({ building_name: 'Maple Apartments', other_names: ['The Maple Apts'] }));
     expect(row).toContain('<td>A</td><td>Maple Apartments</td>');
@@ -152,7 +164,7 @@ describe('group tables', () => {
     ]);
     expect(html).toContain('data-tip="Grouped from 3 provincial registry filings. Name: default (entity with the most properties)."');
     expect(html).toContain('data-tip="Grouped by business licence name"');
-    expect(html).toContain('>Not on record</td>');
+    expect(html).toContain('>Not on record · not yet searched</td>');
   });
 
   it('pins buildings with no known landlord to one greyed row at the bottom of both views', () => {
@@ -164,7 +176,25 @@ describe('group tables', () => {
       const rows = html.split('\n');
       expect(rows).toHaveLength(2);
       expect(rows[1]).toContain('data-pin="last" class="not-on-record"');
-      expect(rows[1]).toContain('<td data-sort-value="">Not on record</td>');
+      expect(rows[1]).toContain('<td data-sort-value="">Not on record · not yet searched</td>');
+    }
+  });
+
+  it('pins searched-without-a-filing buildings as their own not-on-record row', () => {
+    const none = { owner_name: '(Unknown)', owner_key: 'unknown', network_name: '(Unknown)', network_key: 'unknown' };
+    const recs = [
+      rec({ b_id: 1, ...none, units: 500 }),
+      rec({ b_id: 2, ...none, units: 5, registry_no_filing: '2026-10-06' }),
+      rec({ b_id: 3, owner_name: 'A Co', owner_key: 'a', network_name: 'A Co', network_key: 'a', units: 10 }),
+    ];
+    for (const [html, attr, type] of [[ownerRowsHtml(recs), 'data-owner', 'owner'], [networkRowsHtml(recs), 'data-network', 'network']]) {
+      const rows = html.split('\n');
+      expect(rows).toHaveLength(3);
+      expect(rows[1]).toContain(`${attr}="unknown-searched" data-pin="last" class="not-on-record" data-bldgs="1"`);
+      expect(rows[1]).toContain(`data-type="${type}" data-target="unknown-searched"`);
+      expect(rows[1]).toContain('>Not on record · searched, no registry filing</td>');
+      expect(rows[2]).toContain(`${attr}="unknown" data-pin="last"`);
+      expect(rows[2]).toContain('>Not on record · not yet searched</td>');
     }
   });
 
@@ -203,5 +233,10 @@ describe('pinLast', () => {
   it('moves pinned rows to the end, keeping both groups in order', () => {
     const rows = [row('x', 'last'), row('a'), row('b'), row('y', 'last'), row('c')];
     expect(pinLast(rows).map((r) => r.id)).toEqual(['a', 'b', 'c', 'x', 'y']);
+  });
+
+  it('keeps pinned rows in their built order, whatever the sort did to them', () => {
+    const [x, y, a, b] = [row('x', 'last'), row('y', 'last'), row('a'), row('b')];
+    expect(pinLast([b, y, a, x], [a, b, x, y]).map((r) => r.id)).toEqual(['b', 'a', 'x', 'y']);
   });
 });

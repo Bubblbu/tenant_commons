@@ -127,9 +127,9 @@ describe('sidebar tables', () => {
     const h = startHarness();
     const bldgs = '#owners-table thead th:nth-child(3)';
     h.click(bldgs);
-    expect(ownerKeys()).toEqual(['birch', 'acme', 'unknown']);
+    expect(ownerKeys()).toEqual(['birch', 'acme', 'unknown-searched', 'unknown']);
     h.click(bldgs);
-    expect(ownerKeys()).toEqual(['acme', 'birch', 'unknown']);
+    expect(ownerKeys()).toEqual(['acme', 'birch', 'unknown-searched', 'unknown']);
   });
 
   it('does not sort when a header explainer icon is clicked', () => {
@@ -168,6 +168,15 @@ describe('selection and hover', () => {
     h.setChecked('#networks-table input.row-select[data-target="nw1"]', true);
     expect([1, 2, 3, 4, 7, 9, 10].map((b) => h.markerHighlighted(b))).toEqual(Array(7).fill(true));
     expect(h.markerHighlighted(5)).toBe(false);
+  });
+
+  it('selects searched-without-a-filing buildings apart from the other not-on-record ones', () => {
+    const h = startHarness();
+    h.setChecked('#owners-table input.row-select[data-target="unknown-searched"]', true);
+    expect([5, 6, 8].map((b) => h.markerHighlighted(b))).toEqual([false, false, true]);
+    h.setChecked('#owners-table input.row-select[data-target="unknown-searched"]', false);
+    h.setChecked('#networks-table input.row-select[data-target="unknown"]', true);
+    expect([5, 6, 8].map((b) => h.markerHighlighted(b))).toEqual([true, true, false]);
   });
 
   it('highlights on row hover, paints it on top, and leaves a selection alone', () => {
