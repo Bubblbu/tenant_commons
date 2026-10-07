@@ -40,12 +40,12 @@ try:
 except ModuleNotFoundError:  # pragma: no cover - only for <3.11
     tomllib = None
 
-import pandas as pd
+import polars as pl
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT / "src"))
 
-from tc_core.db import get_connection  # noqa: E402
+from tc_core.db import get_connection, query_frame  # noqa: E402
 from tc_core.normalize import addr_key_from_freeform  # noqa: E402
 
 
@@ -62,50 +62,54 @@ def _load_paths(config_path: Path) -> tuple[Path, Path]:
     return REPO_ROOT / db_path, REPO_ROOT / out_path
 
 
-def _addr_key(row: pd.Series) -> str:
-    civic = row["civic_number"]
-    street = row["std_street"]
-    if pd.isna(street):
-        return addr_key_from_freeform("")
-    if pd.isna(civic):
-        return addr_key_from_freeform(str(street))
+def _civic_str(civic) -> str:
     civic_int = float(civic)
-    civic_str = str(int(civic_int)) if civic_int.is_integer() else str(civic_int)
-    return addr_key_from_freeform(f"{civic_str} {street}")
+    return str(int(civic_int)) if civic_int.is_integer() else str(civic_int)
 
 
-def build_pid_address_map(conn) -> pd.DataFrame:
-    df = pd.read_sql_query(
+def _addr_key(civic, street) -> str:
+    if street is None:
+        return addr_key_from_freeform("")
+    if civic is None:
+        return addr_key_from_freeform(str(street))
+    return addr_key_from_freeform(f"{_civic_str(civic)} {street}")
+
+
+def _full_address(civic, street) -> str | None:
+    street = None if street is None else str(street)
+    if civic is None:
+        return street
+    return f"{_civic_str(civic)} {street}" if street else _civic_str(civic)
+
+
+def build_pid_address_map(conn) -> pl.DataFrame:
+    df = query_frame(
+        conn,
         "SELECT p_parcel_id AS address_point_id, site_id, civic_number, std_street, "
         "geo_local_area, geo_point_2d FROM raw_addresses",
-        conn,
-    )
-    dupes = df["address_point_id"].duplicated().sum()
+    ).with_columns(pl.all().cast(pl.String))
+    dupes = df.height - df["address_point_id"].n_unique()
     if dupes:
         raise RuntimeError(
             f"raw_addresses.p_parcel_id has {dupes} duplicate value(s); "
             "this table was assumed to be one row per address point."
         )
 
-    df["pid"] = df["site_id"].where(df["site_id"].str.fullmatch(PID_RE, na=False))
-    df = df.drop(columns=["site_id"])
-
-    df["addr_key"] = df.apply(_addr_key, axis=1)
-
-    def _full_address(row: pd.Series) -> str | None:
-        street = None if pd.isna(row["std_street"]) else str(row["std_street"])
-        if pd.isna(row["civic_number"]):
-            return street
-        civic_int = float(row["civic_number"])
-        civic_str = str(int(civic_int)) if civic_int.is_integer() else str(civic_int)
-        return f"{civic_str} {street}" if street else civic_str
-
-    df["address"] = df.apply(_full_address, axis=1)
-
-    out = df[
-        ["pid", "address_point_id", "address", "addr_key", "geo_local_area", "geo_point_2d"]
-    ].rename(columns={"geo_local_area": "local_area", "geo_point_2d": "lat_lon"})
-    return out.sort_values("addr_key").reset_index(drop=True)
+    points = list(zip(df["civic_number"], df["std_street"]))
+    out = df.select(
+        pid=pl.when(pl.col("site_id").str.contains(f"^{PID_RE.pattern}$"))
+        .then(pl.col("site_id")),
+        address_point_id="address_point_id",
+        address=pl.Series([_full_address(c, s) for c, s in points], dtype=pl.String),
+        addr_key=pl.Series([_addr_key(c, s) for c, s in points], dtype=pl.String),
+        local_area="geo_local_area",
+        lat_lon="geo_point_2d",
+    )
+    # An address point with no street has an empty key; write it as an
+    # empty cell, not "".
+    return out.sort("addr_key", maintain_order=True).with_columns(
+        pl.col("addr_key").replace("", None)
+    )
 
 
 def main() -> int:
@@ -130,8 +134,8 @@ def main() -> int:
         conn.close()
 
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    out.to_csv(out_path, index=False)
-    print(f"Wrote {len(out)} PID->address rows to {out_path}")
+    out.write_csv(out_path)
+    print(f"Wrote {out.height} PID->address rows to {out_path}")
     return 0
 
 
