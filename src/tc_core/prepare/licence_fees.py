@@ -12,9 +12,9 @@ them against the by-law when the licence data moves to a new folderyear.
 
 from __future__ import annotations
 
+import math
+from datetime import datetime, timezone
 from functools import cache
-
-import pandas as pd
 
 DWELLING, HOUSEKEEPING, SLEEPING = 98, 71, 47
 NON_PROFIT, POOL, APPLICATION = 277, 1108, 77
@@ -52,7 +52,18 @@ def _split(fee: float, months: int, application: int, rooms: bool, non_profit: b
     return found[0]
 
 
-def decode_fee(fee: float, issued: pd.Timestamp | None = None, status: str | None = None,
+def parse_issued(value: str | None) -> datetime | None:
+    """A licence's issueddate as a UTC datetime (a date alone is midnight UTC), or None."""
+    try:
+        issued = datetime.fromisoformat(str(value))
+    except ValueError:
+        return None
+    if issued.tzinfo is None:
+        return issued.replace(tzinfo=timezone.utc)
+    return issued.astimezone(timezone.utc)
+
+
+def decode_fee(fee: float, issued: datetime | None = None, status: str | None = None,
                subtype: str | None = None) -> dict:
     """Units behind one fee.
 
@@ -61,7 +72,7 @@ def decode_fee(fee: float, issued: pd.Timestamp | None = None, status: str | Non
     application, the licence issued later). `fee_certain` is False for readings with rooms,
     which often have alternatives ($284 = 4 housekeeping units, or a late 2025 fee plus $98).
     """
-    if fee is None or pd.isna(fee):
+    if fee is None or (isinstance(fee, float) and math.isnan(fee)):
         return {"fee_basis": "no fee"}
     if fee == APPLICATION:
         return {"fee_basis": "application fee only" + (" (pending)" if status == "Pending" else "")}
@@ -69,7 +80,7 @@ def decode_fee(fee: float, issued: pd.Timestamp | None = None, status: str | Non
         return {"fee_basis": "annual + 2025 arrears", "non_profit": False, "dwelling_units": 1,
                 "housekeeping_units": 0, "sleeping_units": 0, "pool": 0, "fee_certain": True}
     tries = [("annual", 12, 0)]
-    if issued is not None and not pd.isna(issued) and issued.year == RATES_FOLDERYEAR:
+    if issued is not None and issued.year == RATES_FOLDERYEAR:
         for month in (issued.month, issued.month - 1):
             if 1 < month <= 12:
                 tries.append(("new, prorated", 13 - month, APPLICATION))

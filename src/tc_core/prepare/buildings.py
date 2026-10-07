@@ -14,14 +14,13 @@ the retired Google Sheets push); that history stays in the archive.
 
 from __future__ import annotations
 
-import pandas as pd
 import polars as pl
 import polars.selectors as cs
 
 from ..paths import DataPaths
 from ..normalize import AddressMatcher, addr_key_from_freeform
 from .io import load_polars
-from .licence_fees import decode_fee
+from .licence_fees import decode_fee, parse_issued
 
 PARCEL_SUMS = ("value_land", "value_bldg", "tax_levy")
 
@@ -116,8 +115,7 @@ def licence_only_rentals(
     for r in licences.select(cols).iter_rows(named=True):
         if not r["address"]:
             continue
-        issued = pd.to_datetime(r["issueddate"], errors="coerce", utc=True)
-        d = decode_fee(r["feepaid"], issued, r["status"], r["bsns_subtype"])
+        d = decode_fee(r["feepaid"], parse_issued(r["issueddate"]), r["status"], r["bsns_subtype"])
         rows.append({
             "address": r["address"],
             "dwelling_units": d.get("dwelling_units", 0) if d.get("fee_certain") else 0,
