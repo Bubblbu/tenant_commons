@@ -2,7 +2,7 @@
 
 *Living document. Update this as decisions change — it's meant to be edited, not archived.*
 
-Last updated: 2026-09-23
+Last updated: 2026-10-06
 
 ---
 
@@ -221,4 +221,4 @@ Risks to actively manage (see Section 7): the "good enough" trap, premature demo
 ## Open questions / not yet decided
 *(add here as they come up)*
 
--
+- **Buildings spanning several parcels/folios (raised 2026-10-06).** `prepare/buildings.py::collapse_parcels()` is a stopgap: it sums assessed values and tax across a building's folios and takes every other column from the highest-value folio. That fixed values being picked at random per run, but it still flattens the building to one parcel's attributes. Air space parcels can have different owners (179 Main St: a private company holds Lot A, Community Builders Benevolence Group holds Air Space Parcel 2 for social housing), and the export's `registered_owners`/`registry_pids` lists don't record which owner holds which parcel, so the popup's "+N co-owners" can't tell joint owners of one parcel from separate owners of separate parcels. Revisit `collapse_parcels()` together with a parcel-level ownership model. Related, paused mid-brainstorm: classifying every building by ownership sector (public / non-profit & co-op / private / mixed) plus a market/non-market flag, inferred classifications shown with their basis; recommended approach is a standalone `tc_core/metrics/sector.py` that works per parcel and ingests the unused City-owned properties dataset (`raw/cov_open_data/city-owned-properties.csv`, joins on folio's first 8 digits = land coordinate).
