@@ -178,14 +178,14 @@ def test_building_overlay_columns_match_what_the_matcher_produces(tmp_path):
     and the buildings schema must agree with it, or matcher output is lost."""
     from tc_core.ingest.overlay_write import BUILDING_OVERLAY_COLUMNS
     from tc_core.ingest.overlays import match_overlays
-    import pandas as pd
+    from tc_core.db import query_frame
 
     conn = sqlite3.connect(":memory:")
     init_db(conn)
     _seed_building(conn)
     conn.commit()
-    buildings = pd.read_sql_query(
-        "SELECT building_id, addr_key, address, lat, lon, local_area FROM buildings", conn
+    buildings = query_frame(
+        conn, "SELECT building_id, addr_key, address, lat, lon, local_area FROM buildings"
     )
 
     added = set(match_overlays(conn, buildings, _boundary(tmp_path)).matched.columns)

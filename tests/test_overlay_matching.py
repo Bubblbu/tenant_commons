@@ -1,7 +1,7 @@
 import json
 import sqlite3
 
-import pandas as pd
+import polars as pl
 
 from tc_core.db import init_db
 from tc_core.ingest.overlays import match_overlays
@@ -38,7 +38,7 @@ def _boundary(tmp_path):
 
 
 def _buildings():
-    return pd.DataFrame(
+    return pl.DataFrame(
         {
             "addr_key": ["100 main st"],
             "address": ["100 main st"],
@@ -63,7 +63,7 @@ def test_matched_sro_sets_flag_on_the_building(tmp_path):
     result = match_overlays(conn, _buildings(), _boundary(tmp_path))
 
     assert result.unmatched == []
-    row = result.matched.iloc[0]
+    row = result.matched.row(0, named=True)
     assert bool(row["is_sro"]) is True
     assert row["sro_owner"] == "Owner Co"
     # These two travel through loader columns whose names differ from the
@@ -100,12 +100,12 @@ def test_matched_sro_leaves_a_null_unit_count_null(tmp_path):
     )
     conn.commit()
     buildings = _buildings()
-    buildings["units"] = [None]
+    buildings = buildings.with_columns(units=pl.lit(None, dtype=pl.Int64))
 
     result = match_overlays(conn, buildings, _boundary(tmp_path))
 
-    assert pd.isna(result.matched.iloc[0]["units"])
-    assert result.matched.iloc[0]["sro_registered_rooms"] == "42"
+    assert result.matched.row(0, named=True)["units"] is None
+    assert result.matched.row(0, named=True)["sro_registered_rooms"] == "42"
 
 
 def test_matched_sro_does_not_overwrite_a_reported_unit_count(tmp_path):
@@ -117,11 +117,11 @@ def test_matched_sro_does_not_overwrite_a_reported_unit_count(tmp_path):
     )
     conn.commit()
     buildings = _buildings()
-    buildings["units"] = [80]
+    buildings = buildings.with_columns(units=pl.lit(80))
 
     result = match_overlays(conn, buildings, _boundary(tmp_path))
 
-    assert result.matched.iloc[0]["units"] == 80
+    assert result.matched.row(0, named=True)["units"] == 80
 
 
 def test_unmatched_sro_has_no_units_fallback(tmp_path):
@@ -170,7 +170,7 @@ def test_secondary_address_fallback_matches(tmp_path):
     result = match_overlays(conn, _buildings(), _boundary(tmp_path))
 
     assert result.unmatched == []
-    assert bool(result.matched.iloc[0]["is_sro"]) is True
+    assert bool(result.matched.row(0, named=True)["is_sro"]) is True
 
 
 def test_record_without_coordinates_is_skipped(tmp_path):
@@ -185,3 +185,18 @@ def test_record_without_coordinates_is_skipped(tmp_path):
     result = match_overlays(conn, _buildings(), _boundary(tmp_path))
 
     assert result.unmatched == []
+
+
+def test_the_first_source_row_wins_when_several_match_one_building(tmp_path):
+    conn = sqlite3.connect(":memory:")
+    init_db(conn)
+    for title in ("First Co-op", "Second Co-op"):
+        conn.execute(
+            "INSERT INTO raw_coops (title, address, lat, lon, status, ingested_at) "
+            f"VALUES ('{title}', '100 Main St, Vancouver, BC', 49.28, -123.1, 'open', 'now')"
+        )
+    conn.commit()
+
+    result = match_overlays(conn, _buildings(), _boundary(tmp_path))
+
+    assert result.matched.row(0, named=True)["housing_name"] == "First Co-op"

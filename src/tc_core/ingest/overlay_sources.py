@@ -17,17 +17,18 @@ import json
 import sqlite3
 from pathlib import Path
 
-import pandas as pd
+import polars as pl
 
+from ..db import query_frame
 from ..normalize import addr_key_from_freeform
 
 
-def _frame_or_none(conn: sqlite3.Connection, sql: str) -> pd.DataFrame | None:
-    df = pd.read_sql_query(sql, conn)
-    return None if df.empty else df
+def _frame_or_none(conn: sqlite3.Connection, sql: str) -> pl.DataFrame | None:
+    df = query_frame(conn, sql)
+    return None if df.is_empty() else df
 
 
-def load_sro_frame(conn: sqlite3.Connection) -> pd.DataFrame | None:
+def load_sro_frame(conn: sqlite3.Connection) -> pl.DataFrame | None:
     return _frame_or_none(
         conn,
         """
@@ -39,7 +40,7 @@ def load_sro_frame(conn: sqlite3.Connection) -> pd.DataFrame | None:
     )
 
 
-def load_coops_frame(conn: sqlite3.Connection) -> pd.DataFrame | None:
+def load_coops_frame(conn: sqlite3.Connection) -> pl.DataFrame | None:
     return _frame_or_none(
         conn,
         """
@@ -50,7 +51,7 @@ def load_coops_frame(conn: sqlite3.Connection) -> pd.DataFrame | None:
     )
 
 
-def load_rezoning_frame(conn: sqlite3.Connection) -> pd.DataFrame | None:
+def load_rezoning_frame(conn: sqlite3.Connection) -> pl.DataFrame | None:
     return _frame_or_none(
         conn,
         """
@@ -73,12 +74,9 @@ def load_secondary_address_index(conn: sqlite3.Connection) -> dict[str, str]:
     one building is left out: which building it belongs to is unknown, and
     matching it to one of them would be a guess.
     """
-    df = pd.read_sql_query(
-        "SELECT address, secondary_addresses FROM raw_buildings", conn
-    )
     claims: dict[str, set[str]] = {}
-    for primary, secs in zip(df["address"], df["secondary_addresses"]):
-        if secs is None or (isinstance(secs, float) and pd.isna(secs)):
+    for primary, secs in conn.execute("SELECT address, secondary_addresses FROM raw_buildings"):
+        if secs is None:
             continue
         secs = str(secs).strip()
         if not secs:

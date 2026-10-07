@@ -5,6 +5,8 @@ from __future__ import annotations
 import sqlite3
 from pathlib import Path
 
+import polars as pl
+
 SCHEMA_PATH = Path(__file__).parent / "schema.sql"
 
 
@@ -13,6 +15,14 @@ def get_connection(path: str | Path) -> sqlite3.Connection:
     conn = sqlite3.connect(path)
     conn.execute("PRAGMA foreign_keys = ON")
     return conn
+
+
+def query_frame(conn: sqlite3.Connection, sql: str, params: tuple = ()) -> pl.DataFrame:
+    """Run a query into a polars frame, typing each column from all its values
+    (SQLite types per value, not per column)."""
+    cursor = conn.execute(sql, params)
+    columns = [d[0] for d in cursor.description]
+    return pl.DataFrame(cursor.fetchall(), schema=columns, orient="row", infer_schema_length=None)
 
 
 # Columns added to PERSISTENT tables after they first shipped. CREATE TABLE IF

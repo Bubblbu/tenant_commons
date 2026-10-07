@@ -13,9 +13,10 @@ import logging
 import sqlite3
 from datetime import datetime, timezone
 
-import pandas as pd
+import polars as pl
 
-from .overlays import match_overlays
+from ..db import query_frame
+from .overlays import _missing, match_overlays
 
 logger = logging.getLogger("tc_core.ingest.overlays")
 
@@ -75,9 +76,7 @@ _OVERLAY_HOUSING_COLUMNS = [
 
 
 def _clean(value):
-    if value is None:
-        return None
-    if isinstance(value, float) and pd.isna(value):
+    if _missing(value):
         return None
     if isinstance(value, bool):
         return int(value)
@@ -87,9 +86,8 @@ def _clean(value):
 
 
 def ingest_overlays(conn: sqlite3.Connection, boundary_path: str) -> int:
-    buildings = pd.read_sql_query(
-        "SELECT building_id, addr_key, address, lat, lon, local_area, units FROM buildings",
-        conn,
+    buildings = query_frame(
+        conn, "SELECT building_id, addr_key, address, lat, lon, local_area, units FROM buildings"
     )
     result = match_overlays(conn, buildings, boundary_path)
 
@@ -99,10 +97,10 @@ def ingest_overlays(conn: sqlite3.Connection, boundary_path: str) -> int:
     # pinned "18 new columns" list) since `units` is a pre-existing buildings
     # column the matcher only ever fills in when null, not one it introduces.
     sro_unit_updates = []
-    for _, row in matched.iterrows():
+    for row in matched.iter_rows(named=True):
         values = [_clean(row.get(col)) for col in BUILDING_OVERLAY_COLUMNS]
         updates.append((*values, int(row["building_id"])))
-        if row.get("is_sro") and not pd.isna(row.get("units")):
+        if row.get("is_sro") and not _missing(row.get("units")):
             sro_unit_updates.append((_clean(row.get("units")), int(row["building_id"])))
 
     set_sql = ", ".join(f"{col} = ?" for col in BUILDING_OVERLAY_COLUMNS)
@@ -137,7 +135,7 @@ def ingest_overlays(conn: sqlite3.Connection, boundary_path: str) -> int:
 
     logger.info(
         "Overlays: %d buildings flagged, %d unmatched records stored",
-        int(matched[["is_coop", "is_sro", "is_rezoning"]].any(axis=1).sum()),
+        matched.select(pl.any_horizontal("is_coop", "is_sro", "is_rezoning").sum()).item(),
         len(result.unmatched),
     )
     return len(result.unmatched)

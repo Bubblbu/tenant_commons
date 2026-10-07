@@ -35,7 +35,7 @@ def test_loads_sro_rows():
     conn.commit()
     df = load_sro_frame(conn)
     assert len(df) == 1
-    row = df.iloc[0]
+    row = df.row(0, named=True)
     assert row["address"] == "100 main st"
     assert row["owner"] == "Owner Co"
     # Returned under the matcher body's name, not the table's — see Interfaces.
@@ -55,7 +55,7 @@ def test_loads_coop_rows():
     conn.commit()
     df = load_coops_frame(conn)
     assert len(df) == 1
-    assert df.iloc[0]["title"] == "Elm Co-op"
+    assert df["title"][0] == "Elm Co-op"
     assert "raw_coop_id" in df.columns
 
 
@@ -68,7 +68,7 @@ def test_loads_rezoning_rows_with_id_alias():
     conn.commit()
     df = load_rezoning_frame(conn)
     assert len(df) == 1
-    row = df.iloc[0]
+    row = df.row(0, named=True)
     # Returned under the matcher body's name, not the table's source_id
     assert row["id"] == "RZ285"
     assert "source_id" in df.columns  # source_id is still there from SELECT *
