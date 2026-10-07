@@ -23,6 +23,39 @@ from ..normalize import AddressMatcher, addr_key_from_freeform
 from .io import load_polars
 from .licence_fees import decode_fee
 
+PARCEL_SUMS = ("value_land", "value_bldg", "tax_levy")
+
+
+def collapse_parcels(df: pl.DataFrame) -> pl.DataFrame:
+    """One row per address from its property rows (one per pid/folio).
+
+    A building can span several folios (air space parcels, consolidated lots):
+    assessed values and tax are summed per distinct folio, pid/folio become
+    sorted ";" lists, and every other column takes the first non-null value
+    from the highest-value folio, so the row reads as one real parcel and the
+    result doesn't depend on row order.
+    """
+    sums = [c for c in PARCEL_SUMS if c in df.columns]
+    totals = (
+        df.unique(["address", "folio", *sums])
+        .group_by("address")
+        .agg(pl.when(pl.col(c).is_not_null().any()).then(pl.col(c).sum()).alias(c) for c in sums)
+    )
+    value = pl.sum_horizontal(pl.col(c).fill_null(0) for c in sums if c != "tax_levy")
+    by_value = dict(by=[value, pl.col("folio"), pl.col("pid")], descending=[True, False, False], nulls_last=True)
+    rest = [c for c in df.columns if c not in ("address", "pid", "folio", *sums)]
+    return (
+        df.group_by("address")
+        .agg(
+            *(pl.col(c).sort_by(**by_value).drop_nulls().first() for c in rest),
+            *(pl.col(c).drop_nulls().unique().sort().cast(pl.Utf8).str.join(";") for c in ("pid", "folio")),
+        )
+        .join(totals, on="address", how="left")
+        .select(df.columns)
+        .sort("address")
+    )
+
+
 BC_versions = {
     "B C": "BC",
     "B.C.": "BC",
@@ -165,7 +198,9 @@ def run(paths: DataPaths) -> None:
     pl.Config.set_tbl_rows(10)
 
     # --- Datasets ---
-    props = pl.read_csv(properties_f)
+    # pid is text (leading zeros; some aren't numeric, e.g. BCS1010): don't let
+    # schema inference guess it from whichever rows happen to come first.
+    props = pl.read_csv(properties_f, schema_overrides={"pid": pl.String})
     # Source addresses resolve to a property address (normalize.AddressMatcher:
     # ranges, unit prefixes, appended building names, missing street types),
     # falling back to the plain key so an unmatched row keeps its own address.
@@ -174,15 +209,8 @@ def run(paths: DataPaths) -> None:
     CLEAN = lambda col: pl.col(col).map_elements(to_key, return_dtype=pl.Utf8)
 
     # --- Chinatown properties ---
-    ct_props = (
-        props.filter(pl.col("chinatown"))
-        .group_by("address")
-        .agg(pl.all().drop_nulls().unique())
-        .with_columns(pl.exclude("address", "pid", "folio").list.first())
-    )
-    ct_props.with_columns(
-        pl.col("pid", "folio").cast(pl.List(pl.Utf8)).list.join(";")
-    ).write_csv(ct_properties_f)
+    ct_props = collapse_parcels(props.filter(pl.col("chinatown")))
+    ct_props.write_csv(ct_properties_f)
     print(f"ct_properties.csv: {ct_props.height} rows")
 
     # --- Rentals (merged FOI 2023+2024, see tc_core.prepare.foi) ---
@@ -333,12 +361,7 @@ def run(paths: DataPaths) -> None:
 
     # Collapse to one row per address (the VanMaps join can bring in multiple
     # pid/objectid records per primary_address).
-    buildings = (
-        buildings.group_by("address")
-        .agg(pl.all().drop_nulls().unique())
-        .with_columns(pl.exclude("address", "pid", "folio").list.first())
-        .with_columns(pl.col("pid", "folio").cast(pl.List(pl.Utf8)).list.join(";"))
-    )
+    buildings = collapse_parcels(buildings)
 
     # --- Address lookup: every address (primary + secondary) VanMaps knows
     # about, resolved to its primary address and property. Folded into buildings.csv
@@ -390,7 +413,7 @@ def run(paths: DataPaths) -> None:
         "management",
         "n_issues",
         "issues_details",
-    ).sort("units", descending=True, nulls_last=True)
+    ).sort(["units", "address"], descending=[True, False], nulls_last=True)
 
     buildings.write_csv(buildings_f)
     print(f"buildings.csv: {buildings.height} rows -> {buildings_f}")

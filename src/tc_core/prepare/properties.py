@@ -187,5 +187,7 @@ def run(paths: DataPaths) -> None:
         "tax_levy",
     )
 
+    # The joins and unique() above don't preserve row order; sort so reruns match.
+    props = props.sort(props.columns, nulls_last=True)
     props.write_csv(properties_f)
     print(f"Wrote {props.height} rows -> {properties_f}")
