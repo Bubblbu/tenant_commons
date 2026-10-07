@@ -37,7 +37,7 @@ from .ingest.overlay_write import BUILDING_OVERLAY_COLUMNS
 from .metrics.building_metrics import BUILDING_METRICS, build_building_metrics
 from .metrics.membership_metrics import compute_building_member_metrics
 from .metrics.portfolios import build_landlord_portfolios
-from .metrics.registry_owners import build_registry_owners
+from .metrics.registry_owners import build_registry_owners, build_registry_searches
 from .normalize import sanitize_owner
 
 
@@ -89,6 +89,11 @@ def reconstruct_points(
         build_landlord_portfolios(conn, pid_address_map_path) if pid_address_map_path else {}
     )
     _assign_ownership(merged, registry, portfolios)
+    # "Searched the registry, no filing": public as a date only (search notes stay internal).
+    no_filing = build_registry_searches(conn, pid_address_map_path) if pid_address_map_path else {}
+    merged["registry_no_filing"] = [
+        None if registry.get(key) else no_filing.get(key) for key in merged["addr_key"]
+    ]
     building_listings = _load_building_listings(conn, listing_aliases or {})
     merged["listings"] = [building_listings.get(int(b), []) for b in merged["b_id"]]
     apply_property_managers(merged, property_managers or set())
@@ -99,8 +104,8 @@ def reconstruct_points(
             "issues_details",
             "member_count", "has_vtu_member", "member_share_building",
             "owner_name", "owner_key", "owner_source", "registered_owners", "registry_pids",
-            "registry_retrieved", "licence_holder", "managed_by", "managed_by_source", "listings",
-            "network_key", "network_name",
+            "registry_retrieved", "registry_no_filing", "licence_holder", "managed_by",
+            "managed_by_source", "listings", "network_key", "network_name",
             "network_source", "network_name_source", "network_entities",
             "network_properties_on_title", "network_evidence",
             "member_count_all", "members_payload", "value_land",
@@ -871,8 +876,8 @@ def _marker_records(points_df: pd.DataFrame) -> list[dict]:
 BUILDING_RECORD_COLUMNS = [
     "b_id", "address", "building_name", "other_names", "local_area", "block_id", "units",
     "building_source", "year_built", "owner_name", "owner_key", "owner_source",
-    "registered_owners", "registry_pids", "registry_retrieved", "licence_holder", "managed_by",
-    "managed_by_source", "listings",
+    "registered_owners", "registry_pids", "registry_retrieved", "registry_no_filing",
+    "licence_holder", "managed_by", "managed_by_source", "listings",
     "network_key", "network_name", "network_source", "network_name_source",
     "network_entities", "network_buildings_on_map", "network_properties_on_title",
     "network_evidence",

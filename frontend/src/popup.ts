@@ -7,7 +7,7 @@
  */
 import { escapeHtml, isMissing, sameName } from './html';
 import { formatAddress } from './address';
-import { SRO_INVENTORY, licenceProvenance, listingProvenance, networkProvenance, provenanceIcon, registryProvenance } from './provenance';
+import { SRO_INVENTORY, licenceProvenance, listingProvenance, networkProvenance, provenanceIcon, registryProvenance, registrySearchProvenance } from './provenance';
 import type { BuildingRecord } from './types';
 
 const str = (v: unknown): string => (isMissing(v) ? '' : String(v).trim());
@@ -74,8 +74,12 @@ function ownershipLines(r: BuildingRecord, ctx: PopupContext): string[] {
   const listedLines = listings
     .filter((l) => l !== own)
     .map((l) => div('', `Listed by ${linked(l.by, l.url)}` + provenance(listingProvenance(l.seen))));
+  const searched = ownerSource === 'registry' ? '' : str(r.registry_no_filing);
+  const noFilingLine = () =>
+    div('popup-muted', 'No filing in the land title registry' + provenance(registrySearchProvenance(searched)));
   if (!owner) {
     lines.push(div('popup-owner popup-muted', 'Landlord not on record'));
+    if (searched) lines.push(noFilingLine());
     if (manager) lines.push(managerLine());
     lines.push(...listedLines);
     return lines;
@@ -88,6 +92,7 @@ function ownershipLines(r: BuildingRecord, ctx: PopupContext): string[] {
     const coOwners = strList(r.registered_owners).length - 1;
     if (coOwners > 0) html += ` <span class="popup-muted">${escapeHtml(`+${plural(coOwners, 'co-owner', 'co-owners')}`)}</span>`;
     lines.push(div('popup-owner', html));
+    if (searched) lines.push(noFilingLine());
   }
   const licence = str(r.licence_holder);
   if (manager) lines.push(managerLine());

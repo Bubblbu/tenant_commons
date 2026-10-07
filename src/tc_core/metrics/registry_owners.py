@@ -68,3 +68,39 @@ def build_registry_owners(
             retrieved=retrieved.get(addr_key),
         )
     return result
+
+
+def build_registry_searches(
+    conn: sqlite3.Connection, pid_address_map_path: str
+) -> dict[str, str]:
+    """{addr_key: date} for buildings with a PID searched on LOTR without a filing.
+
+    A PID counts when its latest search (raw_lotr_searches) found no filing and
+    raw_lotr_ownership holds no filing for it either; the date is the latest
+    such search across the building's PIDs. Callers show it only where the
+    building has no registry owner. Notes stay internal.
+    """
+    keys_by_pid = pid_addr_keys(conn, pid_address_map_path)
+    filed = {
+        _normalize_pid(pid) for (pid,) in conn.execute(
+            "SELECT pid FROM raw_lotr_ownership WHERE pid IS NOT NULL "
+            "AND (data_fetch_status IS NULL OR data_fetch_status = 'SUCCESS')"
+        )
+    }
+    latest: dict[str, tuple[str, str, str]] = {}
+    for pid, searched_on, searched_at, result in conn.execute(
+        "SELECT pid, searched_on, searched_at, result FROM raw_lotr_searches"
+    ):
+        pid = _normalize_pid(pid)
+        when = (searched_on, searched_at or "")
+        if pid not in latest or when > latest[pid][:2]:
+            latest[pid] = (*when, result)
+
+    result: dict[str, str] = {}
+    for pid, (searched_on, _, outcome) in latest.items():
+        if outcome != "no_filing" or pid in filed:
+            continue
+        for addr_key in keys_by_pid.get(pid, ()):
+            if searched_on > result.get(addr_key, ""):
+                result[addr_key] = searched_on
+    return result

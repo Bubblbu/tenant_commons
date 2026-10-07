@@ -427,13 +427,16 @@ CREATE INDEX IF NOT EXISTS idx_raw_lotr_ownership_reporting_body ON raw_lotr_own
 -- including searches that found no filing, which raw_lotr_ownership can't
 -- record. Tells "searched, no filing" apart from "never searched".
 -- PERSISTENT for the same reason as raw_lotr_ownership; replaced wholesale
--- on each scripts/import_lotr_claims.py run. Internal only.
+-- on each scripts/import_lotr_claims.py run. Only the date of a building's
+-- no-filing search is exported (registry_owners.py::build_registry_searches).
 CREATE TABLE IF NOT EXISTS raw_lotr_searches (
     raw_lotr_search_id INTEGER PRIMARY KEY,
     pid TEXT NOT NULL,             -- dashed, as LOTR writes it
     searched_on TEXT NOT NULL,     -- YYYY-MM-DD
     result TEXT NOT NULL CHECK (result IN ('no_filing', 'filed')),
     note TEXT,
+    result_count INTEGER,          -- Samwise export only: filings found (0 iff no_filing)
+    searched_at TEXT,              -- Samwise export only: 'YYYY-MM-DD HH:MM'
     source_path TEXT NOT NULL,     -- file name under the searches directory
     ingested_at TEXT NOT NULL
 );

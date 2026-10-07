@@ -219,3 +219,37 @@ def test_feed_staff_contacts_never_reach_any_artifact(tmp_path):
         assert "canary-staff" not in path.read_text(encoding="utf-8").lower(), path.name
     rec = _records(out)["1 solo st"]
     assert [set(e) for e in rec["listings"]] == [{"by", "url", "seen"}]
+
+
+def _searches(conn):
+    """1 solo st: searched twice, no filing. 2 solo st: no filing, then a filing
+    found. 522 e 8th ave: no filing logged, but it has a registry owner."""
+    conn.executemany(
+        "INSERT INTO raw_buildings (address, pid, ingested_at) VALUES (?, ?, 'now')",
+        [("1 solo st", "011-111-111"), ("2 solo st", "022-222-222")],
+    )
+    conn.executemany(
+        "INSERT INTO raw_lotr_searches (pid, searched_on, result, note, searched_at, source_path, "
+        "ingested_at) VALUES (?, ?, ?, ?, ?, 'log.csv', 'now')",
+        [("011-111-111", "2026-09-30", "no_filing", "CANARY-search-note", None),
+         ("011-111-111", "2026-10-06", "no_filing", None, "2026-10-06 18:23"),
+         ("022-222-222", "2026-09-30", "no_filing", None, None),
+         ("022-222-222", "2026-10-02", "filed", None, None),
+         ("008-173-613", "2026-10-06", "no_filing", None, None)],
+    )
+
+
+def test_buildings_searched_without_a_filing_say_so(tmp_path):
+    recs = _records(_export(tmp_path, _searches))
+    assert recs["1 solo st"]["registry_no_filing"] == "2026-10-06"
+    assert recs["1 solo st"]["owner_source"] == "licence"
+    assert recs["2 solo st"]["registry_no_filing"] is None      # a later search found a filing
+    assert recs["522 e 8th ave"]["registry_no_filing"] is None  # has a registry owner
+    assert recs["3 nobody st"]["registry_no_filing"] is None    # never searched
+    assert recs["999 nowhere rd"]["registry_no_filing"] is None
+
+
+def test_search_notes_never_reach_any_artifact(tmp_path):
+    out = _export(tmp_path, _searches)
+    for path in out.iterdir():
+        assert "CANARY-search-note" not in path.read_text(encoding="utf-8"), path.name

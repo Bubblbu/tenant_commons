@@ -33,7 +33,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT / "src"))
 
 from tc_core.config import load_ingest_config  # noqa: E402
-from tc_core.db import get_connection  # noqa: E402
+from tc_core.db import add_missing_columns, get_connection  # noqa: E402
 from tc_core.ingest import run_source  # noqa: E402
 from tc_core.ingest.lotr_claims import derive_lotr_ownership_claims  # noqa: E402
 from tc_core.ingest.raw_lotr import ingest_raw_lotr  # noqa: E402
@@ -64,6 +64,7 @@ def main() -> int:
         )
 
     conn = get_connection(config.db_path)
+    add_missing_columns(conn)  # columns added since the database was built
     run_id = new_run_id()
     try:
         raw_count = run_source(conn, run_id, "raw_lotr_ownership", ingest_raw_lotr, conn, lotr_path)

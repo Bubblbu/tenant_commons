@@ -33,6 +33,11 @@ export function registryProvenance(pids: string[], retrieved: string): string {
   return `${REGISTRY}${pidText}${when}`;
 }
 
+/** A search of the registry that found no filing for the building's PIDs. */
+export function registrySearchProvenance(searched: string): string {
+  return searched ? `${REGISTRY}, searched ${searched}` : REGISTRY;
+}
+
 export function licenceProvenance(year: number | null | undefined): string {
   return year ? `City of Vancouver business licence, ${year}` : 'City of Vancouver business licence';
 }

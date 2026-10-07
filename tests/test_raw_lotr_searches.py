@@ -55,3 +55,32 @@ def test_malformed_rows_fail_the_import(tmp_path, row):
     _log(tmp_path, "manual.csv", row + "\n")
     with pytest.raises(RuntimeError):
         ingest_raw_lotr_searches(_conn(), str(tmp_path))
+
+
+def _export_log(tmp_path, body):
+    (tmp_path / "samwise-searches-2026-10-06.csv").write_text(
+        "pid,searched_on,result,note,result_count,searched_at\n" + body
+    )
+
+
+def test_samwise_export_columns_are_kept(tmp_path):
+    _log(tmp_path, "manual.csv", "014-344-190,2026-09-30,no_filing,\n")
+    _export_log(tmp_path, "007-043-899,2026-10-06,no_filing,,0,2026-10-06 18:23\n")
+    conn = _conn()
+    ingest_raw_lotr_searches(conn, str(tmp_path))
+    rows = conn.execute(
+        "SELECT pid, result_count, searched_at FROM raw_lotr_searches ORDER BY pid"
+    ).fetchall()
+    assert rows == [("007-043-899", 0, "2026-10-06 18:23"), ("014-344-190", None, None)]
+
+
+@pytest.mark.parametrize("row", [
+    "007-043-899,2026-10-06,no_filing,,2,2026-10-06 18:23",   # count says filed
+    "007-043-899,2026-10-06,filed,,0,2026-10-06 18:23",       # count says no filing
+    "007-043-899,2026-10-06,filed,,many,2026-10-06 18:23",    # not a count
+    "007-043-899,2026-10-06,filed,,1,06/10/2026 18:23",       # not ISO
+])
+def test_inconsistent_export_rows_fail_the_import(tmp_path, row):
+    _export_log(tmp_path, row + "\n")
+    with pytest.raises(RuntimeError):
+        ingest_raw_lotr_searches(_conn(), str(tmp_path))

@@ -137,6 +137,21 @@ describe('ownership lines', () => {
     expect(html).not.toContain('ownership group');
   });
 
+  it('says when the registry was searched without a filing', () => {
+    const licensed = renderPopup({
+      b_id: 9, address: '1 Solo St', owner_name: 'Solo Rentals Ltd', owner_key: 'solo-rentals-ltd',
+      owner_source: 'licence', registry_no_filing: '2026-10-06',
+    });
+    expect(licensed).toContain('No filing in the land title registry<span class="prov"');
+    expect(licensed).toContain('data-tip="BC Land Owner Transparency Registry, searched 2026-10-06"');
+    const unknown = renderPopup({
+      b_id: 9, address: '999 Nowhere Rd', owner_name: '(Unknown)', owner_key: 'unknown', registry_no_filing: '2026-10-06',
+    });
+    expect(unknown.indexOf('Landlord not on record')).toBeLessThan(unknown.indexOf('No filing in the land title registry'));
+    expect(renderPopup(building)).not.toContain('No filing');
+    expect(renderPopup({ ...building, registry_no_filing: '2026-10-06' })).not.toContain('No filing');
+  });
+
   it('names the property manager when the landlord is not on record', () => {
     const html = renderPopup({
       b_id: 9, address: '1220 cardero st', owner_name: '(Unknown)', owner_key: 'unknown', owner_source: null,
