@@ -1,6 +1,7 @@
 import sqlite3
+from datetime import datetime, timezone
 
-import pandas as pd
+import polars as pl
 
 from tc_core.db import init_db
 from tc_core.export import reconstruct_blocks, reconstruct_filter_config, reconstruct_points
@@ -32,10 +33,10 @@ def test_source_distinguishes_buildings_from_overlay_records():
     init_db(conn)
     _seed(conn)
 
-    pts = reconstruct_points(conn, pd.Timestamp("2026-09-20", tz="UTC"))
+    pts = reconstruct_points(conn, datetime(2026, 9, 20, tzinfo=timezone.utc))
 
     assert set(pts["source"]) == {"building", "overlay_coop", "overlay_sro"}
-    assert (pts.loc[pts["source"] == "building", "addr_key"] == "100 main st").all()
+    assert pts.filter(pl.col("source") == "building")["addr_key"].to_list() == ["100 main st"]
 
 
 def test_b_id_is_unique_across_both_origins():
@@ -43,10 +44,10 @@ def test_b_id_is_unique_across_both_origins():
     init_db(conn)
     _seed(conn)
 
-    pts = reconstruct_points(conn, pd.Timestamp("2026-09-20", tz="UTC"))
+    pts = reconstruct_points(conn, datetime(2026, 9, 20, tzinfo=timezone.utc))
 
-    assert pts["b_id"].is_unique
-    assert len(pts) == 3
+    assert pts["b_id"].is_unique().all()
+    assert pts.height == 3
 
 
 def test_overlay_rows_have_no_units_or_owner():
@@ -54,10 +55,10 @@ def test_overlay_rows_have_no_units_or_owner():
     init_db(conn)
     _seed(conn)
 
-    pts = reconstruct_points(conn, pd.Timestamp("2026-09-20", tz="UTC"))
-    overlay = pts[pts["source"] != "building"]
+    pts = reconstruct_points(conn, datetime(2026, 9, 20, tzinfo=timezone.utc))
+    overlay = pts.filter(pl.col("source") != "building")
 
-    assert overlay["units"].isna().all()
+    assert overlay["units"].is_null().all()
     assert (overlay["owner_name"] == "(Unknown)").all()
     assert (overlay["member_count"] == 0).all()
 
@@ -67,7 +68,7 @@ def test_filter_config_counts_only_buildings():
     init_db(conn)
     _seed(conn)
 
-    now = pd.Timestamp("2026-09-20", tz="UTC")
+    now = datetime(2026, 9, 20, tzinfo=timezone.utc)
     pts = reconstruct_points(conn, now)
     blocks = reconstruct_blocks(conn, pts)
     cfg = reconstruct_filter_config(conn, pts, blocks, now)

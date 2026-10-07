@@ -44,20 +44,20 @@ def test_an_unlisted_building_on_an_address_point_is_added():
     _point(conn, "1120", "PACIFIC ST", 49.2783, -123.1335)
     rows = listing_building_rows([_listing(7, "1120 Pacific Street", units=120)], set(), {}, _points(conn))
     assert len(rows) == 1
-    row = rows.iloc[0]
+    row = rows.row(0, named=True)
     assert row["addr_key"] == "1120 pacific st"
     assert (row["lat"], row["lon"]) == (49.2783, -123.1335)
     assert row["local_area"] == "West End"
     assert row["units"] == 120
     assert row["building_source"] == BUILDING_SOURCE == "manager listing"
     assert (row["owner_group"], row["owner_key"]) == ("(Unknown)", "unknown")
-    assert row["source_row_ids"] == {"raw_manager_listings": [7]}
+    assert json.loads(row["source_row_ids"]) == {"raw_manager_listings": [7]}
 
 
 def test_a_listing_without_an_address_point_adds_nothing():
     conn = _conn()
     _point(conn, "1120", "PACIFIC ST", 49.2783, -123.1335)
-    assert listing_building_rows([_listing(7, "6000 Wesbrook Mall")], set(), {}, _points(conn)).empty
+    assert listing_building_rows([_listing(7, "6000 Wesbrook Mall")], set(), {}, _points(conn)).is_empty()
 
 
 def test_a_listing_matching_a_known_building_adds_nothing_even_by_street_type_typo():
@@ -65,7 +65,7 @@ def test_a_listing_matching_a_known_building_adds_nothing_even_by_street_type_ty
     _point(conn, "1333", "JERVIS ST", 49.28, -123.13)
     known = {"1333 jervis st"}
     rows = listing_building_rows([_listing(1, "1333 Jervis Avenue")], known, {}, _points(conn))
-    assert rows.empty
+    assert rows.is_empty()
 
 
 def test_a_listing_at_a_secondary_address_adds_nothing():
@@ -74,7 +74,7 @@ def test_a_listing_at_a_secondary_address_adds_nothing():
     rows = listing_building_rows(
         [_listing(1, "936 Bute Street")], {"958 bute st"}, {"936 bute st": "958 bute st"}, _points(conn),
     )
-    assert rows.empty
+    assert rows.is_empty()
 
 
 def test_two_companies_listing_one_new_address_make_one_building():
@@ -86,8 +86,8 @@ def test_two_companies_listing_one_new_address_make_one_building():
         set(), {}, _points(conn),
     )
     assert len(rows) == 1
-    assert rows.iloc[0]["units"] == 82
-    assert rows.iloc[0]["source_row_ids"] == {"raw_manager_listings": [3, 4]}
+    assert rows["units"][0] == 82
+    assert json.loads(rows["source_row_ids"][0]) == {"raw_manager_listings": [3, 4]}
 
 
 def test_city_sources_win_and_listings_fill_the_gaps():
@@ -104,7 +104,7 @@ def test_city_sources_win_and_listings_fill_the_gaps():
         listings=[_listing(1, "1220 Cardero Street", units=99), _listing(2, "1120 Pacific Street")],
         secondary_index={},
     )
-    by_key = {r["addr_key"]: r for _, r in out.iterrows()}
+    by_key = {r["addr_key"]: r for r in out.iter_rows(named=True)}
     assert set(by_key) == {"1220 cardero st", "1120 pacific st"}
     assert by_key["1220 cardero st"]["building_source"] == "rental licence"
     assert by_key["1220 cardero st"]["units"] == 30

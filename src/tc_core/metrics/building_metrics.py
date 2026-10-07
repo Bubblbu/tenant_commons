@@ -10,7 +10,7 @@ so this needs to be a real, faithful port, not a "close enough" summary.
 from __future__ import annotations
 
 import numpy as np
-import pandas as pd
+import polars as pl
 
 BUILDING_METRICS = {
     "value_land": {
@@ -63,11 +63,10 @@ BUILDING_METRICS = {
 }
 
 
-def _summarize_metric(series: pd.Series, *, meta: dict) -> dict | None:
-    data = series.dropna()
-    if data.empty:
+def _summarize_metric(series: pl.Series, *, meta: dict) -> dict | None:
+    data = series.drop_nulls().cast(pl.Float64).to_numpy().copy()
+    if data.size == 0:
         return None
-    data = data.astype(float)
     min_val = float(np.min(data))
     max_val = float(np.max(data))
     if not np.isfinite(min_val) or not np.isfinite(max_val):
@@ -118,7 +117,7 @@ def _summarize_metric(series: pd.Series, *, meta: dict) -> dict | None:
         below_mask = data <= safe_min
         below_count = int(below_mask.sum())
         above = data[~below_mask]
-        if below_count and not above.empty:
+        if below_count and above.size:
             log_data = np.log(above)
             above_bins = max(1, bins - 1)
             # Explicit range (rather than np.histogram's default of the
@@ -192,7 +191,7 @@ def _summarize_metric(series: pd.Series, *, meta: dict) -> dict | None:
     }
 
 
-def build_building_metrics(pts_df: pd.DataFrame) -> dict[str, dict]:
+def build_building_metrics(pts_df: pl.DataFrame) -> dict[str, dict]:
     summaries: dict[str, dict] = {}
     for column, meta in BUILDING_METRICS.items():
         if column not in pts_df.columns:

@@ -5,7 +5,7 @@
 (emails, phone, ethnicity, religion, donation history, marital status, ...).
 The current v1 pipeline only ever reads an address column, `tag_list`, and
 `updated_at`; nothing else from those 154 columns should ever become a row
-in this database. `pd.read_csv(usecols=...)` enforces the allow-list at the
+in this database. `pl.read_csv(columns=...)` enforces the allow-list at the
 CSV-read layer itself — the other 150 columns never even become an in-memory
 column, let alone a SQLite row.
 
@@ -26,23 +26,30 @@ from __future__ import annotations
 import sqlite3
 from datetime import datetime, timezone
 
-import pandas as pd
+import polars as pl
 
+from ..io import PLACEHOLDER_NULLS
 from ..normalize import AddressMatcher, addr_key_from_freeform
 from .overlay_sources import load_secondary_address_index
 
 ALLOWED_MEMBERSHIP_COLUMNS = ["nationbuilder_id", "primary_address1", "tag_list", "updated_at"]
 
 
-def load_membership_frame(path: str) -> pd.DataFrame:
-    df = pd.read_csv(path, usecols=ALLOWED_MEMBERSHIP_COLUMNS)
-    df["addr_key"] = df["primary_address1"].fillna("").apply(addr_key_from_freeform)
-    return df
+def load_membership_frame(path: str) -> pl.DataFrame:
+    # Read as text (every kept column is stored as text anyway), with
+    # hand-typed placeholders like "N/A" as missing, as pandas read them.
+    df = pl.read_csv(
+        path, columns=ALLOWED_MEMBERSHIP_COLUMNS, infer_schema=False, null_values=PLACEHOLDER_NULLS
+    )
+    return df.with_columns(
+        addr_key=pl.col("primary_address1")
+        .fill_null("")
+        .map_elements(addr_key_from_freeform, return_dtype=pl.String, skip_nulls=False)
+    )
 
 
 def _building_id_by_addr_key(conn: sqlite3.Connection) -> dict[str, int]:
-    lookup = pd.read_sql_query("SELECT building_id, addr_key FROM buildings", conn)
-    return dict(zip(lookup["addr_key"], lookup["building_id"]))
+    return dict(conn.execute("SELECT addr_key, building_id FROM buildings"))
 
 
 def ingest_membership(conn: sqlite3.Connection, path: str) -> int:
@@ -54,14 +61,12 @@ def ingest_membership(conn: sqlite3.Connection, path: str) -> int:
     ingested_at = datetime.now(timezone.utc).isoformat()
 
     rows = []
-    for row in df.itertuples(index=False):
-        nationbuilder_id = None if pd.isna(row.nationbuilder_id) else str(row.nationbuilder_id)
-        tag_list = None if pd.isna(row.tag_list) else str(row.tag_list)
-        updated_at = None if pd.isna(row.updated_at) else str(row.updated_at)
-        addr_key = matcher.match(row.primary_address1) or row.addr_key
+    for row in df.iter_rows(named=True):
+        addr_key = matcher.match(row["primary_address1"]) or row["addr_key"]
         building_id = building_id_by_addr_key.get(addr_key)
         rows.append(
-            (nationbuilder_id, addr_key, building_id, tag_list, updated_at, ingested_at)
+            (row["nationbuilder_id"], addr_key, building_id, row["tag_list"], row["updated_at"],
+             ingested_at)
         )
 
     with conn:

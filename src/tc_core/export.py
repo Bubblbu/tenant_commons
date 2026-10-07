@@ -21,16 +21,20 @@ aren't byte-identical to v1.
 from __future__ import annotations
 
 import json
+import math
 import shutil
 import tomllib
 import sqlite3
+from collections import Counter
+from datetime import datetime, timezone
 from pathlib import Path
 
 import numpy as np
-import pandas as pd
+import polars as pl
 from shapely.geometry import Point, shape
 from shapely.strtree import STRtree
 
+from .db import query_frame
 from .geometry import parse_geom
 from .ingest.building_names import pick_building_name
 from .ingest.overlay_write import BUILDING_OVERLAY_COLUMNS
@@ -41,43 +45,78 @@ from .metrics.registry_owners import build_registry_owners, build_registry_searc
 from .normalize import sanitize_owner
 
 
+def _missing(v) -> bool:
+    return v is None or (isinstance(v, float) and math.isnan(v))
+
+
+def _objects(values) -> pl.Series:
+    """A column of Python lists/dicts, passed through to the JSON as they are."""
+    return pl.Series(list(values), dtype=pl.Object)
+
+
+def _mode(values) -> object | None:
+    """Most frequent non-missing value; ties go to the smallest (pandas'
+    mode().iloc[0])."""
+    counts = Counter(v for v in values if not _missing(v))
+    if not counts:
+        return None
+    top = max(counts.values())
+    return min(v for v, n in counts.items() if n == top)
+
+
+def _where(df: pl.DataFrame, mask: pl.Expr, **values) -> pl.DataFrame:
+    """Set each column to its value (an expression or a constant) where
+    `mask` holds, evaluated against `df` as it is."""
+    return df.with_columns(
+        pl.when(mask)
+        .then(v if isinstance(v, pl.Expr) else pl.lit(v) if v is not None else pl.lit(None, dtype=df.schema[c]))
+        .otherwise(pl.col(c))
+        .alias(c)
+        for c, v in values.items()
+    )
+
+
 def reconstruct_points(
     conn: sqlite3.Connection,
-    now: pd.Timestamp,
+    now: datetime,
     pid_address_map_path: str | None = None,
     property_managers: set[str] | None = None,
     listing_aliases: dict[str, str] | None = None,
-) -> pd.DataFrame:
-    buildings = pd.read_sql_query("SELECT * FROM buildings", conn)
-    landlords = pd.read_sql_query(
-        "SELECT landlord_id, display_name, owner_key FROM landlords", conn
+) -> pl.DataFrame:
+    # Counts are integers; values and years (medians, so possibly fractional)
+    # are floats whatever this build's data happens to hold.
+    buildings = query_frame(conn, "SELECT * FROM buildings").with_columns(
+        pl.col("building_id", "landlord_id", "block_id", "units", "n_issues").cast(pl.Int64),
+        pl.col("year_built", "value_land", "value_bldg", "bldg_land_ratio", "lat", "lon").cast(pl.Float64),
     )
-    buildings = buildings.merge(landlords, on="landlord_id", how="left")
-    buildings["display_name"] = buildings["display_name"].fillna("(Unknown)")
-    buildings["owner_key"] = buildings["owner_key"].fillna("unknown")
-    buildings = buildings.rename(
-        columns={"building_id": "b_id", "display_name": "licence_holder", "owner_key": "licence_key"}
+    landlords = query_frame(
+        conn, "SELECT landlord_id, display_name, owner_key FROM landlords"
+    ).with_columns(pl.col("landlord_id").cast(pl.Int64), pl.col("display_name", "owner_key").cast(pl.String))
+    buildings = (
+        buildings.join(landlords, on="landlord_id", how="left", maintain_order="left")
+        .with_columns(
+            pl.col("display_name").fill_null("(Unknown)"),
+            pl.col("owner_key").fill_null("unknown"),
+            source=pl.lit("building"),
+        )
+        .rename({"building_id": "b_id", "display_name": "licence_holder", "owner_key": "licence_key"})
     )
-    buildings["source"] = "building"
 
-    members = pd.read_sql_query(
-        "SELECT * FROM vtu_membership WHERE building_id IS NOT NULL", conn
-    )
-    metrics = compute_building_member_metrics(members, now).rename(
-        columns={"building_id": "b_id"}
-    )
+    members = query_frame(conn, "SELECT * FROM vtu_membership WHERE building_id IS NOT NULL")
+    metrics = compute_building_member_metrics(members, now).rename({"building_id": "b_id"})
 
-    merged = buildings.merge(metrics, on="b_id", how="left")
-    merged["member_count"] = merged["member_count"].fillna(0).astype(int)
-    merged["member_count_all"] = merged["member_count_all"].fillna(0).astype(int)
-    merged["has_vtu_member"] = merged["member_count"] > 0
-    merged["members_payload"] = merged["members_payload"].apply(
-        lambda v: v if isinstance(v, list) else []
+    merged = buildings.join(
+        metrics.with_columns(pl.col("b_id").cast(pl.Int64)), on="b_id", how="left", maintain_order="left"
+    ).with_columns(
+        pl.col("member_count").fill_null(0),
+        pl.col("member_count_all").fill_null(0),
     )
-    merged["member_share_building"] = np.where(
-        (merged["units"] > 0) & merged["units"].notna(),
-        np.minimum(merged["member_count"] / merged["units"], 1.0),
-        0.0,
+    merged = merged.with_columns(
+        has_vtu_member=pl.col("member_count") > 0,
+        members_payload=_objects(v if isinstance(v, list) else [] for v in merged["members_payload"].to_list()),
+        member_share_building=pl.when(pl.col("units") > 0)
+        .then(pl.min_horizontal(pl.col("member_count") / pl.col("units"), pl.lit(1.0)))
+        .otherwise(0.0),
     )
 
     # Two ownership layers (docs/superpowers/specs/2026-09-23-ownership-layers-design.md):
@@ -88,17 +127,20 @@ def reconstruct_points(
     portfolios = (
         build_landlord_portfolios(conn, pid_address_map_path) if pid_address_map_path else {}
     )
-    _assign_ownership(merged, registry, portfolios)
+    merged = _assign_ownership(merged, registry, portfolios)
     # "Searched the registry, no filing": public as a date only (search notes stay internal).
     no_filing = build_registry_searches(conn, pid_address_map_path) if pid_address_map_path else {}
-    merged["registry_no_filing"] = [
-        None if registry.get(key) else no_filing.get(key) for key in merged["addr_key"]
-    ]
     building_listings = _load_building_listings(conn, listing_aliases or {})
-    merged["listings"] = [building_listings.get(int(b), []) for b in merged["b_id"]]
-    apply_property_managers(merged, property_managers or set())
+    merged = merged.with_columns(
+        registry_no_filing=pl.Series(
+            [None if registry.get(key) else no_filing.get(key) for key in merged["addr_key"]],
+            dtype=pl.String,
+        ),
+        listings=_objects(building_listings.get(int(b), []) for b in merged["b_id"]),
+    )
+    merged = apply_property_managers(merged, property_managers or set())
 
-    merged = merged[
+    merged = merged.select(
         [
             "addr_key", "address", "lat", "lon", "units", "building_source", "year_built", "n_issues",
             "issues_details",
@@ -113,57 +155,67 @@ def reconstruct_points(
             "latest_membership_year", "source",
             *BUILDING_OVERLAY_COLUMNS,
         ]
-    ]
+    )
     merged = _append_overlay_housing(conn, merged)
     # Overlay records have no listings; keep the column a list throughout.
-    merged["listings"] = [v if isinstance(v, list) else [] for v in merged["listings"]]
-    fill_owner_from_sro(merged)
-    fallback_group_to_owner(merged)
-    apply_building_names(merged, _load_building_names(conn))
+    merged = merged.with_columns(
+        listings=_objects(v if isinstance(v, list) else [] for v in merged["listings"].to_list())
+    )
+    merged = fill_owner_from_sro(merged)
+    merged = fallback_group_to_owner(merged)
+    merged = apply_building_names(merged, _load_building_names(conn))
 
     # Derived post-union (not stored): the matcher's exact expression from
     # ingest/overlays.py, applied uniformly across both origins now that
     # is_coop/is_sro are guaranteed boolean by _append_overlay_housing.
-    merged["housing_type"] = np.where(
-        merged["is_coop"] & merged["is_sro"],
-        "co-op, sro",
-        np.where(merged["is_coop"], "co-op", np.where(merged["is_sro"], "sro", "")),
+    return merged.with_columns(
+        housing_type=pl.when(pl.col("is_coop") & pl.col("is_sro"))
+        .then(pl.lit("co-op, sro"))
+        .when(pl.col("is_coop"))
+        .then(pl.lit("co-op"))
+        .when(pl.col("is_sro"))
+        .then(pl.lit("sro"))
+        .otherwise(pl.lit("")),
+        network_buildings_on_map=pl.when(pl.col("network_key") == "unknown")
+        .then(None)
+        .otherwise(pl.len().over("network_key"))
+        .cast(pl.Int64),
     )
-    on_map = merged.groupby("network_key")["b_id"].transform("count")
-    merged["network_buildings_on_map"] = [
-        None if key == "unknown" else int(count)
-        for key, count in zip(merged["network_key"], on_map)
-    ]
-    return merged
 
 
-def _assign_ownership(df: pd.DataFrame, registry: dict, portfolios: dict) -> None:
-    """Adds the owner_* and network_* columns in place (see the ownership-layers spec)."""
+def _assign_ownership(df: pl.DataFrame, registry: dict, portfolios: dict) -> pl.DataFrame:
+    """Adds the owner_* and network_* columns (see the ownership-layers spec)."""
     reg = [registry.get(key) for key in df["addr_key"]]
     port = [portfolios.get(key) for key in df["addr_key"]]
-    df["registered_owners"] = [r.owners if r else [] for r in reg]
-    df["registry_pids"] = [r.pids if r else [] for r in reg]
-    df["registry_retrieved"] = [r.retrieved if r else None for r in reg]
-    df["owner_name"] = [r.owners[0] if r else lic for r, lic in zip(reg, df["licence_holder"])]
-    df["owner_key"] = df["owner_name"].map(sanitize_owner)
-    df["owner_source"] = [
-        "registry" if r else ("licence" if key != "unknown" else None)
-        for r, key in zip(reg, df["owner_key"])
-    ]
+    owner_name = [r.owners[0] if r else lic for r, lic in zip(reg, df["licence_holder"])]
+    owner_key = [sanitize_owner(name) for name in owner_name]
     # "net:" namespaces claims-network keys: sanitize_owner() keys never contain
     # ":", so a claims network can't collide with a same-named licence group.
-    df["network_key"] = [
-        f"net:{p.portfolio_key}" if p else key for p, key in zip(port, df["licence_key"])
-    ]
-    df["network_name"] = [p.portfolio_name if p else lic for p, lic in zip(port, df["licence_holder"])]
-    df["network_source"] = [
-        "claims" if p else ("licence" if key != "unknown" else None)
-        for p, key in zip(port, df["network_key"])
-    ]
-    df["network_name_source"] = [p.name_source if p else None for p in port]
-    df["network_entities"] = [list(p.entities) if p else None for p in port]
-    df["network_properties_on_title"] = [len(p.addr_keys) if p else None for p in port]
-    df["network_evidence"] = [dict(p.evidence) if p else None for p in port]
+    network_key = [f"net:{p.portfolio_key}" if p else key for p, key in zip(port, df["licence_key"])]
+    text = lambda values: pl.Series(list(values), dtype=pl.String)
+    return df.with_columns(
+        registered_owners=_objects(r.owners if r else [] for r in reg),
+        registry_pids=_objects(r.pids if r else [] for r in reg),
+        registry_retrieved=text(r.retrieved if r else None for r in reg),
+        owner_name=text(owner_name),
+        owner_key=text(owner_key),
+        owner_source=text(
+            "registry" if r else ("licence" if key != "unknown" else None)
+            for r, key in zip(reg, owner_key)
+        ),
+        network_key=text(network_key),
+        network_name=text(p.portfolio_name if p else lic for p, lic in zip(port, df["licence_holder"])),
+        network_source=text(
+            "claims" if p else ("licence" if key != "unknown" else None)
+            for p, key in zip(port, network_key)
+        ),
+        network_name_source=text(p.name_source if p else None for p in port),
+        network_entities=_objects(list(p.entities) if p else None for p in port),
+        network_properties_on_title=pl.Series(
+            [len(p.addr_keys) if p else None for p in port], dtype=pl.Int64
+        ),
+        network_evidence=_objects(dict(p.evidence) if p else None for p in port),
+    )
 
 
 # The SRO inventory abbreviates and truncates names; expand the ones that recur.
@@ -182,7 +234,7 @@ SRO_CATEGORY_WORDS = {"private", "government", "non-profit"}
 
 def clean_sro_name(name) -> str | None:
     """Display form of an SRO owner/operator name; None when it names no one."""
-    if name is None or pd.isna(name):
+    if _missing(name):
         return None
     text = str(name).strip()
     if not text or text.lower() in SRO_CATEGORY_WORDS:
@@ -190,28 +242,37 @@ def clean_sro_name(name) -> str | None:
     return SRO_NAME_ALIASES.get(text, text)
 
 
-def fill_owner_from_sro(df: pd.DataFrame) -> None:
+def fill_owner_from_sro(df: pl.DataFrame) -> pl.DataFrame:
     """Expands SRO owner/operator names, and makes the SRO owner the landlord
     of buildings that neither the registry nor a licence names.
 
-    In place. Never replaces a registry or licence owner: when sources
+    Never replaces a registry or licence owner: when sources
     disagree (BC Housing on title, PHS as licensee), choosing between them is
     the headline rule of the roles spec, not this fallback. Such a building's
     group is itself, as for a licence-only landlord.
     """
-    for col in ("sro_owner", "sro_operator"):
-        if col in df.columns:
-            df[col] = df[col].map(clean_sro_name).astype(object)
+    df = df.with_columns(
+        pl.col(col).map_elements(clean_sro_name, return_dtype=pl.String, skip_nulls=False)
+        for col in ("sro_owner", "sro_operator")
+        if col in df.columns
+    )
     if "sro_owner" not in df.columns:
-        return
-    fill = (df["owner_key"] == "unknown") & df["sro_owner"].notna()
-    df.loc[fill, "owner_name"] = df.loc[fill, "sro_owner"]
-    df.loc[fill, "owner_key"] = df.loc[fill, "sro_owner"].map(sanitize_owner)
-    df.loc[fill, "owner_source"] = "sro_list"
-    group = fill & (df["network_key"] == "unknown")
-    df.loc[group, "network_key"] = df.loc[group, "owner_key"]
-    df.loc[group, "network_name"] = df.loc[group, "owner_name"]
-    df.loc[group, "network_source"] = "sro_list"
+        return df
+    df = df.with_columns(
+        _fill=(pl.col("owner_key") == "unknown").fill_null(False) & pl.col("sro_owner").is_not_null()
+    )
+    df = _where(
+        df,
+        pl.col("_fill"),
+        owner_name=pl.col("sro_owner"),
+        owner_key=pl.col("sro_owner").map_elements(sanitize_owner, return_dtype=pl.String),
+        owner_source="sro_list",
+    )
+    group = pl.col("_fill") & (pl.col("network_key") == "unknown").fill_null(False)
+    return _where(
+        df, group, network_key=pl.col("owner_key"), network_name=pl.col("owner_name"),
+        network_source="sro_list",
+    ).drop("_fill")
 
 
 def load_property_managers(path: str | None) -> set[str]:
@@ -271,47 +332,47 @@ def managers_from_claims(conn: sqlite3.Connection) -> set[str]:
     return {sanitize_owner(a) for (a,) in rows}
 
 
-def apply_property_managers(df: pd.DataFrame, managers: set[str]) -> None:
+def apply_property_managers(df: pl.DataFrame, managers: set[str]) -> pl.DataFrame:
     """A rental licence held by a known property manager names who runs the
     building, not who owns it (Tribe Rental Management holds licences for
-    Greenbrier Holdings' buildings). In place: records the manager in
+    Greenbrier Holdings' buildings). Records the manager in
     `managed_by`; where the licence was the only source for the landlord,
     the building becomes not on record instead. Registry owners and claims
     groups are kept. Otherwise a known manager's current listing names the
     manager (`managed_by_source` "listing") and changes nothing else.
     """
-    licence_keys = df["licence_holder"].map(sanitize_owner)
-    managed = licence_keys.isin(managers)
-    df["managed_by"] = df["licence_holder"].where(managed, None).astype(object)
-    df["managed_by_source"] = pd.Series(
-        np.where(managed, "licence", None), index=df.index, dtype=object
+    managed = pl.Series(
+        [sanitize_owner(h) in managers for h in df["licence_holder"]], dtype=pl.Boolean
     )
-    owner = managed & (df["owner_source"] == "licence")
-    df.loc[owner, ["owner_name", "owner_key"]] = ["(Unknown)", "unknown"]
-    df.loc[owner, "owner_source"] = None
+    df = df.with_columns(
+        _managed=managed,
+        managed_by=pl.when(managed).then(pl.col("licence_holder")).otherwise(None),
+        managed_by_source=pl.when(managed).then(pl.lit("licence")).otherwise(None),
+    )
+    owner = pl.col("_managed") & (pl.col("owner_source") == "licence").fill_null(False)
+    df = _where(df, owner, owner_name="(Unknown)", owner_key="unknown", owner_source=None)
     # A group that came from the manager's licence falls back to the landlord
     # itself (a group of one), or to not on record when there is none.
-    group = managed & (df["network_source"] == "licence")
-    df.loc[group, "network_name"] = df.loc[group, "owner_name"]
-    df.loc[group, "network_key"] = df.loc[group, "owner_key"]
-    df.loc[group, "network_source"] = df.loc[group, "owner_source"]
+    group = pl.col("_managed") & (pl.col("network_source") == "licence").fill_null(False)
+    df = _where(
+        df, group, network_name=pl.col("owner_name"), network_key=pl.col("owner_key"),
+        network_source=pl.col("owner_source"),
+    ).drop("_managed")
     if "listings" not in df.columns:
-        return
-    listed = pd.Series(
+        return df
+    listed = pl.Series(
         [
             next(
                 (e["by"] for e in (ls if isinstance(ls, list) else [])
                  if sanitize_owner(e["by"]) in managers),
                 None,
             )
-            for ls in df["listings"]
+            for ls in df["listings"].to_list()
         ],
-        index=df.index,
-        dtype=object,
+        dtype=pl.String,
     )
-    fill = df["managed_by"].isna() & listed.notna()
-    df.loc[fill, "managed_by"] = listed[fill]
-    df.loc[fill, "managed_by_source"] = "listing"
+    fill = pl.col("managed_by").is_null() & listed.is_not_null()
+    return _where(df, fill, managed_by=pl.lit(listed), managed_by_source="listing")
 
 
 def _load_building_names(conn: sqlite3.Connection) -> dict[int, list[tuple[str, str]]]:
@@ -325,32 +386,37 @@ def _load_building_names(conn: sqlite3.Connection) -> dict[int, list[tuple[str, 
     return names
 
 
-def apply_building_names(df: pd.DataFrame, names: dict[int, list[tuple[str, str]]]) -> None:
-    """Adds building_name (the one shown) and other_names. In place.
+def apply_building_names(df: pl.DataFrame, names: dict[int, list[tuple[str, str]]]) -> pl.DataFrame:
+    """Adds building_name (the one shown) and other_names.
     Buildings take theirs from building_names; overlay records, whose b_ids
     aren't building ids, keep their own co-op/SRO name."""
     picked = [
         pick_building_name(names.get(int(bid), [])) if src == "building"
-        else ((None if pd.isna(hn) or not str(hn).strip() else str(hn)), [])
+        else ((None if _missing(hn) or not str(hn).strip() else str(hn)), [])
         for bid, src, hn in zip(df["b_id"], df["source"], df["housing_name"])
     ]
-    df["building_name"] = pd.Series([p[0] for p in picked], index=df.index, dtype=object)
-    df["other_names"] = pd.Series([p[1] for p in picked], index=df.index, dtype=object)
+    return df.with_columns(
+        building_name=pl.Series([p[0] for p in picked], dtype=pl.String),
+        other_names=_objects(p[1] for p in picked),
+    )
 
 
-def fallback_group_to_owner(df: pd.DataFrame) -> None:
+def fallback_group_to_owner(df: pl.DataFrame) -> pl.DataFrame:
     """A landlord with no group (no claims cluster, no licence to group by)
     is its own group of one, so the by-ownership-group view never files a
-    known landlord under "not on record". In place."""
-    alone = (df["owner_key"] != "unknown") & (df["network_key"] == "unknown")
-    df.loc[alone, "network_name"] = df.loc[alone, "owner_name"]
-    df.loc[alone, "network_key"] = df.loc[alone, "owner_key"]
-    df.loc[alone, "network_source"] = df.loc[alone, "owner_source"]
+    known landlord under "not on record"."""
+    alone = (pl.col("owner_key") != "unknown").fill_null(False) & (
+        pl.col("network_key") == "unknown"
+    ).fill_null(False)
+    return _where(
+        df, alone, network_name=pl.col("owner_name"), network_key=pl.col("owner_key"),
+        network_source=pl.col("owner_source"),
+    )
 
 
 def _append_overlay_housing(
-    conn: sqlite3.Connection, points: pd.DataFrame
-) -> pd.DataFrame:
+    conn: sqlite3.Connection, points: pl.DataFrame
+) -> pl.DataFrame:
     """Union `overlay_housing` onto the points frame.
 
     These are SRO/co-op source records that matched no building (see
@@ -368,44 +434,43 @@ def _append_overlay_housing(
     out of the export. A record that is both co-op and SRO gets
     source=overlay_coop; housing_type still says "co-op, sro".
     """
-    overlay = pd.read_sql_query("SELECT * FROM overlay_housing", conn)
-    if overlay.empty:
-        combined = points
-        for col in ("is_coop", "is_sro", "is_rezoning", "has_vtu_member"):
-            if col in combined.columns:
-                combined[col] = combined[col].fillna(False).astype(bool)
-        return combined
-
-    first_id = int(pd.to_numeric(points["b_id"]).max()) + 1 if len(points) else 1
-    overlay["b_id"] = range(first_id, first_id + len(overlay))
-    overlay["source"] = [
-        "overlay_coop" if bool(c) else "overlay_sro"
-        for c in overlay["is_coop"]
+    flags = [
+        pl.col(col).cast(pl.Boolean).fill_null(False)
+        for col in ("is_coop", "is_sro", "is_rezoning", "has_vtu_member")
+        if col in points.columns
     ]
-    overlay["owner_name"] = "(Unknown)"
-    overlay["owner_key"] = "unknown"
-    overlay["licence_holder"] = "(Unknown)"
-    overlay["network_key"] = "unknown"
-    overlay["network_name"] = "(Unknown)"
-    overlay["registered_owners"] = [[] for _ in range(len(overlay))]
-    overlay["registry_pids"] = [[] for _ in range(len(overlay))]
-    overlay["member_count"] = 0
-    overlay["member_count_all"] = 0
-    overlay["has_vtu_member"] = False
-    overlay["member_share_building"] = 0.0
-    overlay["members_payload"] = [[] for _ in range(len(overlay))]
-    overlay = overlay.reindex(columns=points.columns)
+    overlay = query_frame(conn, "SELECT * FROM overlay_housing")
+    if overlay.is_empty():
+        return points.with_columns(flags)
 
-    combined = pd.concat([points, overlay], ignore_index=True)
-    for col in ("is_coop", "is_sro", "is_rezoning", "has_vtu_member"):
-        if col in combined.columns:
-            combined[col] = combined[col].fillna(False).astype(bool)
-    return combined
+    first_id = int(points["b_id"].max()) + 1 if points.height else 1
+    n = overlay.height
+    overlay = overlay.with_columns(
+        b_id=pl.int_range(first_id, first_id + n, dtype=pl.Int64),
+        source=pl.when(pl.col("is_coop").cast(pl.Boolean))
+        .then(pl.lit("overlay_coop"))
+        .otherwise(pl.lit("overlay_sro")),
+        owner_name=pl.lit("(Unknown)"),
+        owner_key=pl.lit("unknown"),
+        licence_holder=pl.lit("(Unknown)"),
+        network_key=pl.lit("unknown"),
+        network_name=pl.lit("(Unknown)"),
+        registered_owners=_objects([] for _ in range(n)),
+        registry_pids=_objects([] for _ in range(n)),
+        member_count=pl.lit(0),
+        member_count_all=pl.lit(0),
+        has_vtu_member=pl.lit(False),
+        member_share_building=pl.lit(0.0),
+        members_payload=_objects([] for _ in range(n)),
+    )
+    # Only the points frame's own columns, in its order; the rest stay null.
+    overlay = overlay.select([c for c in points.columns if c in overlay.columns])
+    return pl.concat([points, overlay], how="diagonal_relaxed").with_columns(flags)
 
 
 def resolve_local_area_from_block_numbers(
-    blocks_merged: pd.DataFrame, block_numbers_df: pd.DataFrame
-) -> pd.Series:
+    blocks_merged: pl.DataFrame, block_numbers_df: pl.DataFrame
+) -> pl.Series:
     """Fork of the retired src/sica_mapping/data/spatial.py::resolve_local_area_from_block_numbers
     — see its docstring. Blocks with zero buildings have no local_area to take
     a mode from and default to "(Unknown)"; resolve those from Vancouver Open
@@ -416,51 +481,46 @@ def resolve_local_area_from_block_numbers(
     distance, for the rare block with none landing inside it. Populated
     blocks keep their buildings-derived mode, untouched.
     """
-    local_area = blocks_merged["local_area"].copy()
-    unknown_mask = local_area == "(Unknown)"
-    if not unknown_mask.any() or block_numbers_df.empty:
-        return local_area
+    local_area = blocks_merged["local_area"].to_list()
+    unknown = [i for i, area in enumerate(local_area) if area == "(Unknown)"]
+    if not unknown or block_numbers_df.is_empty():
+        return pl.Series("local_area", local_area, dtype=pl.String)
 
-    bn = block_numbers_df.copy()
-    bn["geom_parsed"] = bn["geom"].apply(parse_geom)
-    bn = bn.dropna(subset=["geom_parsed", "geo_local_area"])
-    if bn.empty:
-        return local_area
+    bn = [
+        (geom, area)
+        for geom, area in zip(
+            (parse_geom(g) for g in block_numbers_df["geom"]), block_numbers_df["geo_local_area"]
+        )
+        if geom is not None and area is not None
+    ]
+    if not bn:
+        return pl.Series("local_area", local_area, dtype=pl.String)
 
-    block_geoms = list(blocks_merged["geom_parsed"])
-    block_ids = blocks_merged["block_id"].to_numpy()
+    block_geoms = blocks_merged["geom_parsed"].to_list()
+    block_ids = blocks_merged["block_id"].to_list()
     block_tree = STRtree(block_geoms)
 
     # Primary: point-in-polygon, one block-numbers point -> one of our blocks.
     matches: dict[int, list[str]] = {}
-    for point, area in zip(bn["geom_parsed"], bn["geo_local_area"]):
+    for point, area in bn:
         for idx in np.atleast_1d(block_tree.query(point)):
             geom = block_geoms[int(idx)]
             if geom.contains(point) or geom.touches(point):
                 matches.setdefault(int(block_ids[int(idx)]), []).append(area)
                 break
-    resolved_by_block = {
-        bid: pd.Series(areas).mode().iloc[0] for bid, areas in matches.items()
-    }
+    resolved_by_block = {bid: _mode(areas) for bid, areas in matches.items()}
 
     # Fallback: nearest block-numbers point by centroid distance, for blocks
     # that got zero points inside their polygon.
-    point_tree = STRtree(bn["geom_parsed"].tolist())
-    bn_areas = bn["geo_local_area"].to_numpy()
-    centroids = blocks_merged["geom_parsed"].apply(
-        lambda geom: geom.centroid if geom is not None else None
-    )
-    for idx in blocks_merged.index[unknown_mask]:
-        bid = int(blocks_merged.at[idx, "block_id"])
-        resolved = resolved_by_block.get(bid)
-        if resolved is None:
-            centroid = centroids.at[idx]
-            if centroid is not None:
-                nearest = point_tree.nearest(centroid)
-                resolved = bn_areas[int(nearest)]
+    point_tree = STRtree([geom for geom, _ in bn])
+    bn_areas = [area for _, area in bn]
+    for i in unknown:
+        resolved = resolved_by_block.get(int(block_ids[i]))
+        if resolved is None and block_geoms[i] is not None:
+            resolved = bn_areas[int(point_tree.nearest(block_geoms[i].centroid))]
         if resolved:
-            local_area.at[idx] = resolved
-    return local_area
+            local_area[i] = resolved
+    return pl.Series("local_area", local_area, dtype=pl.String)
 
 
 def load_boundary_polygons(geojson_path: str | None) -> list:
@@ -474,30 +534,29 @@ def load_boundary_polygons(geojson_path: str | None) -> list:
     return [shape(f["geometry"]) for f in data.get("features", []) if f.get("geometry")]
 
 
-def flag_points_in_polygons(points_df: pd.DataFrame, polygons: list) -> pd.Series:
+def flag_points_in_polygons(points_df: pl.DataFrame, polygons: list) -> pl.Series:
     """True where a building's point falls inside (or right on the edge of)
     any of `polygons` — the same STRtree point-in-polygon technique as
     resolve_local_area_from_block_numbers above, used here to flag buildings
     within a boundary overlay (e.g. Chinatown) rather than to resolve a
     neighbourhood label.
     """
-    flags = pd.Series(False, index=points_df.index)
-    if not polygons:
-        return flags
-    tree = STRtree(polygons)
-    for idx, lat, lon in zip(points_df.index, points_df["lat"], points_df["lon"]):
-        if pd.isna(lat) or pd.isna(lon):
-            continue
-        point = Point(lon, lat)
-        for gi in np.atleast_1d(tree.query(point)):
-            geom = polygons[int(gi)]
-            if geom.contains(point) or geom.touches(point):
-                flags.at[idx] = True
-                break
-    return flags
+    flags = [False] * points_df.height
+    if polygons:
+        tree = STRtree(polygons)
+        for i, (lat, lon) in enumerate(zip(points_df["lat"], points_df["lon"])):
+            if _missing(lat) or _missing(lon):
+                continue
+            point = Point(lon, lat)
+            for gi in np.atleast_1d(tree.query(point)):
+                geom = polygons[int(gi)]
+                if geom.contains(point) or geom.touches(point):
+                    flags[i] = True
+                    break
+    return pl.Series(flags, dtype=pl.Boolean)
 
 
-def flag_geoms_intersecting_polygons(geoms: pd.Series, polygons: list) -> pd.Series:
+def flag_geoms_intersecting_polygons(geoms: pl.Series, polygons: list) -> pl.Series:
     """True where a block's own polygon overlaps any of `polygons` at all.
 
     Deliberately derived from the block's own geometry, not from whether any
@@ -507,102 +566,93 @@ def flag_geoms_intersecting_polygons(geoms: pd.Series, polygons: list) -> pd.Ser
     membership would inherit that; testing the block polygon directly avoids
     it and keeps the block layer consistent with the buildings drawn on it.
     """
-    flags = pd.Series(False, index=geoms.index)
-    if not polygons:
-        return flags
-    tree = STRtree(polygons)
-    for idx, geom in geoms.items():
-        if geom is None:
-            continue
-        for gi in np.atleast_1d(tree.query(geom)):
-            if polygons[int(gi)].intersects(geom):
-                flags.at[idx] = True
-                break
-    return flags
+    flags = [False] * len(geoms)
+    if polygons:
+        tree = STRtree(polygons)
+        for i, geom in enumerate(geoms.to_list()):
+            if geom is None:
+                continue
+            for gi in np.atleast_1d(tree.query(geom)):
+                if polygons[int(gi)].intersects(geom):
+                    flags[i] = True
+                    break
+    return pl.Series(flags, dtype=pl.Boolean)
 
 
-def assign_block_labels(blocks_merged: pd.DataFrame) -> pd.Series:
+def assign_block_labels(blocks_merged: pl.DataFrame) -> pl.Series:
     """Fork of the retired src/sica_mapping/data/spatial.py::assign_block_labels — see its
     docstring. Human-readable "{local_area}-{NN}" labels, reading-order
     (north-to-south, west-to-east) within each neighbourhood. Display-only;
     block_id remains the join/index key everywhere else.
     """
-    centroids = blocks_merged["geom_parsed"].apply(
-        lambda geom: geom.centroid if geom is not None else None
-    )
-    order_df = pd.DataFrame(
-        {
-            "local_area": blocks_merged["local_area"],
-            "lat": centroids.apply(lambda c: c.y if c is not None else np.nan),
-            "lon": centroids.apply(lambda c: c.x if c is not None else np.nan),
-        },
-        index=blocks_merged.index,
-    )
-    labels = pd.Series(index=blocks_merged.index, dtype=object)
-    for area, group in order_df.groupby("local_area"):
-        ordered = group.sort_values(["lat", "lon"], ascending=[False, True])
-        for ordinal, idx in enumerate(ordered.index, start=1):
-            labels.at[idx] = f"{area}-{ordinal:02d}"
-    return labels
+    by_area: dict[str, list[tuple[int, float | None, float | None]]] = {}
+    for i, (area, geom) in enumerate(zip(blocks_merged["local_area"], blocks_merged["geom_parsed"])):
+        if area is None:
+            continue
+        c = geom.centroid if geom is not None else None
+        by_area.setdefault(area, []).append((i, c.y if c else None, c.x if c else None))
+    labels: list[str | None] = [None] * blocks_merged.height
+    for area, group in by_area.items():
+        # North to south, then west to east; a block without a centroid last.
+        ordered = sorted(
+            group, key=lambda t: (t[1] is None, -(t[1] or 0.0), t[2] is None, t[2] or 0.0)
+        )
+        for ordinal, (i, _, _) in enumerate(ordered, start=1):
+            labels[i] = f"{area}-{ordinal:02d}"
+    return pl.Series("block_label", labels, dtype=pl.String)
 
 
-def reconstruct_blocks(conn: sqlite3.Connection, points_df: pd.DataFrame) -> pd.DataFrame:
+def reconstruct_blocks(conn: sqlite3.Connection, points_df: pl.DataFrame) -> pl.DataFrame:
     # Not bbox-filtered: buildings.csv is already city-wide (not West-End-scoped —
     # see merge.py's notes), so restricting blocks to the static config bbox left
     # most of the actual data — the whole eastside and south of the city — with no
     # block polygons at all.
-    blocks_raw = pd.read_sql_query("SELECT block_id, geom FROM blocks", conn)
+    blocks_raw = query_frame(conn, "SELECT block_id, geom FROM blocks").with_columns(
+        pl.col("block_id").cast(pl.Int64), pl.col("geom").cast(pl.String)
+    )
     agg = (
-        points_df.groupby("block_id", dropna=True)
+        points_df.filter(pl.col("block_id").is_not_null())
+        .group_by("block_id")
         .agg(
-            buildings=("address", "count"),
-            total_units=("units", "sum"),
-            median_year_built=("year_built", "median"),
-            member_buildings=("has_vtu_member", "sum"),
-            total_members=("member_count", "sum"),
+            buildings=pl.col("address").count(),
+            total_units=pl.col("units").sum(),
+            median_year_built=pl.col("year_built").median(),
+            member_buildings=pl.col("has_vtu_member").sum(),
+            total_members=pl.col("member_count").sum(),
+            # Most common; ties to the alphabetically first (pandas' mode().iloc[0]).
+            local_area=pl.col("local_area").drop_nulls().mode().min(),
         )
-        .reset_index()
+        .with_columns(pl.col("block_id").cast(pl.Int64))
     )
-    local_area_by_block = (
-        points_df.dropna(subset=["block_id"])
-        .groupby("block_id")["local_area"]
-        .agg(lambda s: s.mode().iloc[0] if not s.mode().empty else "(Unknown)")
-        .rename("local_area")
+    merged = blocks_raw.join(agg, on="block_id", how="left", maintain_order="left").with_columns(
+        pl.col("buildings", "total_units", "member_buildings", "total_members").fill_null(0),
+        pl.col("local_area").fill_null("(Unknown)"),
     )
-    agg = agg.merge(local_area_by_block, on="block_id", how="left")
-    merged = blocks_raw.merge(agg, on="block_id", how="left").fillna(
-        {
-            "buildings": 0,
-            "total_units": 0,
-            "median_year_built": np.nan,
-            "member_buildings": 0,
-            "total_members": 0,
-        }
+    merged = merged.with_columns(
+        member_share=pl.when(pl.col("buildings") > 0)
+        .then(pl.col("member_buildings") / pl.col("buildings"))
+        .otherwise(0.0),
+        geom_parsed=_objects(parse_geom(g) for g in merged["geom"]),
     )
-    merged["local_area"] = merged["local_area"].fillna("(Unknown)")
-    merged["member_share"] = np.where(
-        merged["buildings"] > 0, merged["member_buildings"] / merged["buildings"], 0.0
+    block_numbers_df = query_frame(conn, "SELECT geom, geo_local_area FROM raw_block_numbers")
+    merged = merged.with_columns(
+        local_area=resolve_local_area_from_block_numbers(merged, block_numbers_df)
     )
-    merged["geom_parsed"] = merged["geom"].apply(parse_geom)
-    block_numbers_df = pd.read_sql_query(
-        "SELECT geom, geo_local_area FROM raw_block_numbers", conn
-    )
-    merged["local_area"] = resolve_local_area_from_block_numbers(merged, block_numbers_df)
-    merged["block_label"] = assign_block_labels(merged)
-    return merged  # keep `geom` (GeoJSON text) — callers that need shapely use geom_parsed
+    # keep `geom` (GeoJSON text) — callers that need shapely use geom_parsed
+    return merged.with_columns(block_label=assign_block_labels(merged))
 
 
 def reconstruct_filter_config(
     conn: sqlite3.Connection,
-    points_df: pd.DataFrame,
-    blocks_df: pd.DataFrame,
-    now: pd.Timestamp,
+    points_df: pl.DataFrame,
+    blocks_df: pl.DataFrame,
+    now: datetime,
 ) -> dict[str, object]:
     cfg: dict[str, object] = {}
 
-    pts = points_df.copy()
-    pts["local_area"] = pts["local_area"].fillna("(Unknown)")
-    pts["units"] = pts["units"].fillna(0)
+    pts = points_df.with_columns(
+        pl.col("local_area").fill_null("(Unknown)"), pl.col("units").fill_null(0)
+    )
 
     # Building-describing aggregates (neighbourhood counts/units, dataset
     # totals, building_metrics) must exclude overlay_housing rows (source
@@ -612,18 +662,18 @@ def reconstruct_filter_config(
     # bounds stays over every mapped point below since overlay rows are
     # still drawn on the map.
     buildings_only = (
-        pts[pts["source"] == "building"] if "source" in pts.columns else pts
+        pts.filter(pl.col("source") == "building") if "source" in pts.columns else pts
     )
 
-    neighbourhood_counts = (
-        buildings_only["local_area"].value_counts().sort_values(ascending=False)
-    )
-    neighbourhood_units = (
-        buildings_only.groupby("local_area")["units"].sum().sort_values(ascending=False)
+    # Most buildings first; equal counts in order of first appearance.
+    neighbourhoods = (
+        buildings_only.group_by("local_area", maintain_order=True)
+        .agg(count=pl.len(), units=pl.col("units").sum())
+        .sort("count", descending=True, maintain_order=True)
     )
     cfg["neighbourhoods"] = [
-        {"name": area, "count": int(count), "units": int(round(neighbourhood_units.get(area, 0)))}
-        for area, count in neighbourhood_counts.items()
+        {"name": area, "count": int(count), "units": int(round(units))}
+        for area, count, units in neighbourhoods.iter_rows()
     ]
 
     # Chinatown/Villages Plan Areas: rendered as two more Filters >
@@ -632,12 +682,14 @@ def reconstruct_filter_config(
     # building can belong to *in addition to* its real local_area, not an
     # alternative value of it.
     def _special_area(key: str, name: str, flag_col: str) -> dict:
-        flagged = buildings_only[flag_col] if flag_col in buildings_only.columns else pd.Series(dtype=bool)
+        if flag_col not in buildings_only.columns:
+            return {"key": key, "name": name, "count": 0, "units": 0}
+        flagged = buildings_only.filter(pl.col(flag_col))
         return {
             "key": key,
             "name": name,
-            "count": int(flagged.sum()),
-            "units": int(round(buildings_only.loc[flagged, "units"].sum())) if flagged.any() else 0,
+            "count": flagged.height,
+            "units": int(round(flagged["units"].sum())) if flagged.height else 0,
         }
 
     cfg["special_areas"] = [
@@ -645,21 +697,24 @@ def reconstruct_filter_config(
         _special_area("village-plan", "Villages Plan", "in_village_plan"),
     ]
 
-    valid_coords = pts.dropna(subset=["lat", "lon"])
+    valid_coords = pts.drop_nulls(["lat", "lon"])
     bounds = None
-    if not valid_coords.empty:
+    if not valid_coords.is_empty():
+        lat, lon = valid_coords["lat"].to_numpy(), valid_coords["lon"].to_numpy()
         bounds = {
-            "lat_min": float(valid_coords["lat"].min()),
-            "lat_max": float(valid_coords["lat"].max()),
-            "lon_min": float(valid_coords["lon"].min()),
-            "lon_max": float(valid_coords["lon"].max()),
-            "center_lat": float(valid_coords["lat"].mean()),
-            "center_lon": float(valid_coords["lon"].mean()),
+            "lat_min": float(lat.min()),
+            "lat_max": float(lat.max()),
+            "lon_min": float(lon.min()),
+            "lon_max": float(lon.max()),
+            # numpy's mean, as pandas computed it: a different summation
+            # order shifts the last digit.
+            "center_lat": float(np.mean(lat)),
+            "center_lon": float(np.mean(lon)),
         }
     cfg["bounds"] = bounds
     cfg["dataset_totals"] = {
-        "buildings": int(len(buildings_only)),
-        "units": int(pd.to_numeric(buildings_only["units"], errors="coerce").fillna(0).sum()),
+        "buildings": buildings_only.height,
+        "units": int(buildings_only["units"].sum()),
     }
 
     building_metrics = build_building_metrics(buildings_only)
@@ -669,7 +724,7 @@ def reconstruct_filter_config(
     ]
 
     cfg["blocks_total_units_max"] = (
-        int(blocks_df["total_units"].max()) if not blocks_df.empty else 0
+        int(blocks_df["total_units"].max()) if not blocks_df.is_empty() else 0
     )
     cfg["licence_year"] = _licence_year(conn)
     return cfg
@@ -707,7 +762,7 @@ def _round_geometry(geom: dict) -> dict:
 
 
 def _round_coord(value) -> float | None:
-    return None if value is None or pd.isna(value) else round(float(value), COORD_DECIMALS)
+    return None if _missing(value) else round(float(value), COORD_DECIMALS)
 
 
 def export_artifacts(
@@ -717,7 +772,7 @@ def export_artifacts(
     boundary_geojson_path: str | None = None,
     villages_geojson_path: str | None = None,
     chinatown_geojson_path: str | None = None,
-    now: pd.Timestamp | None = None,
+    now: datetime | None = None,
     property_managers_path: str | None = None,
 ) -> None:
     """Write the complete frontend artifact set.
@@ -727,7 +782,7 @@ def export_artifacts(
     against an older shape fails loudly instead of rendering an empty map.
     """
     if now is None:
-        now = pd.Timestamp.now(tz="UTC")
+        now = datetime.now(timezone.utc)
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
 
@@ -744,15 +799,15 @@ def export_artifacts(
     # into local_area.
     chinatown_polygons = load_boundary_polygons(chinatown_geojson_path)
     village_polygons = load_boundary_polygons(villages_geojson_path)
-    points_df["in_chinatown"] = flag_points_in_polygons(points_df, chinatown_polygons)
-    points_df["in_village_plan"] = flag_points_in_polygons(points_df, village_polygons)
+    points_df = points_df.with_columns(
+        in_chinatown=flag_points_in_polygons(points_df, chinatown_polygons),
+        in_village_plan=flag_points_in_polygons(points_df, village_polygons),
+    )
 
     blocks_df = reconstruct_blocks(conn, points_df)
-    blocks_df["in_chinatown"] = flag_geoms_intersecting_polygons(
-        blocks_df["geom_parsed"], chinatown_polygons
-    )
-    blocks_df["in_village_plan"] = flag_geoms_intersecting_polygons(
-        blocks_df["geom_parsed"], village_polygons
+    blocks_df = blocks_df.with_columns(
+        in_chinatown=flag_geoms_intersecting_polygons(blocks_df["geom_parsed"], chinatown_polygons),
+        in_village_plan=flag_geoms_intersecting_polygons(blocks_df["geom_parsed"], village_polygons),
     )
 
     filter_cfg = reconstruct_filter_config(conn, points_df, blocks_df, now)
@@ -797,7 +852,7 @@ def _write_json(path: Path, payload: object) -> None:
     path.write_text(json.dumps(payload, separators=(",", ":")), encoding="utf-8")
 
 
-def _blocks_feature_collection(blocks_df: pd.DataFrame) -> dict:
+def _blocks_feature_collection(blocks_df: pl.DataFrame) -> dict:
     """Emit stored GeoJSON geometry directly — no shapely round trip.
 
     `blocks.geom` is already GeoJSON text in SQLite, so parsing it into a
@@ -813,22 +868,20 @@ def _blocks_feature_collection(blocks_df: pd.DataFrame) -> dict:
         "in_chinatown",
         "in_village_plan",
     ]
+    property_cols = [col for col in property_cols if col in blocks_df.columns]
     features = []
-    for _, row in blocks_df.iterrows():
-        geom = row.get("geom")
+    for row in blocks_df.select("geom", *property_cols).iter_rows(named=True):
+        geom = row["geom"]
         if geom is None:
             continue
         if isinstance(geom, str):
             geom = json.loads(geom)
+        properties = {col: (None if _missing(row[col]) else row[col]) for col in property_cols}
         features.append(
             {
                 "type": "Feature",
                 "geometry": _round_geometry(geom),
-                "properties": {
-                    col: (None if pd.isna(row.get(col)) else row.get(col))
-                    for col in property_cols
-                    if col in blocks_df.columns
-                },
+                "properties": properties,
             }
         )
     return {
@@ -838,14 +891,15 @@ def _blocks_feature_collection(blocks_df: pd.DataFrame) -> dict:
     }
 
 
-def _marker_records(points_df: pd.DataFrame) -> list[dict]:
+def _marker_records(points_df: pl.DataFrame) -> list[dict]:
     """Per-building marker data, including coordinates.
 
     Styling (radius, colours, rings) is presentation and is computed by the
     frontend (frontend/src/markers.ts); these records carry only data.
     """
+    as_int = lambda v: None if _missing(v) else int(v)
     records = []
-    for _, r in points_df.iterrows():
+    for r in points_df.iter_rows(named=True):
         records.append(
             {
                 "b_id": int(r["b_id"]),
@@ -853,14 +907,12 @@ def _marker_records(points_df: pd.DataFrame) -> list[dict]:
                 "lon": _round_coord(r["lon"]),
                 "owner_key": r.get("owner_key"),
                 "network_key": r.get("network_key"),
-                "block_id": None if pd.isna(r.get("block_id")) else int(r["block_id"]),
-                "units": None if pd.isna(r.get("units")) else int(r["units"]),
-                "year_built": None
-                if pd.isna(r.get("year_built"))
-                else int(r["year_built"]),
+                "block_id": as_int(r.get("block_id")),
+                "units": as_int(r.get("units")),
+                "year_built": as_int(r.get("year_built")),
                 "local_area": r.get("local_area"),
                 "housing_type": r.get("housing_type") or "",
-                "n_issues": None if pd.isna(r.get("n_issues")) else int(r["n_issues"]),
+                "n_issues": as_int(r.get("n_issues")),
                 "source": r.get("source", "building"),
             }
         )
@@ -889,17 +941,12 @@ BUILDING_RECORD_COLUMNS = [
 ]
 
 
-def _building_records(points_df: pd.DataFrame) -> dict:
+def _building_records(points_df: pl.DataFrame) -> dict:
     """Full per-building record set — the popup and the table both read this."""
-    df = points_df.copy()
     records = {}
-    for _, r in df.iterrows():
-        rec = {
-            c: (None if isinstance(r[c], float) and pd.isna(r[c]) else r[c])
-            for c in BUILDING_RECORD_COLUMNS
-        }
+    for r in points_df.select(BUILDING_RECORD_COLUMNS).iter_rows(named=True):
+        rec = {c: (None if _missing(v) else v) for c, v in r.items()}
         for c in ("lat", "lon"):
-            if c in rec:
-                rec[c] = _round_coord(rec[c])
+            rec[c] = _round_coord(rec[c])
         records[str(int(r["b_id"]))] = rec
     return {"columns": list(BUILDING_RECORD_COLUMNS), "records": records}

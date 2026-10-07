@@ -22,7 +22,7 @@ from __future__ import annotations
 import logging
 import sqlite3
 
-import pandas as pd
+import polars as pl
 
 from ..claims import NETWORK_LABEL, find_similar_entity, record_claim
 from ..io import normalize_cols, read_any_csv
@@ -42,7 +42,7 @@ OPTIONAL_CLAIM_COLUMNS = {
 ALLOWED_CLAIM_COLUMNS = REQUIRED_CLAIM_COLUMNS | OPTIONAL_CLAIM_COLUMNS
 
 
-def load_ownership_claims_frame(path: str) -> pd.DataFrame:
+def load_ownership_claims_frame(path: str) -> pl.DataFrame:
     df = normalize_cols(read_any_csv(path))
     unexpected = set(df.columns) - ALLOWED_CLAIM_COLUMNS
     if unexpected:
@@ -56,11 +56,9 @@ def load_ownership_claims_frame(path: str) -> pd.DataFrame:
     return df
 
 
-def _cell(row, col: str) -> str | None:
-    if col not in row.index:
-        return None
-    value = row[col]
-    if pd.isna(value):
+def _cell(row: dict, col: str) -> str | None:
+    value = row.get(col)
+    if value is None:
         return None
     text = str(value).strip()
     return text or None
@@ -70,11 +68,11 @@ def ingest_ownership_claims(conn: sqlite3.Connection, path: str) -> int:
     df = load_ownership_claims_frame(path)
 
     count = 0
-    for _, row in df.iterrows():
+    for row in df.iter_rows(named=True):
         claim_key = _cell(row, "claim_key")
         if claim_key is None:
             raise RuntimeError(
-                f"ownership_claims CSV row missing required claim_key: {row.to_dict()}"
+                f"ownership_claims CSV row missing required claim_key: {row}"
             )
         entity_a = _cell(row, "entity_a")
         entity_b = _cell(row, "entity_b")

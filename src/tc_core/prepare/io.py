@@ -11,7 +11,7 @@ def load_polars(file: Path) -> pl.DataFrame:
     return (
         pl.read_json(file)
         .select("features")
-        .explode("features")
+        .explode("features", empty_as_null=False)
         .unnest("features")
         .select("properties")
         .unnest("properties")

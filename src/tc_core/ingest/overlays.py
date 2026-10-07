@@ -44,12 +44,13 @@ rezoning ~43/377 (11%).
 from __future__ import annotations
 
 import logging
+import math
 import re
 import sqlite3
 from dataclasses import dataclass, field
+from typing import Callable
 
-import numpy as np
-import pandas as pd
+import polars as pl
 from shapely.geometry import Point, shape
 
 from ..normalize import AddressMatcher, address_key_variants
@@ -71,17 +72,25 @@ def rezoning_status_group(status: str) -> str:
 
 @dataclass
 class OverlayMatchResult:
-    matched: pd.DataFrame
+    matched: pl.DataFrame
     unmatched: list[dict] = field(default_factory=list)
 
 
+def _missing(val) -> bool:
+    return val is None or (isinstance(val, float) and math.isnan(val))
+
+
 def _clean(val) -> str:
-    if val is None:
-        return ""
-    if isinstance(val, float) and pd.isna(val):
+    if _missing(val):
         return ""
     s = str(val).strip()
     return "" if s.lower() == "nan" else s
+
+
+def _clean_expr(col: str) -> pl.Expr:
+    """_clean() as an expression: stripped text, "" for missing or "nan"."""
+    s = pl.col(col).cast(pl.String).str.strip_chars()
+    return pl.when(s.is_null() | (s.str.to_lowercase() == "nan")).then(pl.lit("")).otherwise(s)
 
 
 def _build_boundary_polys(local_area_boundary_fc: dict) -> list[tuple[str, object]]:
@@ -108,7 +117,7 @@ def _resolve_local_area(lat, lon, boundary_polys: list[tuple[str, object]]) -> s
     unmatched marker needs a local_area that actually lines up with those
     checkboxes to be filterable correctly.
     """
-    if lat is None or lon is None or pd.isna(lat) or pd.isna(lon):
+    if _missing(lat) or _missing(lon):
         return ""
     point = Point(float(lon), float(lat))
     for name, poly in boundary_polys:
@@ -137,6 +146,50 @@ def _rezoning_street(name) -> str:
     return _REZONING_NAME_SPLIT_RE.split(s, maxsplit=1)[0].strip()
 
 
+def _split_matches(
+    source: pl.DataFrame,
+    column: str,
+    street: Callable[[object], str],
+    matcher: AddressMatcher,
+    addr_keys: list[str],
+) -> tuple[pl.DataFrame, pl.DataFrame]:
+    """Key each source row, then split it into (matched, unmatched) rows.
+    Several rows matching one building: the first in source order wins."""
+    source = source.with_columns(
+        addr_key=pl.col(column).map_elements(
+            lambda a: _match_key(street(a), matcher), return_dtype=pl.String, skip_nulls=False
+        )
+    )
+    hit = pl.col("addr_key").is_in(addr_keys)
+    matched = source.filter(hit).unique("addr_key", keep="first", maintain_order=True)
+    return matched, source.filter(~hit)
+
+
+def _apply_matches(
+    df: pl.DataFrame, matched: pl.DataFrame, flag: str, fields: dict[str, str]
+) -> pl.DataFrame:
+    """Set `flag` and each source column -> building column in `fields` on
+    the buildings `matched` resolved to; other buildings keep their values."""
+    fields = {src: dst for src, dst in fields.items() if src in matched.columns}
+    lookup = matched.select(
+        "addr_key",
+        pl.lit(True).alias("_hit"),
+        *(_clean_expr(src).alias(f"_{dst}") for src, dst in fields.items()),
+    )
+    hit = pl.col("_hit").fill_null(False)
+    return (
+        df.join(lookup, on="addr_key", how="left", maintain_order="left")
+        .with_columns(
+            pl.when(hit).then(True).otherwise(pl.col(flag)).alias(flag),
+            *(
+                pl.when(hit).then(pl.col(f"_{dst}")).otherwise(pl.col(dst)).alias(dst)
+                for dst in fields.values()
+            ),
+        )
+        .drop("_hit", *(f"_{dst}" for dst in fields.values()))
+    )
+
+
 def _add_extra_housing(
     extras: dict[str, dict],
     key: str,
@@ -156,14 +209,14 @@ def _add_extra_housing(
     `source_row_ids` (CLAUDE.md lineage hook) keeps every contributing raw
     row per table, since one row can merge a co-op and an SRO.
     """
-    if lat is None or lon is None or pd.isna(lat) or pd.isna(lon):
+    if _missing(lat) or _missing(lon):
         logger.warning("Skipping unplaceable housing record (no lat/lon): %s", address)
         return
     row = extras.setdefault(
         key, {"addr_key": key, "address": address, "lat": float(lat), "lon": float(lon)}
     )
     row.update(flags)
-    if source_id is not None and not pd.isna(source_id):
+    if not _missing(source_id):
         row.setdefault("source_row_ids", {}).setdefault(source_table, []).append(
             int(source_id)
         )
@@ -173,14 +226,13 @@ def _add_extra_housing(
 
 def match_overlays(
     conn: sqlite3.Connection,
-    buildings_df: pd.DataFrame,
+    buildings_df: pl.DataFrame,
     boundary_path: str,
 ) -> OverlayMatchResult:
-    df = buildings_df.copy()
-    addr_keys = set(df["addr_key"])
+    addr_keys = buildings_df["addr_key"].unique().to_list()
     boundary_polys = _build_boundary_polys(load_boundary_feature_collection(boundary_path))
     secondary_index = load_secondary_address_index(conn)
-    matcher = AddressMatcher(addr_keys, aliases=secondary_index)
+    matcher = AddressMatcher(set(addr_keys), aliases=secondary_index)
     coops = load_coops_frame(conn)
     sro = load_sro_frame(conn)
     rezoning = load_rezoning_frame(conn)
@@ -199,56 +251,46 @@ def match_overlays(
     # Defaults for every new column, so downstream code never needs to branch
     # on a column being absent. overlay_write.BUILDING_OVERLAY_COLUMNS lists
     # these same 18 (a test pins the two together).
-    df["is_coop"] = False
-    df["coop_status"] = ""
-    df["coop_ownership_model"] = ""
-    df["coop_url"] = ""
-    df["housing_name"] = ""
-    df["is_sro"] = False
-    df["sro_owner"] = ""
-    df["sro_operator"] = ""
-    df["sro_operator_group"] = ""
-    df["sro_ownership_group"] = ""
-    df["sro_occupancy_status"] = ""
-    df["sro_registered_rooms"] = ""
-    df["is_rezoning"] = False
-    df["rezoning_status"] = ""
-    df["rezoning_status_group"] = ""
-    df["rezoning_category"] = ""
-    df["rezoning_status_detail"] = ""
-    df["rezoning_link"] = ""
+    df = buildings_df.with_columns(
+        is_coop=pl.lit(False),
+        coop_status=pl.lit(""),
+        coop_ownership_model=pl.lit(""),
+        coop_url=pl.lit(""),
+        housing_name=pl.lit(""),
+        is_sro=pl.lit(False),
+        sro_owner=pl.lit(""),
+        sro_operator=pl.lit(""),
+        sro_operator_group=pl.lit(""),
+        sro_ownership_group=pl.lit(""),
+        sro_occupancy_status=pl.lit(""),
+        sro_registered_rooms=pl.lit(""),
+        is_rezoning=pl.lit(False),
+        rezoning_status=pl.lit(""),
+        rezoning_status_group=pl.lit(""),
+        rezoning_category=pl.lit(""),
+        rezoning_status_detail=pl.lit(""),
+        rezoning_link=pl.lit(""),
+    )
 
     # ---- Co-ops ----
     if coops is not None:
-        coops = coops.copy()
-        coops["addr_key"] = coops["address"].apply(
-            lambda a: _match_key(_coop_street(a), matcher)
-        )
-        matched_mask = coops["addr_key"].isin(addr_keys)
-        matched = coops[matched_mask].drop_duplicates("addr_key")
-        unmatched = coops[~matched_mask]
+        matched, unmatched = _split_matches(coops, "address", _coop_street, matcher, addr_keys)
         logger.info(
-            "Co-ops: %d/%d matched an existing building", len(matched), len(coops)
+            "Co-ops: %d/%d matched an existing building", matched.height, coops.height
+        )
+        df = _apply_matches(
+            df,
+            matched,
+            "is_coop",
+            {
+                "status": "coop_status",
+                "ownership_model": "coop_ownership_model",
+                "read_more_url": "coop_url",
+                "title": "housing_name",
+            },
         )
 
-        if not matched.empty:
-            lookup = matched.set_index("addr_key")
-            hit = df["addr_key"].isin(lookup.index)
-            df.loc[hit, "is_coop"] = True
-            df.loc[hit, "coop_status"] = (
-                df.loc[hit, "addr_key"].map(lookup["status"]).apply(_clean)
-            )
-            df.loc[hit, "coop_ownership_model"] = (
-                df.loc[hit, "addr_key"].map(lookup["ownership_model"]).apply(_clean)
-            )
-            df.loc[hit, "coop_url"] = (
-                df.loc[hit, "addr_key"].map(lookup["read_more_url"]).apply(_clean)
-            )
-            df.loc[hit, "housing_name"] = (
-                df.loc[hit, "addr_key"].map(lookup["title"]).apply(_clean)
-            )
-
-        for _, row in unmatched.iterrows():
+        for row in unmatched.iter_rows(named=True):
             _add_extra_housing(
                 extras,
                 key=row["addr_key"],
@@ -268,38 +310,27 @@ def match_overlays(
 
     # ---- SRO/SRA housing ----
     if sro is not None:
-        sro = sro.copy()
-        sro["addr_key"] = sro["address"].apply(
-            lambda a: _match_key(str(a), matcher)
-        )
-        matched_mask = sro["addr_key"].isin(addr_keys)
-        matched = sro[matched_mask].drop_duplicates("addr_key")
-        unmatched = sro[~matched_mask]
+        matched, unmatched = _split_matches(sro, "address", str, matcher, addr_keys)
         logger.info(
-            "SRO/SRA: %d/%d matched an existing building", len(matched), len(sro)
+            "SRO/SRA: %d/%d matched an existing building", matched.height, sro.height
         )
-
-        if not matched.empty:
-            lookup = matched.set_index("addr_key")
-            hit = df["addr_key"].isin(lookup.index)
-            df.loc[hit, "is_sro"] = True
-            field_map = {
+        # Registered rooms are not dwelling units: they stay in
+        # sro_registered_rooms and never fill `units`.
+        df = _apply_matches(
+            df,
+            matched,
+            "is_sro",
+            {
                 "owner": "sro_owner",
                 "operator": "sro_operator",
                 "operator_group": "sro_operator_group",
                 "ownership_group": "sro_ownership_group",
                 "occupancy_status": "sro_occupancy_status",
                 "#_registered_rooms": "sro_registered_rooms",
-            }
-            for src_col, dst_col in field_map.items():
-                if src_col in lookup.columns:
-                    df.loc[hit, dst_col] = (
-                        df.loc[hit, "addr_key"].map(lookup[src_col]).apply(_clean)
-                    )
-            # Registered rooms are not dwelling units: they stay in
-            # sro_registered_rooms and never fill `units`.
+            },
+        )
 
-        for _, row in unmatched.iterrows():
+        for row in unmatched.iter_rows(named=True):
             _add_extra_housing(
                 extras,
                 key=row["addr_key"],
@@ -322,40 +353,35 @@ def match_overlays(
 
     # ---- Rezoning applications ----
     if rezoning is not None:
-        rezoning = rezoning.copy()
-        rezoning["addr_key"] = rezoning["name"].apply(
-            lambda n: _match_key(_rezoning_street(n), matcher)
+        matched, unmatched = _split_matches(
+            rezoning.with_row_index("_idx"), "name", _rezoning_street, matcher, addr_keys
         )
-        matched_mask = rezoning["addr_key"].isin(addr_keys)
-        matched = rezoning[matched_mask].drop_duplicates("addr_key")
-        unmatched = rezoning[~matched_mask]
         logger.info(
             "Rezoning applications: %d/%d matched an existing building",
-            len(matched),
-            len(rezoning),
+            matched.height,
+            rezoning.height,
+        )
+        df = _apply_matches(
+            df,
+            matched,
+            "is_rezoning",
+            {
+                "status": "rezoning_status",
+                "category": "rezoning_category",
+                "status_detail": "rezoning_status_detail",
+                "link": "rezoning_link",
+            },
+        ).with_columns(
+            rezoning_status_group=pl.when(pl.col("is_rezoning"))
+            .then(
+                pl.when(pl.col("rezoning_status").str.to_lowercase() == "approved")
+                .then(pl.lit("closed"))
+                .otherwise(pl.lit("open"))
+            )
+            .otherwise(pl.col("rezoning_status_group"))
         )
 
-        if not matched.empty:
-            lookup = matched.set_index("addr_key")
-            hit = df["addr_key"].isin(lookup.index)
-            df.loc[hit, "is_rezoning"] = True
-            df.loc[hit, "rezoning_status"] = (
-                df.loc[hit, "addr_key"].map(lookup["status"]).apply(_clean)
-            )
-            df.loc[hit, "rezoning_status_group"] = df.loc[hit, "rezoning_status"].apply(
-                rezoning_status_group
-            )
-            df.loc[hit, "rezoning_category"] = (
-                df.loc[hit, "addr_key"].map(lookup["category"]).apply(_clean)
-            )
-            df.loc[hit, "rezoning_status_detail"] = (
-                df.loc[hit, "addr_key"].map(lookup["status_detail"]).apply(_clean)
-            )
-            df.loc[hit, "rezoning_link"] = (
-                df.loc[hit, "addr_key"].map(lookup["link"]).apply(_clean)
-            )
-
-        for idx, row in unmatched.iterrows():
+        for row in unmatched.iter_rows(named=True):
             lat, lon = row.get("latitude"), row.get("longitude")
             status = _clean(row.get("status"))
             unmatched_records.append(
@@ -365,7 +391,7 @@ def match_overlays(
                     # different addresses/lat-lons as separate rows (a
                     # multi-site umbrella application) — confirmed via a
                     # real duplicate-key collision during testing.
-                    "synthetic_id": f"rezoning-{row.get('id')}-{idx}",
+                    "synthetic_id": f"rezoning-{row.get('id')}-{row['_idx']}",
                     "source": "rezoning",
                     "lat": lat,
                     "lon": lon,
@@ -384,10 +410,14 @@ def match_overlays(
                 }
             )
 
-    df["housing_type"] = np.where(
-        df["is_coop"] & df["is_sro"],
-        "co-op, sro",
-        np.where(df["is_coop"], "co-op", np.where(df["is_sro"], "sro", "")),
+    df = df.with_columns(
+        housing_type=pl.when(pl.col("is_coop") & pl.col("is_sro"))
+        .then(pl.lit("co-op, sro"))
+        .when(pl.col("is_coop"))
+        .then(pl.lit("co-op"))
+        .when(pl.col("is_sro"))
+        .then(pl.lit("sro"))
+        .otherwise(pl.lit(""))
     )
 
     for rec in extras.values():

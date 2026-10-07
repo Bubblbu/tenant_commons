@@ -1,15 +1,28 @@
 """decode_fee (Long Term Rental fees read back into units, Licence By-law 4450, 2026 rates) and
 licence_only_rentals (which licensed rentals become buildings of their own)."""
 
-import pandas as pd
+from datetime import datetime, timezone
+
 import polars as pl
 
 from tc_core.prepare.buildings import licence_only_rentals
-from tc_core.prepare.licence_fees import decode_fee
+from tc_core.prepare.licence_fees import decode_fee, parse_issued
 
 
-def ts(s: str) -> pd.Timestamp:
-    return pd.Timestamp(s, tz="UTC")
+def ts(s: str) -> datetime:
+    return datetime.fromisoformat(s).replace(tzinfo=timezone.utc)
+
+
+def test_issue_dates_are_read_in_utc():
+    # A late-evening Pacific issue date belongs to the next UTC month, as pandas read it.
+    assert parse_issued("2026-04-30T20:00:00-07:00") == datetime(2026, 5, 1, 3, tzinfo=timezone.utc)
+    assert parse_issued("2026-04-18T00:00:00+00:00").month == 4
+    assert parse_issued("2026-04-18") == datetime(2026, 4, 18, tzinfo=timezone.utc)
+
+
+def test_missing_or_garbled_issue_dates_are_none():
+    assert parse_issued(None) is None
+    assert parse_issued("not a date") is None
 
 
 def test_annual_dwelling_units():

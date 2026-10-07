@@ -10,35 +10,42 @@ building's owner is "(Unknown)" until the registry or a licence says more.
 
 from __future__ import annotations
 
-import pandas as pd
+import json
+
+import polars as pl
 
 from ..normalize import AddressMatcher, sanitize_owner
 
 BUILDING_SOURCE = "manager listing"
 
-_COLUMNS = [
-    "address", "lat", "lon", "units", "building_source", "year_built", "n_issues",
-    "issues_details", "value_land", "value_bldg", "bldg_land_ratio", "owner_group",
-    "owner_key", "local_area", "source_row_ids", "addr_key",
-]
+# One merged building per row, as merge._deduplicate_buildings() produces
+# them; source_row_ids is the JSON stored in buildings.source_row_ids.
+BUILDING_SCHEMA = {
+    "address": pl.String, "lat": pl.Float64, "lon": pl.Float64, "units": pl.Float64,
+    "building_source": pl.String, "year_built": pl.Float64, "n_issues": pl.Float64,
+    "issues_details": pl.String, "value_land": pl.Float64, "value_bldg": pl.Float64,
+    "bldg_land_ratio": pl.Float64, "owner_group": pl.String, "owner_key": pl.String,
+    "local_area": pl.String, "source_row_ids": pl.String, "addr_key": pl.String,
+}
 
 
 def listing_building_rows(
     listings: list[dict],
     known_keys: set[str],
     secondary_index: dict[str, str],
-    addr_points: pd.DataFrame,
-) -> pd.DataFrame:
+    addr_points: pl.DataFrame,
+) -> pl.DataFrame:
     """New building rows, shaped like merge._deduplicate_buildings' output.
     addr_points is merge._prepare_addresses' frame (addr_key, lat, lon,
     geo_local_area). Listings at one address make one building."""
     buildings = AddressMatcher(known_keys, aliases=secondary_index)
-    points = (
-        addr_points.dropna(subset=["lat", "lon"])
-        .drop_duplicates("addr_key")
-        .set_index("addr_key")
-    )
-    address_points = AddressMatcher(points.index)
+    points = {
+        row["addr_key"]: row
+        for row in addr_points.drop_nulls(["lat", "lon"])
+        .unique("addr_key", keep="first", maintain_order=True)
+        .iter_rows(named=True)
+    }
+    address_points = AddressMatcher(list(points))
     found: dict[str, dict] = {}
     for listing in listings:
         address = listing.get("address")
@@ -56,7 +63,7 @@ def listing_building_rows(
 
     rows = []
     for key, rec in found.items():
-        point = points.loc[key]
+        point = points[key]
         area = point.get("geo_local_area")
         rows.append({
             "address": key,
@@ -73,10 +80,10 @@ def listing_building_rows(
             "owner_group": "(Unknown)",
             "owner_key": sanitize_owner("(Unknown)"),
             "local_area": area.strip() if isinstance(area, str) and area.strip() else "(Unknown)",
-            "source_row_ids": {"raw_manager_listings": sorted(rec["ids"])},
+            "source_row_ids": json.dumps({"raw_manager_listings": sorted(rec["ids"])}),
             "addr_key": key,
         })
-    return pd.DataFrame(rows, columns=_COLUMNS)
+    return pl.DataFrame(rows, schema=BUILDING_SCHEMA)
 
 
 def added_from_listings(conn) -> list[tuple[str, str]]:

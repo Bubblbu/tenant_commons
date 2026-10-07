@@ -6,7 +6,6 @@ from __future__ import annotations
 
 import logging
 
-import pandas as pd
 
 from tc_core.claims import (
     NETWORK_LABEL,
@@ -85,10 +84,10 @@ def test_bulk_import_does_not_report_a_label_as_a_collapsed_entity(tmp_path, cap
     record_claim(conn, "GLR PROPERTIES LTD.", "RENER, GEORGE", "common_owner",
                  "public_registry", confidence="confirmed")
     csv = tmp_path / "claims.csv"
-    pd.DataFrame([{
-        "claim_key": "label-1", "entity_a": "RENER, GEORGE", "entity_b": "Glr Properties Ltd",
-        "relationship": NETWORK_LABEL, "source_type": "manual_research", "confidence": "confirmed",
-    }]).to_csv(csv, index=False)
+    csv.write_text(
+        "claim_key,entity_a,entity_b,relationship,source_type,confidence\n"
+        f'label-1,"RENER, GEORGE",Glr Properties Ltd,{NETWORK_LABEL},manual_research,confirmed\n'
+    )
     caplog.set_level(logging.INFO, logger="tc_core.ingest")
 
     ingest_ownership_claims(conn, str(csv))
