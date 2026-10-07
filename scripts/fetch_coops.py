@@ -23,7 +23,7 @@ import re
 import sys
 from pathlib import Path
 
-import pandas as pd
+import polars as pl
 import requests
 
 SOURCE_URL = "https://www.chf.bc.ca/find-a-co-op/"
@@ -61,7 +61,7 @@ def extract_coops(html: str) -> list[dict]:
     return json.loads(match.group(1))
 
 
-def normalize_coops(records: list[dict], city: str = "Vancouver") -> pd.DataFrame:
+def normalize_coops(records: list[dict], city: str = "Vancouver") -> pl.DataFrame:
     """Flatten CHF's nested JSON into one row per co-op, filtered to `city`.
 
     Filters on CHF's own `location.city` field — i.e. all of Vancouver
@@ -98,13 +98,17 @@ def normalize_coops(records: list[dict], city: str = "Vancouver") -> pd.DataFram
                 "read_more_url": rec.get("read_more_url"),
             }
         )
-    df = pd.DataFrame(rows)
-    if df.empty:
+    if not rows:
         raise RuntimeError(
             f"No records matched city={city!r} — check CHF's `location.city` "
             "values haven't changed format (e.g. 'Vancouver' vs 'City of Vancouver')."
         )
-    return df.sort_values("title").reset_index(drop=True)
+    # Empty text (e.g. no home types listed) is written as an empty cell, not "".
+    return (
+        pl.DataFrame(rows, infer_schema_length=None)
+        .sort("title", maintain_order=True)
+        .with_columns(pl.col(pl.String).replace("", None))
+    )
 
 
 def main() -> None:
@@ -124,11 +128,11 @@ def main() -> None:
     print(f"Fetched {len(records)} co-ops province-wide.", file=sys.stderr)
 
     df = normalize_coops(records, city=args.city)
-    print(f"{len(df)} co-ops in city={args.city!r}.", file=sys.stderr)
+    print(f"{df.height} co-ops in city={args.city!r}.", file=sys.stderr)
 
     out_path = Path(args.out)
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    df.to_csv(out_path, index=False)
+    df.write_csv(out_path)
     print(f"Wrote {out_path}", file=sys.stderr)
 
 
