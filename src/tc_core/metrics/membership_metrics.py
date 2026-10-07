@@ -15,11 +15,15 @@ from __future__ import annotations
 import re
 from collections import Counter
 from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 
 import polars as pl
 
 MEMBERSHIP_YEAR_RE = re.compile(r"membership-(\d{4})", re.IGNORECASE)
 RECENT_ACTIVITY_WINDOW = timedelta(days=365)
+# NationBuilder exports times as "10/15/2024 9:22 AM", in the nation's time zone.
+NATIONBUILDER_TIME_FORMAT = "%m/%d/%Y %I:%M %p"
+NATIONBUILDER_TIME_ZONE = ZoneInfo("America/Vancouver")
 
 
 def _extract_tags(raw: object) -> list[str]:
@@ -38,9 +42,15 @@ def _latest_membership_year(tags: list[str]) -> int | None:
 
 
 def _parse_updated_at(raw: object) -> datetime | None:
-    """An ISO 8601 updated_at in UTC (no offset means UTC); None otherwise."""
+    """updated_at in UTC: NationBuilder's export format (Vancouver time) or
+    ISO 8601 (no offset means UTC); None if it's neither."""
     if not isinstance(raw, str):
         return None
+    try:
+        local = datetime.strptime(raw.strip(), NATIONBUILDER_TIME_FORMAT)
+        return local.replace(tzinfo=NATIONBUILDER_TIME_ZONE).astimezone(timezone.utc)
+    except ValueError:
+        pass
     try:
         parsed = datetime.fromisoformat(raw)
     except ValueError:
