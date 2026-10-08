@@ -10,7 +10,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 FIXTURES = REPO_ROOT / "frontend" / "fixtures"
 FILES = [
     "filter_config.json", "marker_metadata.json", "building_records.json",
-    "blocks.geojson", "local-area-boundary.geojson",
+    "networks.json", "blocks.geojson", "local-area-boundary.geojson",
 ]
 
 
@@ -36,12 +36,22 @@ def test_fixtures_hold_no_membership():
 def test_fixtures_cover_every_source_and_carry_the_contract_version():
     markers = json.loads((FIXTURES / "marker_metadata.json").read_text())["markers"]
     assert {m["source"] for m in markers} == {"building", "overlay_sro", "overlay_coop"}
-    for name in FILES[:4]:
-        assert json.loads((FIXTURES / name).read_text())["schema_version"] == 1, name
+    for name in FILES[:5]:
+        assert json.loads((FIXTURES / name).read_text())["schema_version"] == 2, name
 
 
-def test_fixtures_exercise_registry_owners_and_a_claims_network():
-    records = json.loads((FIXTURES / "building_records.json").read_text())["records"].values()
-    assert any(r["owner_source"] == "registry" for r in records)
-    assert any(r["network_source"] == "claims" for r in records)
+def test_fixtures_exercise_every_popup_case():
+    """The popup's cases (spec 2026-10-08): registry owner with an interest
+    holder and a differently spelled licence, an SRO with an unmatched
+    licensee, a rezoning, a co-op, a claims network."""
+    records = list(json.loads((FIXTURES / "building_records.json").read_text())["records"].values())
+    networks = json.loads((FIXTURES / "networks.json").read_text())["networks"]
+    parties = [p for r in records for p in r["parties"]]
+    assert any(p["role"] == "owner" and p["sources"][0]["type"] == "registry" for p in parties)
+    assert any(p["role"] == "interest_holder" for p in parties)
+    assert any(p["role"] == "licensee" and p["same_as"] == "owner" for p in parties)
+    assert any(p["role"] == "licensee" and p["same_as"] is None for p in parties)
+    assert any(r["sro"] for r in records) and any(r["coop"] for r in records)
+    assert any(r["rezoning"] for r in records)
+    assert any(n["tier"] == "confirmed" for n in networks.values())
     assert json.loads((FIXTURES / "filter_config.json").read_text())["licence_year"] == 2026

@@ -48,7 +48,7 @@ BUILDINGS = [
      5000000, 800000, 0.16, 0, None, 1, 1, 0, 0, None, None, None, None),
     (2, "110 example st", "110 Example St", "Northside", 49.2812, -123.1288, 12, 1978,
      2500000, 400000, 0.16, 1, "http://app.vancouver.ca/RPS_Net/Default.aspx?num=110&street=EXAMPLE%20ST",
-     1, 1, 1, 0, "Active", "Leasehold", "https://example.org/coop",
+     1, 1, 1, 0, "open_waitlist", "non_profit", "https://example.org/coop",
      "Example Co-op"),
     (3, "200 sample ave", "200 Sample Ave", "Southside", 49.271, -123.119, 80, 1972,
      9000000, 1500000, 0.17, 0, None, 2, 2, 0, 1, None, None, None, "Sample Rooms"),
@@ -96,13 +96,24 @@ def _seed(conn: sqlite3.Connection) -> None:
             "year_built, value_land, value_bldg, bldg_land_ratio, n_issues, issues_details, "
             "landlord_id, block_id, "
             "is_coop, is_sro, coop_status, coop_ownership_model, coop_url, housing_name, sro_owner, "
-            "sro_operator, sro_occupancy_status, sro_registered_rooms, created_at, updated_at) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "sro_operator, sro_ownership_group, sro_operator_group, sro_occupancy_status, "
+            "sro_registered_rooms, created_at, updated_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (bid, key, addr, area, lat, lon, units, year, land, bldg, ratio, issues, issues_url,
              landlord, block, coop, sro, cstatus, cmodel, curl, hname,
-             "Sample Owner" if sro else None, "Sample Operator" if sro else None,
+             # The SRO inventory's abbreviation, expanded on export ("BCH" -> BC Housing);
+             # the licence (Sample Rentals Inc) stays a separate licensee.
+             "BCH" if sro else None, "Example Housing Society" if sro else None,
+             "Government" if sro else None, "N on-Profit" if sro else None,
              "Open" if sro else None, "24" if sro else None, TS, TS),
         )
+    # Building 4 has an approved rezoning.
+    conn.execute(
+        "UPDATE buildings SET is_rezoning = 1, rezoning_status = 'Approved', "
+        "rezoning_status_group = 'closed', rezoning_category = 'approved_market', "
+        "rezoning_status_detail = 'Approved January 1, 2026', "
+        "rezoning_link = 'https://www.shapeyourcity.ca/example' WHERE building_id = 4"
+    )
     conn.executemany(
         "INSERT INTO overlay_housing (addr_key, address, housing_name, local_area, lat, lon, "
         "is_coop, is_sro, sro_owner, sro_operator, sro_occupancy_status, sro_registered_rooms, "
@@ -110,12 +121,19 @@ def _seed(conn: sqlite3.Connection) -> None:
         [("300 invented rd", "300 Invented Rd", "Invented Rooms", "Southside", 49.265, -123.105,
           0, 1, "Invented Owner", "Invented Operator", "Open", "10", None, TS),
          ("400 madeup way", "400 Madeup Way", "Madeup Co-op", "Northside", 49.285, -123.135,
-          1, 0, None, None, None, None, "Active", TS)],
+          1, 0, None, None, None, None, "closed", TS)],
     )
     conn.executemany(
         "INSERT INTO raw_lotr_ownership (pid, reporting_body_name, order_created_date, "
         "data_fetch_status, ingested_at) VALUES (?, ?, '2026-01-01 00:00:00.000', 'SUCCESS', ?)",
         [(pid, name, TS) for pid, name in LOTR],
+    )
+    # An invented person behind building 1's owner.
+    conn.execute(
+        "INSERT INTO raw_lotr_ownership (pid, reporting_body_name, type_of_interest, holder_name, "
+        "order_created_date, data_fetch_status, ingested_at) VALUES ('000-000-001', "
+        "'EXAMPLE HOLDINGS LTD.', 'INTEREST_HOLDER', 'DOE, JANE', '2026-01-01 00:00:00.000', 'SUCCESS', ?)",
+        (TS,),
     )
     conn.executemany(
         "INSERT INTO ownership_claims (claim_key, entity_a, entity_b, relationship, source_type, "
