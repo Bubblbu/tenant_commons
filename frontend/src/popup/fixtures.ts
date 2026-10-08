@@ -6,7 +6,7 @@ const party = (p: Partial<Party> & Pick<Party, 'role' | 'name'>): Party => ({
   entity_key: p.name.toLowerCase(), kind: null, interest: null, pids: [], same_as: null, sources: [], ...p,
 });
 const base = (b: Partial<Building> & Pick<Building, 'id' | 'address'>): Building => ({
-  origin: 'building', name: null, also_known_as: [], local_area: null, block_id: null, lat: 49.2, lon: -123.1,
+  origin: 'building', name: null, also_known_as: [], pids: [], local_area: null, block_id: null, lat: 49.2, lon: -123.1,
   in_chinatown: false, in_village_plan: false, units: null, units_basis: null, year_built: null, listed_in: [],
   value: null, issues: null, parties: [], network_id: null, registry_search: { status: 'not_searched', date: null },
   coop: null, sro: null, rezoning: null, ...b,
@@ -28,7 +28,7 @@ export const NETWORKS: Record<string, Network> = {
 };
 
 export const YORK = base({
-  id: 1, address: '2145 york ave', name: 'Yorkshire Apartments', local_area: 'Kitsilano', units: 43,
+  id: 1, address: '2145 york ave', name: 'Yorkshire Apartments', pids: ['007-273-924'], local_area: 'Kitsilano', units: 43,
   units_basis: 'inventory', year_built: 1979, listed_in: ['rental_inventory'],
   value: { land: 8721000, building: 11437000, land_share: 0.433, land_share_pctl: 12 },
   issues: { count: 1, url: 'http://app.vancouver.ca/RPS_Net/x' }, network_id: 'net:cressey',

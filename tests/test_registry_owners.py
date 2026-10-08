@@ -180,3 +180,15 @@ def test_withheld_names_are_never_published_even_if_a_name_is_present(tmp_path):
     )
     holders = build_interest_holders(conn, _pid_map(tmp_path, [("011111111", "1 main st")]))
     assert [h["name"] for h in holders["1 main st"]] == ["PUBLIC, PERSON"]
+
+
+def test_building_pids_come_from_every_address_point_and_are_dashed(tmp_path):
+    from tc_core.metrics.registry_owners import building_pids
+
+    conn = _conn()
+    pid_map = _pid_map(tmp_path, [("004410785", "139 e cordova st"), ("4410786", "139 e cordova st"),
+                                  ("011111111", "1 main st")])
+    assert building_pids(conn, pid_map) == {
+        "139 e cordova st": ["004-410-785", "004-410-786"],
+        "1 main st": ["011-111-111"],
+    }

@@ -147,6 +147,13 @@
           "title": "Parties",
           "type": "array"
         },
+        "pids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Pids",
+          "type": "array"
+        },
         "registry_search": {
           "$ref": "#/$defs/RegistrySearch"
         },
@@ -225,6 +232,7 @@
         "address",
         "name",
         "also_known_as",
+        "pids",
         "local_area",
         "block_id",
         "lat",

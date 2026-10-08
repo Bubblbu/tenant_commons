@@ -48,6 +48,7 @@ from .metrics.membership_metrics import compute_building_member_metrics
 from .metrics.portfolios import build_landlord_portfolios
 from .metrics.registry_owners import (
     build_interest_holders,
+    building_pids,
     build_registry_owners,
     build_registry_searches,
 )
@@ -142,6 +143,7 @@ def reconstruct_points(
     no_filing = build_registry_searches(conn, pid_address_map_path) if pid_address_map_path else {}
     # Who stands behind the owners: name and interest type only (spec 2026-10-08 §3).
     holders = build_interest_holders(conn, pid_address_map_path) if pid_address_map_path else {}
+    parcels = building_pids(conn, pid_address_map_path) if pid_address_map_path else {}
     building_listings = _load_building_listings(conn, listing_aliases or {})
     merged = merged.with_columns(
         registry_no_filing=pl.Series(
@@ -176,6 +178,8 @@ def reconstruct_points(
         _objects(v if isinstance(v, list) else [] for v in merged[col].to_list()).alias(col)
         for col in ("listings", "registry_owner_pids", "interest_holders")
     )
+    # Every known PID, buildings and overlay records alike, by address.
+    merged = merged.with_columns(pids=_objects(parcels.get(k, []) for k in merged["addr_key"]))
     merged = fill_owner_from_sro(merged)
     merged = regroup_registry_owners(merged)
     merged = fallback_group_to_owner(merged)

@@ -339,3 +339,9 @@ def test_v2_has_no_sentinels(tmp_path):
     assert '"unknown"' not in text
     nobody = records(out)["3 nobody st"]
     assert owner(nobody) is None and parties(nobody, "licensee") == []
+
+
+def test_records_carry_every_known_pid(tmp_path):
+    recs = records(_export(tmp_path))
+    assert recs["522 e 8th ave"]["pids"] == ["008-173-613"]
+    assert recs["1 solo st"]["pids"] == []  # no PID known for it

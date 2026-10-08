@@ -145,6 +145,7 @@ def build_building(row: Mapping[str, object], *, shares: LandShares, clusters: M
         address=_text(row["address"]),
         name=_text(row.get("building_name")),
         also_known_as=[n for n in (_text(v) for v in (row.get("other_names") or [])) if n],
+        pids=list(row.get("pids") or []),
         local_area=_text(row.get("local_area")),
         block_id=_int(row.get("block_id")),
         lat=_coord(row.get("lat")),

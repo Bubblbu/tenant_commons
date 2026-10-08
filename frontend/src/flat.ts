@@ -13,7 +13,7 @@ export const FLAT_COLUMNS = [
   'owner_name', 'owner_key', 'owner_source', 'licence_holder', 'managed_by',
   'network_key', 'network_name', 'network_source', 'network_buildings_on_map',
   'network_evidence_registry', 'network_evidence_research',
-  'registry_no_filing', 'value_land', 'value_bldg', 'bldg_land_ratio', 'land_share_pctl',
+  'pids', 'registry_no_filing', 'value_land', 'value_bldg', 'bldg_land_ratio', 'land_share_pctl',
   'housing_type', 'rezoning_status', 'n_issues', 'issues_details',
   'in_chinatown', 'in_village_plan', 'lat', 'lon',
 ];
@@ -48,6 +48,7 @@ export function flatten(b: Building, networks: Record<string, Network>): Buildin
     network_evidence_registry: net ? net.evidence.registry : null,
     network_evidence_research: net ? net.evidence.vtu_research : null,
     network_buildings_on_map: net?.totals.buildings ?? null,
+    pids: b.pids.length ? b.pids.join('; ') : null,
     registry_no_filing: b.registry_search.status === 'no_filing' ? b.registry_search.date : null,
     value_land: b.value?.land ?? null,
     value_bldg: b.value?.building ?? null,

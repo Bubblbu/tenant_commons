@@ -22,7 +22,7 @@ describe('checkSchemaVersion', () => {
 describe('buildingViews', () => {
   it('keeps the nested buildings for the popup and a flat view for the tables', () => {
     const b: Building = {
-      id: 7, origin: 'building', address: '1 main st', name: null, also_known_as: [], local_area: 'X',
+      id: 7, origin: 'building', address: '1 main st', name: null, also_known_as: [], pids: [], local_area: 'X',
       block_id: null, lat: 49.2, lon: -123.1, in_chinatown: false, in_village_plan: false, units: 5,
       units_basis: 'inventory', year_built: 1950, listed_in: [], value: null, issues: null, parties: [],
       network_id: 'n1', registry_search: { status: 'not_searched', date: null }, coop: null, sro: null, rezoning: null,

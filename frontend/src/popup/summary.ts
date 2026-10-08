@@ -56,6 +56,19 @@ function rezoningAlert(b: Building): string {
   return `<div class="popup-alert"><strong>${escapeHtml(LABELS.rezoning[z.status])}</strong>${when} — the site may be redeveloped${link}</div>`;
 }
 
+const SHOWN_PIDS = 3;
+
+/** The building's parcels: a few PIDs inline (for a registry search), the rest collapsed. */
+function parcels(b: Building): string {
+  if (!b.pids.length) return '';
+  const label = b.pids.length === 1 ? 'PID' : 'PIDs';
+  const shown = b.pids.slice(0, SHOWN_PIDS).join(', ');
+  const rest = b.pids.slice(SHOWN_PIDS);
+  const more = rest.length
+    ? ` <details class="popup-inline"><summary>+${rest.length} more</summary>${escapeHtml(rest.join(', '))}</details>` : '';
+  return `<div class="popup-muted popup-pids">${escapeHtml(`${label} ${shown}`)}${more}</div>`;
+}
+
 export function renderSummary(b: Building, ctx: PopupContext): string {
   const licensee = first(b, 'licensee');
   const licensed = licensee && licensee.same_as === null
@@ -63,5 +76,5 @@ export function renderSummary(b: Building, ctx: PopupContext): string {
   const issues = b.issues
     ? `<div class="popup-issues">${linked(plural(b.issues.count, 'outstanding City issue', 'outstanding City issues'), b.issues.url)}</div>` : '';
   return badges(b) + rezoningAlert(b) + row('Owned by', ownedBy(b, ctx)) + row('Managed by', managedBy(b, ctx)) +
-    licensed + portfolio(b, ctx) + issues;
+    licensed + portfolio(b, ctx) + issues + parcels(b);
 }

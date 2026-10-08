@@ -56,6 +56,7 @@ export type Type =
 export type Url2 = string | null;
 export type Sources = Source[];
 export type Parties = Party[];
+export type Pids1 = string[];
 export type Date = string | null;
 export type Status1 = "filed" | "no_filing" | "not_searched";
 export type Category = string;
@@ -126,6 +127,7 @@ export interface Building {
   network_id: NetworkId;
   origin: Origin;
   parties: Parties;
+  pids: Pids1;
   registry_search: RegistrySearch;
   rezoning: Rezoning | null;
   sro: Sro | null;

@@ -9,7 +9,7 @@ const network: Network = {
 };
 
 const york: Building = {
-  id: 1, origin: 'building', address: '2145 york ave', name: 'Yorkshire Apartments', also_known_as: [],
+  id: 1, origin: 'building', address: '2145 york ave', name: 'Yorkshire Apartments', also_known_as: [], pids: ['007-273-924'],
   local_area: 'Kitsilano', block_id: 5, lat: 49.27, lon: -123.15, in_chinatown: false, in_village_plan: false,
   units: 43, units_basis: 'inventory', year_built: 1979, listed_in: ['rental_inventory'],
   value: { land: 8721000, building: 11437000, land_share: 0.43, land_share_pctl: 20 },
@@ -37,6 +37,13 @@ describe('flatten', () => {
       value_land: 8721000, value_bldg: 11437000, registry_no_filing: null,
     });
     expect(f.bldg_land_ratio).toBeCloseTo(11437000 / 8721000);
+  });
+
+  it('carries the PIDs as one CSV column', () => {
+    const f = flatten({ ...york, pids: ['007-273-924', '007-273-925'] }, {});
+    expect(f.pids).toBe('007-273-924; 007-273-925');
+    expect(FLAT_COLUMNS).toContain('pids');
+    expect(flatten({ ...york, pids: [] }, {}).pids).toBeNull();
   });
 
   it('marks an owner-less building with nulls', () => {

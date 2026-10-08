@@ -100,6 +100,8 @@ class Building(_Model):
     address: Text
     name: Text | None
     also_known_as: list[Text]
+    # Every parcel known to carry the address, searched in the registry or not.
+    pids: list[Text]
     local_area: Text | None
     block_id: Int | None
     lat: float | None

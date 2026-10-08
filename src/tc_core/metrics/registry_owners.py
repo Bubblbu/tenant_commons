@@ -173,3 +173,19 @@ def build_interest_holders(
         ]
         for addr_key, holders in found.items()
     }
+
+
+def _dashed(pid: str) -> str:
+    digits = pid.zfill(9)
+    return f"{digits[:3]}-{digits[3:6]}-{digits[6:9]}"
+
+
+def building_pids(conn: sqlite3.Connection, pid_address_map_path: str) -> dict[str, list[str]]:
+    """{addr_key: [PID, ...]} — every parcel known to carry the address (City
+    address points, building records, strata lots), dashed as the registry
+    writes them, whether or not the registry has been searched."""
+    result: dict[str, set[str]] = defaultdict(set)
+    for pid, addr_keys in pid_addr_keys(conn, pid_address_map_path).items():
+        for addr_key in addr_keys:
+            result[addr_key].add(_dashed(pid))
+    return {addr_key: sorted(pids) for addr_key, pids in result.items()}
