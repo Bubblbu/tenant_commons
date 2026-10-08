@@ -28,7 +28,7 @@ import {
 } from './layers';
 import { initLegendToggle, renderLegend } from './legend';
 import { markerStyle } from './markers';
-import { renderPopup } from './popup';
+import { initPopupTabs, renderPopup } from './popup/index';
 import { initTipDismiss } from './provenance';
 import { initClearButton } from './search-clear';
 import { initTableSearch } from './table-search';
@@ -64,14 +64,24 @@ async function main(): Promise<void> {
   const villages = createVillagesLayer(artifacts.villages, boundaryRenderer);
   const chinatown = createChinatownLayer(artifacts.chinatown, boundaryRenderer).addTo(map);
   const styled = artifacts.markers.map((m) => ({ ...m, ...markerStyle(m) }));
+  // The flat view: the landlord picker and coverage panel read it too.
   const records = artifacts.buildingData.records;
-  // Lazy: the markup is built on first open, from the one record the table and filters also read.
+  const popupCtx = {
+    networks: artifacts.networks,
+    licenceYear: artifacts.filterConfig.licence_year ?? null,
+    landShareMedian: artifacts.filterConfig.land_share_median ?? null,
+  };
+  // Lazy: the markup is built on first open, from the building as published.
   const buildings = createBuildingLayers(styled, (marker, m) => {
     marker.bindPopup(
-      () => renderPopup(records[String(m.b_id)] ?? { b_id: m.b_id }, { licenceYear: artifacts.filterConfig.licence_year ?? null }),
+      () => {
+        const b = artifacts.buildings[String(m.b_id)];
+        return b ? renderPopup(b, popupCtx) : '';
+      },
       { maxWidth: 320 },
     );
   });
+  initPopupTabs(document);
   buildings.buildings.addTo(map);
 
   renderLegend(artifacts.filterConfig);
