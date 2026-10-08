@@ -1,5 +1,6 @@
 /** Shapes of the artifact files (spec §4). Fields the frontend does not read are omitted. */
 import type { FeatureCollection, Geometry } from 'geojson';
+import type { Building, Network } from './contract.gen';
 
 export interface MarkerRecord {
   b_id: number;
@@ -43,13 +44,14 @@ export interface FilterConfig {
   blocks_total_units_max?: number | null;
   /** Business-licence data year of this build. */
   licence_year?: number | null;
+  /** Median land share of assessed value across buildings (the popup's value-bar tick). */
+  land_share_median?: number | null;
   [key: string]: unknown;
 }
 
 /**
- * One row of building_records.json: the columns of tc_core's
- * export.BUILDING_RECORD_COLUMNS, read defensively. Overlay text fields are ''
- * on building rows and null on overlay rows; treat both as empty.
+ * The flat view of a building (flat.ts): what the tables, filters, landlord
+ * picker, coverage panel and CSV export read. Missing values are null.
  */
 export type BuildingRecord = { b_id: number } & Record<string, unknown>;
 
@@ -86,7 +88,11 @@ export type VillagesCollection = BoundaryCollection;
 export interface Artifacts {
   filterConfig: FilterConfig;
   markers: MarkerRecord[];
+  /** The flat view (flat.ts) of building_records.json. */
   buildingData: BuildingData;
+  /** building_records.json as published: the popup reads these. */
+  buildings: Record<string, Building>;
+  networks: Record<string, Network>;
   blocks: BlocksCollection;
   boundaries: BoundaryCollection;
   villages: VillagesCollection;

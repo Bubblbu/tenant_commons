@@ -1,5 +1,7 @@
 /** Loads the artifact directory once and checks its contract version (spec §4). */
 import { EXPECTED_SCHEMA_VERSION, artifactUrl } from './config';
+import type { Building, BuildingRecordsFile, Network, NetworksFile } from './contract.gen';
+import { FLAT_COLUMNS, flatten } from './flat';
 import type {
   Artifacts,
   BlocksCollection,
@@ -36,11 +38,27 @@ async function fetchJson(name: string): Promise<unknown> {
   return resp.json();
 }
 
+/** The nested buildings (for the popup) and their flat view (tables, filters, CSV). */
+export function buildingViews(
+  file: BuildingRecordsFile,
+  networks: NetworksFile,
+): { buildings: Record<string, Building>; networks: Record<string, Network>; buildingData: BuildingData } {
+  const records = Object.fromEntries(
+    Object.entries(file.records).map(([id, b]) => [id, flatten(b, networks.networks)]),
+  );
+  return {
+    buildings: file.records,
+    networks: networks.networks,
+    buildingData: { schema_version: file.schema_version, columns: FLAT_COLUMNS, records },
+  };
+}
+
 export async function loadArtifacts(): Promise<Artifacts> {
-  const [filterConfig, markerMetadata, buildingData, blocks, boundaries, villages, chinatown] = await Promise.all([
+  const [filterConfig, markerMetadata, buildingData, networks, blocks, boundaries, villages, chinatown] = await Promise.all([
     fetchJson('filter_config.json'),
     fetchJson('marker_metadata.json'),
     fetchJson('building_records.json'),
+    fetchJson('networks.json'),
     fetchJson('blocks.geojson'),
     fetchJson('local-area-boundary.geojson'),
     fetchJson('villages_plan_areas.geojson'),
@@ -49,6 +67,7 @@ export async function loadArtifacts(): Promise<Artifacts> {
   checkSchemaVersion('filter_config.json', filterConfig);
   checkSchemaVersion('marker_metadata.json', markerMetadata);
   checkSchemaVersion('building_records.json', buildingData);
+  checkSchemaVersion('networks.json', networks);
   checkSchemaVersion('blocks.geojson', blocks);
   // local-area-boundary.geojson, villages_plan_areas.geojson and
   // chinatown_boundary.geojson are passed through unchanged (the City's
@@ -56,7 +75,7 @@ export async function loadArtifacts(): Promise<Artifacts> {
   return {
     filterConfig: filterConfig as FilterConfig,
     markers: (markerMetadata as { markers: MarkerRecord[] }).markers,
-    buildingData: buildingData as BuildingData,
+    ...buildingViews(buildingData as BuildingRecordsFile, networks as NetworksFile),
     blocks: blocks as BlocksCollection,
     boundaries: boundaries as BoundaryCollection,
     villages: villages as VillagesCollection,
