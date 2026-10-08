@@ -6,6 +6,8 @@ import json
 import sqlite3
 from pathlib import Path
 
+from contract_helpers import network, networks, owner, parties, records
+
 from tc_core.claims import NETWORK_LABEL, record_claim
 from tc_core.db import init_db
 from tc_core.export import export_artifacts
@@ -73,48 +75,47 @@ def _export(tmp_path: Path, extra=None, **kwargs) -> Path:
     return out
 
 
-def _records(out: Path) -> dict:
-    data = json.loads((out / "building_records.json").read_text())
-    return {r["address"]: r for r in data["records"].values()}
-
-
 def test_building_owner_is_its_registry_body_within_a_claims_network(tmp_path):
-    rec = _records(_export(tmp_path))["522 e 8th ave"]
-    assert (rec["owner_name"], rec["owner_key"], rec["owner_source"]) == (
-        "ST. GEORGE ESTATES LTD.", "st-george-estates-ltd", "registry")
-    assert rec["registered_owners"] == ["ST. GEORGE ESTATES LTD."]
-    assert rec["registry_pids"] == ["008-173-613"]
-    assert rec["registry_retrieved"] == "2026-05-28"
-    assert rec["licence_holder"] == "Willow Lane Apartments Inc"
-    assert (rec["network_key"], rec["network_name"], rec["network_source"], rec["network_name_source"]) == (
-        "net:glr-properties-ltd", "GLR PROPERTIES LTD.", "claims", "default")
-    assert rec["network_entities"] == ["GLR PROPERTIES LTD.", "RENER, GEORGE", "ST. GEORGE ESTATES LTD."]
-    assert rec["network_buildings_on_map"] == 2
-    assert rec["network_properties_on_title"] == 3
-    assert rec["network_evidence"] == {"registry": 2, "vtu_research": 1}
+    out = _export(tmp_path)
+    rec = records(out)["522 e 8th ave"]
+    o = owner(rec)
+    assert (o["name"], o["entity_key"], o["pids"]) == (
+        "ST. GEORGE ESTATES LTD.", "st-george-estates-ltd", ["008-173-613"])
+    assert o["sources"] == [{"type": "registry", "as_of": "2026-05-28", "url": None}]
+    assert [p["name"] for p in parties(rec, "owner")] == ["ST. GEORGE ESTATES LTD."]
+    (licensee,) = parties(rec, "licensee")
+    assert (licensee["name"], licensee["same_as"]) == ("Willow Lane Apartments Inc", None)
+    net = network(out, rec)
+    assert (net["id"], net["name"], net["tier"], net["name_source"]) == (
+        "net:glr-properties-ltd", "GLR PROPERTIES LTD.", "confirmed", "default")
+    assert net["entities"] == ["GLR PROPERTIES LTD.", "RENER, GEORGE", "ST. GEORGE ESTATES LTD."]
+    assert net["totals"]["buildings"] == 2
+    assert net["totals"]["properties_on_title"] == 3
+    assert net["evidence"] == {"registry": 2, "vtu_research": 1}
 
 
 def test_licence_only_buildings_fall_back_to_the_licence_holder(tmp_path):
-    rec = _records(_export(tmp_path))["1 solo st"]
-    assert (rec["owner_name"], rec["owner_key"], rec["owner_source"]) == (
-        "Solo Rentals Ltd", "solo-rentals-ltd", "licence")
-    assert rec["registered_owners"] == [] and rec["registry_pids"] == []
-    assert rec["registry_retrieved"] is None
-    assert (rec["network_key"], rec["network_name"], rec["network_source"]) == (
-        "solo-rentals-ltd", "Solo Rentals Ltd", "licence")
-    assert rec["network_buildings_on_map"] == 2
-    assert rec["network_properties_on_title"] is None
-    assert rec["network_entities"] is None and rec["network_evidence"] is None
-    assert rec["network_name_source"] is None
+    out = _export(tmp_path)
+    rec = records(out)["1 solo st"]
+    o = owner(rec)
+    assert (o["name"], o["entity_key"], o["pids"]) == ("Solo Rentals Ltd", "solo-rentals-ltd", [])
+    assert [s["type"] for s in o["sources"]] == ["licence"]
+    assert parties(rec, "licensee")[0]["same_as"] == "owner"
+    assert rec["registry_search"] == {"status": "not_searched", "date": None}
+    net = network(out, rec)
+    assert (net["id"], net["name"], net["tier"], net["name_source"]) == (
+        "solo-rentals-ltd", "Solo Rentals Ltd", "name_match", "default")
+    assert net["totals"]["buildings"] == 2
+    assert net["totals"]["properties_on_title"] is None
+    assert net["entities"] == [] and net["evidence"] == {"registry": 0, "vtu_research": 0}
 
 
-def test_unknown_owners_carry_no_source_and_no_network_size(tmp_path):
-    recs = _records(_export(tmp_path))
+def test_unknown_owners_carry_no_owner_and_no_network(tmp_path):
+    recs = records(_export(tmp_path))
     for address in ("3 nobody st", "999 nowhere rd"):
         rec = recs[address]
-        assert (rec["owner_name"], rec["owner_key"]) == ("(Unknown)", "unknown"), address
-        assert rec["owner_source"] is None and rec["network_source"] is None, address
-        assert rec["network_buildings_on_map"] is None, address
+        assert owner(rec) is None, address
+        assert rec["network_id"] is None, address
 
 
 def test_network_label_claim_renames_the_network_but_not_its_key(tmp_path):
@@ -122,8 +123,9 @@ def test_network_label_claim_renames_the_network_but_not_its_key(tmp_path):
         record_claim(conn, "RENER, GEORGE", "GLR Properties / Rener family", NETWORK_LABEL,
                      "manual_research", confidence="confirmed")
 
-    rec = _records(_export(tmp_path, label))["525 w 14th ave"]
-    assert (rec["network_name"], rec["network_name_source"], rec["network_key"]) == (
+    out = _export(tmp_path, label)
+    net = network(out, records(out)["525 w 14th ave"])
+    assert (net["name"], net["name_source"], net["id"]) == (
         "GLR Properties / Rener family", "claim", "net:glr-properties-ltd")
 
 
@@ -152,12 +154,13 @@ def test_licence_holder_named_like_a_claims_network_stays_a_separate_network(tmp
             "'Mount Pleasant', 10, 4, 'now', 'now')"
         )
 
-    recs = _records(_export(tmp_path, lookalike))
-    network = recs["522 e 8th ave"]
-    licence = recs["7 lookalike st"]
-    assert network["network_key"] != licence["network_key"]
-    assert network["network_buildings_on_map"] == 2
-    assert licence["network_buildings_on_map"] == 1
+    out = _export(tmp_path, lookalike)
+    recs = records(out)
+    claims_net = network(out, recs["522 e 8th ave"])
+    licence_net = network(out, recs["7 lookalike st"])
+    assert claims_net["id"] != licence_net["id"]
+    assert claims_net["totals"]["buildings"] == 2
+    assert licence_net["totals"]["buildings"] == 1
 
 
 def test_claim_source_notes_never_reach_any_artifact(tmp_path):
@@ -180,17 +183,15 @@ def test_listings_reach_the_record_under_the_managers_own_name(tmp_path):
              (bid, "Wall Financial Corporation", "https://example.org/w", "2026-09-30", 2)],
         )
 
-    records = _records(_export(tmp_path, extra, property_managers_path=str(managers)))
-    rec = records["1 solo st"]
-    assert rec["listings"] == [
-        {"by": "Tribe Rental Management", "url": "https://example.org/1", "seen": "2026-09-30"},
-        {"by": "Wall Financial Corporation", "url": "https://example.org/w", "seen": "2026-09-30"},
+    recs = records(_export(tmp_path, extra, property_managers_path=str(managers)))
+    rec = recs["1 solo st"]
+    # The known manager first, under its own name; every listing company manages.
+    assert [(m["name"], m["sources"]) for m in parties(rec, "manager")] == [
+        ("Tribe Rental Management", [{"type": "listing", "as_of": "2026-09-30", "url": "https://example.org/1"}]),
+        ("Wall Financial Corporation", [{"type": "listing", "as_of": "2026-09-30", "url": "https://example.org/w"}]),
     ]
-    assert (rec["managed_by"], rec["managed_by_source"]) == ("Tribe Rental Management", "listing")
-    assert rec["owner_name"] == "Solo Rentals Ltd"
-    # unlisted buildings and overlay records carry an empty list, never null
-    assert records["2 solo st"]["listings"] == [] and records["999 nowhere rd"]["listings"] == []
-    assert records["2 solo st"]["managed_by_source"] is None
+    assert owner(rec)["name"] == "Solo Rentals Ltd"
+    assert parties(recs["2 solo st"], "manager") == [] and parties(recs["999 nowhere rd"], "manager") == []
 
 
 def test_feed_staff_contacts_never_reach_any_artifact(tmp_path):
@@ -217,8 +218,9 @@ def test_feed_staff_contacts_never_reach_any_artifact(tmp_path):
     out = _export(tmp_path, extra)
     for path in out.iterdir():
         assert "canary-staff" not in path.read_text(encoding="utf-8").lower(), path.name
-    rec = _records(out)["1 solo st"]
-    assert [set(e) for e in rec["listings"]] == [{"by", "url", "seen"}]
+    rec = records(out)["1 solo st"]
+    (manager,) = parties(rec, "manager")
+    assert [set(src) for src in manager["sources"]] == [{"type", "as_of", "url"}]
 
 
 def _searches(conn):
@@ -240,13 +242,14 @@ def _searches(conn):
 
 
 def test_buildings_searched_without_a_filing_say_so(tmp_path):
-    recs = _records(_export(tmp_path, _searches))
-    assert recs["1 solo st"]["registry_no_filing"] == "2026-10-06"
-    assert recs["1 solo st"]["owner_source"] == "licence"
-    assert recs["2 solo st"]["registry_no_filing"] is None      # a later search found a filing
-    assert recs["522 e 8th ave"]["registry_no_filing"] is None  # has a registry owner
-    assert recs["3 nobody st"]["registry_no_filing"] is None    # never searched
-    assert recs["999 nowhere rd"]["registry_no_filing"] is None
+    recs = records(_export(tmp_path, _searches))
+    search = {address: rec["registry_search"] for address, rec in recs.items()}
+    assert search["1 solo st"] == {"status": "no_filing", "date": "2026-10-06"}
+    assert owner(recs["1 solo st"])["sources"][0]["type"] == "licence"
+    assert search["2 solo st"]["status"] == "not_searched"   # a later search found a filing
+    assert search["522 e 8th ave"]["status"] == "filed"      # has a registry owner
+    assert search["3 nobody st"]["status"] == "not_searched"
+    assert search["999 nowhere rd"]["status"] == "not_searched"
 
 
 def test_search_notes_never_reach_any_artifact(tmp_path):
@@ -278,3 +281,61 @@ def test_points_carry_per_owner_pids_and_interest_holders(tmp_path):
     assert rows["1 solo st"]["registry_owner_pids"] == []
     assert rows["1 solo st"]["interest_holders"] == []
     assert rows["999 nowhere rd"]["interest_holders"] == []
+
+
+
+
+def _all_artifact_text(out: Path) -> str:
+    return "\n".join(p.read_text(encoding="utf-8") for p in out.iterdir() if p.is_file())
+
+
+CONTRACT_FILES = ("building_records.json", "networks.json", "marker_metadata.json")
+
+
+def _contract_text(out: Path) -> str:
+    """The v2 contract files. filter_config.json keeps "(Unknown)" as the
+    display name of the missing-neighbourhood bucket — UI text, not data."""
+    return "\n".join((out / name).read_text(encoding="utf-8") for name in CONTRACT_FILES)
+
+
+def test_v2_never_publishes_claim_notes(tmp_path):
+    out = _export(tmp_path)
+    assert CANARY not in _all_artifact_text(out)
+
+
+def test_v2_never_publishes_lotr_residence_or_citizenship(tmp_path):
+    def extra(conn):
+        conn.execute(
+            "INSERT INTO raw_lotr_ownership (pid, reporting_body_name, type_of_interest, holder_name, "
+            "individual_principal_residence_city, individual_citizenship_country_codes, "
+            "corporation_registered_address_line1, data_fetch_status, ingested_at) VALUES "
+            "('008-173-613', 'ST. GEORGE ESTATES LTD.', 'INTEREST_HOLDER', 'RENER, GEORGE', "
+            "'CANARY-CITY', 'CANARY-CC', 'CANARY-STREET', 'SUCCESS', 'now')"
+        )
+    out = _export(tmp_path, extra=extra)
+    text = _all_artifact_text(out)
+    assert "RENER, GEORGE" in text  # the name is public…
+    for canary in ("CANARY-CITY", "CANARY-CC", "CANARY-STREET"):
+        assert canary not in text  # …nothing else about the person is
+
+
+def test_v2_research_sources_collapse_and_unconfirmed_networks_stay_out(tmp_path):
+    def extra(conn):
+        record_claim(conn, "Solo Rentals Ltd", "Hidden Partner Ltd", "common_owner",
+                     "tenant_report", confidence="unconfirmed", source_note=CANARY)
+        conn.commit()
+    out = _export(tmp_path, extra=extra)
+    text = _all_artifact_text(out)
+    assert "tenant_report" not in text and "manual_research" not in text
+    assert "Hidden Partner Ltd" not in text
+    for net in networks(out).values():
+        assert set(net["evidence"]) == {"registry", "vtu_research"}
+
+
+def test_v2_has_no_sentinels(tmp_path):
+    out = _export(tmp_path)
+    text = _contract_text(out)
+    assert "(Unknown)" not in text
+    assert '"unknown"' not in text
+    nobody = records(out)["3 nobody st"]
+    assert owner(nobody) is None and parties(nobody, "licensee") == []

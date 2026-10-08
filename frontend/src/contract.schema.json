@@ -274,20 +274,36 @@
       "additionalProperties": false,
       "properties": {
         "ownership_model": {
-          "enum": [
-            "non_profit",
-            "equity"
+          "anyOf": [
+            {
+              "enum": [
+                "non_profit",
+                "equity"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
           ],
-          "title": "Ownership Model",
-          "type": "string"
+          "default": null,
+          "title": "Ownership Model"
         },
         "status": {
-          "enum": [
-            "open_waitlist",
-            "closed"
+          "anyOf": [
+            {
+              "enum": [
+                "open_waitlist",
+                "closed"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
           ],
-          "title": "Status",
-          "type": "string"
+          "default": null,
+          "title": "Status"
         },
         "url": {
           "anyOf": [

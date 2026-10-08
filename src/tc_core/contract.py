@@ -75,8 +75,8 @@ class RegistrySearch(_Model):
 
 
 class Coop(_Model):
-    status: Literal["open_waitlist", "closed"]
-    ownership_model: Literal["non_profit", "equity"]
+    status: Literal["open_waitlist", "closed"] | None = None
+    ownership_model: Literal["non_profit", "equity"] | None = None
     url: Text | None = None
 
 

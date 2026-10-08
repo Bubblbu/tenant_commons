@@ -1,8 +1,9 @@
 """Exports tc_core's SQLite data for the map.
 
 `export_artifacts()` writes the frontend artifact set (filter_config.json,
-marker_metadata.json, building_records.json, blocks.geojson and the local-area
-boundary), each with a `schema_version`. That directory is the only interface
+marker_metadata.json, building_records.json, networks.json, blocks.geojson and
+the local-area boundary), each with a `schema_version`. building_records.json
+and networks.json are validated against tc_core/contract.py. That directory is the only interface
 between tc_core and the frontend.
 
 VTU membership data (per-building/per-block member counts, membership-year
@@ -23,8 +24,8 @@ from __future__ import annotations
 import json
 import math
 import shutil
-import tomllib
 import sqlite3
+import tomllib
 from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
@@ -34,7 +35,10 @@ import polars as pl
 from shapely.geometry import Point, shape
 from shapely.strtree import STRtree
 
+from .claims import resolve_entity_clusters
+from .contract import SCHEMA_VERSION, BuildingRecordsFile, NetworksFile
 from .db import query_frame
+from .export_contract import LandShares, build_building, build_networks, land_share
 from .geometry import parse_geom
 from .ingest.building_names import pick_building_name
 from .ingest.overlay_write import BUILDING_OVERLAY_COLUMNS
@@ -42,7 +46,9 @@ from .metrics.building_metrics import BUILDING_METRICS, build_building_metrics
 from .metrics.membership_metrics import compute_building_member_metrics
 from .metrics.portfolios import build_landlord_portfolios
 from .metrics.registry_owners import (
-    build_interest_holders, build_registry_owners, build_registry_searches,
+    build_interest_holders,
+    build_registry_owners,
+    build_registry_searches,
 )
 from .normalize import sanitize_owner
 from .sro_text import is_leaked_label
@@ -748,8 +754,6 @@ def _licence_year(conn: sqlite3.Connection) -> int | None:
     return int(row[0]) if row and row[0] is not None else None
 
 
-SCHEMA_VERSION = 1
-
 # ~10 cm. The sources carry 15-decimal coordinates, which made blocks.geojson
 # 3.68 MB gzipped — larger than the whole Folium page it replaces. At 6
 # decimals it is 1.45 MB; nothing on the map resolves finer.
@@ -823,6 +827,8 @@ def export_artifacts(
     )
 
     filter_cfg = reconstruct_filter_config(conn, points_df, blocks_df, now)
+    building_payload, network_payload, median_share = _contract_records(conn, points_df)
+    filter_cfg["land_share_median"] = median_share
 
     _write_json(
         out_dir / "filter_config.json",
@@ -835,13 +841,8 @@ def export_artifacts(
             "markers": _marker_records(points_df),
         },
     )
-    _write_json(
-        out_dir / "building_records.json",
-        {
-            "schema_version": SCHEMA_VERSION,
-            **_building_records(points_df),
-        },
-    )
+    _write_json(out_dir / "building_records.json", building_payload)
+    _write_json(out_dir / "networks.json", network_payload)
     _write_json(out_dir / "blocks.geojson", _blocks_feature_collection(blocks_df))
 
     if boundary_geojson_path:
@@ -910,6 +911,9 @@ def _marker_records(points_df: pl.DataFrame) -> list[dict]:
     frontend (frontend/src/markers.ts); these records carry only data.
     """
     as_int = lambda v: None if _missing(v) else int(v)
+    # Not on record is null, as in the contract files (spec 2026-10-08 §5).
+    key = lambda v: None if _missing(v) or v == "unknown" else v
+    text = lambda v: None if _missing(v) or not str(v).strip() else v
     records = []
     for r in points_df.iter_rows(named=True):
         records.append(
@@ -917,12 +921,12 @@ def _marker_records(points_df: pl.DataFrame) -> list[dict]:
                 "b_id": int(r["b_id"]),
                 "lat": _round_coord(r["lat"]),
                 "lon": _round_coord(r["lon"]),
-                "owner_key": r.get("owner_key"),
-                "network_key": r.get("network_key"),
+                "owner_key": key(r.get("owner_key")),
+                "network_key": key(r.get("network_key")),
                 "block_id": as_int(r.get("block_id")),
                 "units": as_int(r.get("units")),
                 "year_built": as_int(r.get("year_built")),
-                "local_area": r.get("local_area"),
+                "local_area": text(r.get("local_area")),
                 "housing_type": r.get("housing_type") or "",
                 "n_issues": as_int(r.get("n_issues")),
                 "source": r.get("source", "building"),
@@ -931,34 +935,24 @@ def _marker_records(points_df: pl.DataFrame) -> list[dict]:
     return records
 
 
-# building_records.json's columns, in order. An explicit list, not "every
-# column of points_df": the frontend's CSV export writes these verbatim, so
-# lineage/ingest internals and — per the public/sensitive filter (spec
-# §12) — VTU membership data must never reach it. Ownership is two layers:
-# owner_* (the building's own owner) and network_* (its landlord network);
-# claim provenance is public only as source-type counts, never notes.
-BUILDING_RECORD_COLUMNS = [
-    "b_id", "address", "building_name", "other_names", "local_area", "block_id", "units",
-    "building_source", "year_built", "owner_name", "owner_key", "owner_source",
-    "registered_owners", "registry_pids", "registry_retrieved", "registry_no_filing",
-    "licence_holder", "managed_by", "managed_by_source", "listings",
-    "network_key", "network_name", "network_source", "network_name_source",
-    "network_entities", "network_buildings_on_map", "network_properties_on_title",
-    "network_evidence",
-    "value_land", "value_bldg", "bldg_land_ratio",
-    "housing_type", "n_issues", "issues_details", "source",
-    "lat", "lon",
-    "in_chinatown", "in_village_plan",
-    *BUILDING_OVERLAY_COLUMNS,
-]
-
-
-def _building_records(points_df: pl.DataFrame) -> dict:
-    """Full per-building record set — the popup and the table both read this."""
-    records = {}
-    for r in points_df.select(BUILDING_RECORD_COLUMNS).iter_rows(named=True):
-        rec = {c: (None if _missing(v) else v) for c, v in r.items()}
-        for c in ("lat", "lon"):
-            rec[c] = _round_coord(rec[c])
-        records[str(int(r["b_id"]))] = rec
-    return {"columns": list(BUILDING_RECORD_COLUMNS), "records": records}
+def _contract_records(
+    conn: sqlite3.Connection, points_df: pl.DataFrame
+) -> tuple[dict, dict, float | None]:
+    """building_records.json and networks.json payloads, validated against
+    the public contract (tc_core/contract.py — a validation error fails the
+    export), plus the city's median land share. The contract models are the
+    allowlist: VTU membership data, lineage internals and claim notes on
+    points_df have no field to land in (spec 2026-10-08)."""
+    rows = list(points_df.iter_rows(named=True))
+    shares = LandShares(
+        [s for s in (land_share(r) for r in rows if r.get("source") == "building") if s is not None]
+    )
+    clusters = resolve_entity_clusters(conn)
+    buildings = BuildingRecordsFile(
+        schema_version=SCHEMA_VERSION,
+        records={
+            str(int(r["b_id"])): build_building(r, shares=shares, clusters=clusters) for r in rows
+        },
+    )
+    nets = NetworksFile(schema_version=SCHEMA_VERSION, networks=build_networks(rows))
+    return buildings.model_dump(mode="json"), nets.model_dump(mode="json"), shares.median

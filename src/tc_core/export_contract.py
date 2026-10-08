@@ -8,7 +8,16 @@ from collections.abc import Iterable, Mapping
 from statistics import median
 
 from .contract import (
-    Building, Coop, Evidence, Issues, Network, NetworkTotals, RegistrySearch, Rezoning, Sro, Value,
+    Building,
+    Coop,
+    Evidence,
+    Issues,
+    Network,
+    NetworkTotals,
+    RegistrySearch,
+    Rezoning,
+    Sro,
+    Value,
 )
 from .export_parties import _date, _http, _text, build_parties
 from .sro_text import sector
@@ -29,7 +38,7 @@ def _num(value: object) -> float | None:
 
 def _int(value: object) -> int | None:
     n = _num(value)
-    return None if n is None else int(round(n))
+    return None if n is None else round(n)
 
 
 def land_share(row: Mapping[str, object]) -> float | None:
@@ -47,7 +56,7 @@ class LandShares:
 
     def percentile(self, share: float) -> int:
         """Whole percent of buildings with a strictly lower land share."""
-        return int(round(100 * bisect.bisect_left(self._sorted, share) / len(self._sorted)))
+        return round(100 * bisect.bisect_left(self._sorted, share) / len(self._sorted))
 
     @property
     def median(self) -> float | None:
@@ -162,8 +171,8 @@ def build_networks(rows: Iterable[Mapping[str, object]]) -> dict[str, Network]:
     `confirmed`; every other grouping (licence name, SRO owner, an owner on
     its own) is a `name_match`."""
     networks: dict[str, Network] = {}
-    for key, rows in _group_rows(rows).items():
-        first = rows[0]
+    for key, members in _group_rows(rows).items():
+        first = members[0]
         claims = first.get("network_source") == "claims"
         evidence = first.get("network_evidence") or {}
         networks[key] = Network(
@@ -175,9 +184,9 @@ def build_networks(rows: Iterable[Mapping[str, object]]) -> dict[str, Network]:
                               vtu_research=int(evidence.get("vtu_research", 0))),
             entities=[e for e in (_text(v) for v in (first.get("network_entities") or [])) if e],
             totals=NetworkTotals(
-                buildings=len(rows),
-                units=sum(_int(r.get("units")) or 0 for r in rows),
-                open_issues=sum(_int(r.get("n_issues")) or 0 for r in rows),
+                buildings=len(members),
+                units=sum(_int(r.get("units")) or 0 for r in members),
+                open_issues=sum(_int(r.get("n_issues")) or 0 for r in members),
                 properties_on_title=_int(first.get("network_properties_on_title")) if claims else None,
             ),
         )

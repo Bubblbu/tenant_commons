@@ -30,6 +30,7 @@ def test_writes_all_artifacts(tmp_path):
         "filter_config.json",
         "marker_metadata.json",
         "building_records.json",
+        "networks.json",
         "blocks.geojson",
     ):
         assert (tmp_path / name).exists(), name
@@ -57,7 +58,7 @@ def test_marker_metadata_carries_coordinates(tmp_path):
     export_artifacts(conn, tmp_path)
 
     meta = json.loads((tmp_path / "marker_metadata.json").read_text())
-    assert meta["schema_version"] == 1
+    assert meta["schema_version"] == 2
     record = meta["markers"][0]
     assert record["lat"] == 49.28
     assert record["lon"] == -123.1
@@ -96,7 +97,9 @@ def test_matched_building_carries_overlay_data(tmp_path):
 
     records = json.loads((tmp_path / "building_records.json").read_text())
     building = records["records"]["1"]
-    assert building["sro_owner"] == "Owner Co"
+    assert building["sro"] is not None
+    owner = next(p for p in building["parties"] if p["role"] == "owner")
+    assert (owner["name"], owner["sources"][0]["type"]) == ("Owner Co", "sro_inventory")
 
 
 def _seed_with_overlay(conn):
@@ -110,11 +113,11 @@ def _seed_with_overlay(conn):
     conn.commit()
 
 
-def test_building_records_columns_are_the_public_list(tmp_path):
-    """The `columns` array drives the user-facing CSV export, so it is an
-    explicit list: no lineage/ingest internals, no per-member payloads, and
+def test_building_records_are_the_public_contract(tmp_path):
+    """Every record is exactly a contract Building (tc_core/contract.py is the
+    allowlist): no lineage/ingest internals, no per-member payloads, and
     (spec §11/§12) no VTU membership fields — this is a public artifact."""
-    from tc_core.export import BUILDING_RECORD_COLUMNS
+    from tc_core.contract import Building, BuildingRecordsFile
 
     conn = sqlite3.connect(":memory:")
     init_db(conn)
@@ -122,17 +125,18 @@ def test_building_records_columns_are_the_public_list(tmp_path):
 
     export_artifacts(conn, tmp_path)
 
-    data = json.loads((tmp_path / "building_records.json").read_text())
-    assert data["columns"] == BUILDING_RECORD_COLUMNS
-    for rec in data["records"].values():
-        assert list(rec) == BUILDING_RECORD_COLUMNS
+    text = (tmp_path / "building_records.json").read_text()
+    data = BuildingRecordsFile.model_validate_json(text)
+    for rec in json.loads(text)["records"].values():
+        assert list(rec) == list(Building.model_fields)
+    assert data.records
     for internal in (
         "members_payload", "_overlay_id", "source_row_ids",
         "ingested_at", "created_at", "updated_at", "member_share_building",
         "member_count", "member_count_all", "has_vtu_member",
         "latest_membership_year", "member_share_pct", "licence_key",
     ):
-        assert internal not in data["columns"]
+        assert f'"{internal}"' not in text
 
 
 def test_no_membership_data_reaches_any_public_artifact(tmp_path):
@@ -174,8 +178,9 @@ def test_overlay_rows_reach_the_artifacts_with_their_source(tmp_path):
     assert by_source["overlay_coop"]["housing_type"] == "co-op"
     records = json.loads((tmp_path / "building_records.json").read_text())["records"]
     overlay = records[str(by_source["overlay_coop"]["b_id"])]
-    assert overlay["housing_name"] == "Elm Co-op"
-    assert overlay["source"] == "overlay_coop"
+    assert overlay["name"] == "Elm Co-op"
+    assert overlay["origin"] == "overlay_coop"
+    assert overlay["coop"] is not None
 
 
 def _decimals(x: float) -> int:
@@ -255,24 +260,13 @@ def test_boundary_passthrough_is_byte_identical(tmp_path):
     assert (tmp_path / "out" / "local-area-boundary.geojson").read_text() == content
 
 
-POPUP_FIELDS = [
-    "housing_name", "owner_name", "owner_source", "registered_owners", "registry_pids",
-    "registry_retrieved", "licence_holder", "network_name", "network_source",
-    "network_name_source", "network_entities", "network_buildings_on_map",
-    "network_properties_on_title", "network_evidence",
-    "coop_status", "coop_ownership_model", "coop_url",
-    "sro_owner", "sro_operator", "sro_occupancy_status", "sro_registered_rooms",
-]
+def test_networks_json_is_the_public_contract(tmp_path):
+    from tc_core.contract import NetworksFile
 
-
-def test_building_records_carry_the_popup_fields(tmp_path):
-    """Spec §7 plus the ownership-layers spec: the popup reads these fields."""
     conn = sqlite3.connect(":memory:")
     init_db(conn)
     _seed(conn)
 
     export_artifacts(conn, tmp_path)
 
-    columns = json.loads((tmp_path / "building_records.json").read_text())["columns"]
-    missing = [f for f in POPUP_FIELDS if f not in columns]
-    assert missing == []
+    NetworksFile.model_validate_json((tmp_path / "networks.json").read_text())
