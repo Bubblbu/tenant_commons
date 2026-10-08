@@ -345,3 +345,28 @@ def test_records_carry_every_known_pid(tmp_path):
     recs = records(_export(tmp_path))
     assert recs["522 e 8th ave"]["pids"] == ["008-173-613"]
     assert recs["1 solo st"]["pids"] == []  # no PID known for it
+
+
+def test_overlay_records_take_their_owner_from_the_registry(tmp_path):
+    """An SRO/co-op point that matched no building still gets its registry
+    filing (139 E Cordova St: 1208149 B.C. Ltd. on title, not the SRO list's owner)."""
+    def extra(conn):
+        conn.executemany(
+            "INSERT INTO raw_lotr_ownership (pid, reporting_body_name, type_of_interest, holder_name, "
+            "order_created_date, data_fetch_status, ingested_at) VALUES "
+            "('009-999-999', 'OVERLAY OWNER LTD.', ?, ?, '2026-10-08 10:00:00', 'SUCCESS', 'now')",
+            [("RB_CORPORATION", "OVERLAY OWNER LTD."), ("INTEREST_HOLDER", "DOE, JANE")],
+        )
+        conn.execute("UPDATE overlay_housing SET sro_owner = 'Old Name Co' WHERE addr_key = '999 nowhere rd'")
+        with open(tmp_path / "pid_address_map.csv", "a", encoding="utf-8") as f:
+            f.write('009999999,9,999 nowhere rd,999 nowhere rd,Mount Pleasant,"49.3,-123.15"\n')
+
+    out = _export(tmp_path, extra)
+    rec = records(out)["999 nowhere rd"]
+    assert rec["origin"] == "overlay_coop"
+    assert [(p["role"], p["name"]) for p in rec["parties"]] == [
+        ("owner", "OVERLAY OWNER LTD."), ("interest_holder", "DOE, JANE")]
+    assert owner(rec)["sources"][0] == {"type": "registry", "as_of": "2026-10-08", "url": None}
+    assert rec["registry_search"]["status"] == "filed"
+    assert rec["pids"] == ["009-999-999"]
+    assert network(out, rec)["name"] == "OVERLAY OWNER LTD."

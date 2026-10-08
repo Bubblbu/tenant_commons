@@ -180,6 +180,7 @@ def reconstruct_points(
     )
     # Every known PID, buildings and overlay records alike, by address.
     merged = merged.with_columns(pids=_objects(parcels.get(k, []) for k in merged["addr_key"]))
+    merged = apply_registry_to_overlays(merged, registry, portfolios, holders, no_filing)
     merged = fill_owner_from_sro(merged)
     merged = regroup_registry_owners(merged)
     merged = fallback_group_to_owner(merged)
@@ -420,6 +421,55 @@ def apply_building_names(df: pl.DataFrame, names: dict[int, list[tuple[str, str]
     return df.with_columns(
         building_name=pl.Series([p[0] for p in picked], dtype=pl.String),
         other_names=_objects(p[1] for p in picked),
+    )
+
+
+def apply_registry_to_overlays(
+    df: pl.DataFrame, registry: dict, portfolios: dict, holders: dict, no_filing: dict
+) -> pl.DataFrame:
+    """SRO/co-op points that matched no building get the registry layers
+    buildings get in _assign_ownership: the owner on title, who stands behind
+    it, a claims network and the search date. Before this, a researched PID
+    under an overlay point (139 E Cordova St) never reached the map. They
+    have no licence, so nothing else changes."""
+    overlay = [src != "building" for src in df["source"]]
+    if not any(overlay):
+        return df
+    keys = df["addr_key"].to_list()
+    cols = {c: df[c].to_list() for c in (
+        "owner_name", "owner_key", "owner_source", "registered_owners", "registry_pids",
+        "registry_retrieved", "registry_owner_pids", "interest_holders", "registry_no_filing",
+        "network_key", "network_name", "network_source", "network_name_source",
+        "network_entities", "network_properties_on_title", "network_evidence",
+    )}
+    for i, key in enumerate(keys):
+        if not overlay[i]:
+            continue
+        reg, port = registry.get(key), portfolios.get(key)
+        cols["interest_holders"][i] = holders.get(key, [])
+        if not reg:
+            cols["registry_no_filing"][i] = no_filing.get(key)
+            continue
+        cols["owner_name"][i] = reg.owners[0]
+        cols["owner_key"][i] = sanitize_owner(reg.owners[0])
+        cols["owner_source"][i] = "registry"
+        cols["registered_owners"][i] = reg.owners
+        cols["registry_pids"][i] = reg.pids
+        cols["registry_retrieved"][i] = reg.retrieved
+        cols["registry_owner_pids"][i] = [{"name": n, "pids": reg.owner_pids.get(n, [])} for n in reg.owners]
+        if port:
+            cols["network_key"][i] = f"net:{port.portfolio_key}"
+            cols["network_name"][i] = port.portfolio_name
+            cols["network_source"][i] = "claims"
+            cols["network_name_source"][i] = port.name_source
+            cols["network_entities"][i] = list(port.entities)
+            cols["network_properties_on_title"][i] = len(port.addr_keys)
+            cols["network_evidence"][i] = dict(port.evidence)
+    objects = {"registered_owners", "registry_pids", "registry_owner_pids", "interest_holders",
+               "network_entities", "network_evidence"}
+    return df.with_columns(
+        (_objects(v) if c in objects else pl.Series(v, dtype=df.schema[c])).alias(c)
+        for c, v in cols.items()
     )
 
 
