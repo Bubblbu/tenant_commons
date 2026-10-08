@@ -11,7 +11,7 @@ const records = [
   rec({ owner_key: 'acme', owner_name: 'Acme Holdings', network_key: 'kim', network_name: 'Kim network' }),
   rec({ owner_key: '0733603', owner_name: '0733603 BC Ltd', network_key: 'kim', network_name: 'Kim network', managed_by: 'tribe ' }),
   rec({ owner_key: 'solo', owner_name: 'Solo Rentals', network_key: 'solo', network_name: 'Solo Rentals' }),
-  rec({ owner_key: 'unknown', owner_name: '(Unknown)', network_key: 'unknown', managed_by: 'Tribe' }),
+  rec({ owner_key: null, owner_name: null, network_key: null, managed_by: 'Tribe' }),
 ];
 
 const find = (opts: PickOption[], kind: string, key: string) => opts.find((o) => o.kind === kind && o.key === key);
@@ -24,7 +24,7 @@ describe('buildOptions', () => {
   });
 
   it('never offers "not on record" as a landlord or group', () => {
-    expect(opts.some((o) => o.key === 'unknown')).toBe(false);
+    expect(opts.some((o) => o.key === '' || o.key === 'unknown')).toBe(false);
   });
 
   it('offers a group that joins several landlords, counting them', () => {

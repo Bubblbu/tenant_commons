@@ -42,9 +42,9 @@ describe('filterFields', () => {
     expect(f.metrics).toMatchObject({ units: 12, 'year-built': 1965, 'value-bldg': null });
   });
 
-  it('treats a bare record as missing everything', () => {
+  it('treats a bare record as missing everything, grouped as not on record', () => {
     const f = filterFields({ b_id: 3 });
-    expect(f).toMatchObject({ area: '', owner: '', hasOwner: false, nIssues: null, housingTypes: [] });
+    expect(f).toMatchObject({ area: '', owner: 'unknown', network: 'unknown', hasOwner: false, nIssues: null, housingTypes: [] });
     expect(renderedRow({ b_id: 3 }).getAttribute('data-units')).toBe('');
   });
 });

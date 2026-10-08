@@ -45,23 +45,20 @@ function descMissingLast(a: number | null, b: number | null): number {
   return b - a;
 }
 
-/**
- * A building with no known landlord. The export still writes the "unknown"
- * key; it is shown as "Not on record" and never ranked as a landlord.
- */
-const notOnRecord = (key: unknown): boolean => isMissing(key) || key === 'unknown';
+/** A building with no known landlord: shown as "Not on record" and never ranked as a landlord. */
+const notOnRecord = (key: unknown): boolean => isMissing(key);
 
-/** Date the registry was searched without a filing, if the building has no registry owner. */
-const noFilingSearched = (r: BuildingRecord): string =>
-  text(r.owner_source) === 'registry' ? '' : text(r.registry_no_filing);
+/** Date the registry was searched without a filing (null in the flat view when a registry owner exists). */
+const noFilingSearched = (r: BuildingRecord): string => text(r.registry_no_filing);
 
 /** Group key of a not-on-record building that was searched in the registry without a filing. */
 export const SEARCHED_KEY = 'unknown-searched';
 
 /**
  * The owner or network key a building is grouped, filtered and selected by:
- * the export's key, except that not-on-record buildings split into
- * SEARCHED_KEY (registry searched, no filing) and "unknown" (not yet searched).
+ * the export's key, except that not-on-record buildings (null key) split into
+ * SEARCHED_KEY (registry searched, no filing) and "unknown" (not yet searched)
+ * — the tables' own group keys, not data.
  */
 export function groupKey(key: unknown, r: BuildingRecord): string {
   if (!notOnRecord(key)) return String(key);
@@ -86,8 +83,8 @@ export function filterFields(r: BuildingRecord): FilterFields {
     area: text(r.local_area).toLowerCase().trim(),
     chinatown: r.in_chinatown === true,
     village: r.in_village_plan === true,
-    owner: isMissing(r.owner_key) ? '' : groupKey(r.owner_key, r),
-    network: isMissing(r.network_key) ? '' : groupKey(r.network_key, r),
+    owner: groupKey(r.owner_key, r),
+    network: groupKey(r.network_key, r),
     manager: managerKey(r.managed_by),
     housingTypes: text(r.housing_type).split(',').map((t) => t.trim()).filter((t) => t !== ''),
     nIssues: truncOrNull(r.n_issues),
@@ -311,7 +308,7 @@ export function networkRowsHtml(records: BuildingRecord[]): string {
     .map((g) => {
       if (isNotOnRecordGroup(g.key)) return groupRow(g, 'network', g.key, '', 'data-network', '', true);
       const sample = g.records[0];
-      const icon = sample.network_source === 'claims' || sample.network_source === 'licence'
+      const icon = sample.network_source === 'claims' || sample.network_source === 'name_match'
         ? provenanceIcon(networkProvenance(sample))
         : '';
       const landlords = new Set(g.records.map((r) => r.owner_key).filter((k) => !notOnRecord(k))).size;

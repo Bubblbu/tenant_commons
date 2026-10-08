@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { blockRowsHtml, buildingRow, buildingRowsHtml, networkRowsHtml, neighbourhoodRowsHtml, ownerRowsHtml, pinLast } from './tables';
+import { SEARCHED_KEY, blockRowsHtml, buildingRow, buildingRowsHtml, filterFields, networkRowsHtml, neighbourhoodRowsHtml, ownerRowsHtml, pinLast } from './tables';
 import type { BlocksCollection, BuildingRecord } from './types';
 
 const rec = (over: Partial<BuildingRecord>): BuildingRecord => ({
@@ -37,7 +37,7 @@ describe('buildingRow', () => {
   });
 
   it('names the property manager under the landlord, or under "Not on record"', () => {
-    const none = buildingRow(rec({ owner_name: '(Unknown)', owner_key: 'unknown', managed_by: 'Tribe Rental Management' }));
+    const none = buildingRow(rec({ owner_name: null, owner_key: null, managed_by: 'Tribe Rental Management' }));
     expect(none).toContain('<td class="not-on-record">Not on record<div class="cell-sub">Managed by Tribe Rental Management</div></td>');
     expect(none).toContain('tribe rental management');
     const owned = buildingRow(rec({ owner_name: 'GREENBRIER HOLDINGS LTD.', network_name: 'Greenbrier Holdings Ltd', managed_by: 'Tribe Rental Management' }));
@@ -45,14 +45,15 @@ describe('buildingRow', () => {
   });
 
   it('says when a building was searched in the registry without a filing', () => {
-    const none = buildingRow(rec({ owner_name: '(Unknown)', owner_key: 'unknown', network_key: 'unknown', registry_no_filing: '2026-10-06' }));
+    const none = buildingRow(rec({ owner_name: null, owner_key: null, network_key: null, registry_no_filing: '2026-10-06' }));
     expect(none).toContain('<td class="not-on-record">Not on record<div class="cell-sub">No registry filing · searched 2026-10-06</div></td>');
     expect(none).toContain('data-owner="unknown-searched" data-network="unknown-searched"');
     expect(none).toContain('data-has-owner=""');
     const licensed = buildingRow(rec({ owner_name: 'Solo', owner_key: 'solo', network_name: 'Solo', network_key: 'solo', owner_source: 'licence', registry_no_filing: '2026-10-06' }));
     expect(licensed).toContain('<td>Solo<div class="cell-sub">No registry filing · searched 2026-10-06</div></td>');
     expect(licensed).toContain('data-owner="solo"');
-    const registry = buildingRow(rec({ owner_source: 'registry', registry_no_filing: '2026-10-06' }));
+    // The flat view only carries a search date when the search found no filing.
+    const registry = buildingRow(rec({ owner_source: 'registry', registry_no_filing: null }));
     expect(registry).not.toContain('No registry filing');
   });
 
@@ -67,7 +68,7 @@ describe('buildingRow', () => {
   });
 
   it('shows a building with no known landlord as not on record, not as a landlord', () => {
-    const row = buildingRow(rec({ owner_name: '(Unknown)', owner_key: 'unknown', network_name: '(Unknown)', network_key: 'unknown' }));
+    const row = buildingRow(rec({ owner_name: null, owner_key: null, network_name: null, network_key: null }));
     expect(row).toContain('<td class="not-on-record">Not on record</td>');
     expect(row).not.toContain('Group:');
     expect(row).not.toMatch(/data-search="[^"]*unknown/);
@@ -159,17 +160,17 @@ describe('group tables', () => {
     const html = networkRowsHtml([
       rec({ b_id: 1, network_name: 'GLR', network_key: 'net:glr', network_source: 'claims',
         network_name_source: 'default', network_evidence: { registry: 3, vtu_research: 0 } }),
-      rec({ b_id: 2, network_name: 'Solo', network_key: 'solo', network_source: 'licence' }),
-      rec({ b_id: 3, network_name: '(Unknown)', network_key: 'unknown', network_source: null }),
+      rec({ b_id: 2, network_name: 'Solo', network_key: 'solo', network_source: 'name_match' }),
+      rec({ b_id: 3, network_name: null, network_key: null, network_source: null }),
     ]);
     expect(html).toContain('data-tip="Grouped from 3 provincial registry filings. Name: default (entity with the most properties)."');
-    expect(html).toContain('data-tip="Grouped by business licence name"');
+    expect(html).toContain('data-tip="Grouped by the same owner name"');
     expect(html).toContain('>Not on record · not yet searched</td>');
   });
 
   it('pins buildings with no known landlord to one greyed row at the bottom of both views', () => {
     const recs = [
-      rec({ b_id: 1, owner_name: '(Unknown)', owner_key: 'unknown', network_name: '(Unknown)', network_key: 'unknown', units: 500 }),
+      rec({ b_id: 1, owner_name: null, owner_key: null, network_name: null, network_key: null, units: 500 }),
       rec({ b_id: 2, owner_name: 'A Co', owner_key: 'a', network_name: 'A Co', network_key: 'a', units: 10 }),
     ];
     for (const html of [ownerRowsHtml(recs), networkRowsHtml(recs)]) {
@@ -181,7 +182,7 @@ describe('group tables', () => {
   });
 
   it('pins searched-without-a-filing buildings as their own not-on-record row', () => {
-    const none = { owner_name: '(Unknown)', owner_key: 'unknown', network_name: '(Unknown)', network_key: 'unknown' };
+    const none = { owner_name: null, owner_key: null, network_name: null, network_key: null };
     const recs = [
       rec({ b_id: 1, ...none, units: 500 }),
       rec({ b_id: 2, ...none, units: 5, registry_no_filing: '2026-10-06' }),
@@ -238,5 +239,15 @@ describe('pinLast', () => {
   it('keeps pinned rows in their built order, whatever the sort did to them', () => {
     const [x, y, a, b] = [row('x', 'last'), row('y', 'last'), row('a'), row('b')];
     expect(pinLast([b, y, a, x], [a, b, x, y]).map((r) => r.id)).toEqual(['b', 'a', 'x', 'y']);
+  });
+});
+
+describe('not on record', () => {
+  it('groups a building with null keys under the Not on record key', () => {
+    const r = { b_id: 9, owner_key: null, network_key: null, registry_no_filing: null } as BuildingRecord;
+    expect(filterFields(r).owner).toBe('unknown');
+    expect(filterFields(r).network).toBe('unknown');
+    expect(filterFields({ ...r, registry_no_filing: '2026-10-06' }).owner).toBe(SEARCHED_KEY);
+    expect(filterFields(r).hasOwner).toBe(false);
   });
 });

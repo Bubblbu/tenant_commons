@@ -48,7 +48,7 @@ export function listingProvenance(seen: string): string {
 }
 
 export function networkProvenance(r: BuildingRecord): string {
-  if (str(r.network_source) !== 'claims') return 'Grouped by business licence name';
+  if (str(r.network_source) !== 'claims') return 'Grouped by the same owner name';
   const ev = (r.network_evidence ?? {}) as Record<string, unknown>;
   const registry = num(ev.registry) ?? 0;
   const research = num(ev.vtu_research) ?? 0;

@@ -28,7 +28,7 @@ const SOURCE_LABELS: [string, string][] = [
   ['sro_list', 'SRO inventory'],
 ];
 
-export const hasOwner = (r: BuildingRecord): boolean => !isMissing(r.owner_key) && r.owner_key !== 'unknown';
+export const hasOwner = (r: BuildingRecord): boolean => !isMissing(r.owner_key);
 
 export function computeCoverage(records: BuildingRecord[]): Coverage {
   const c: Coverage = { buildings: 0, units: 0, withOwner: 0, withOwnerUnits: 0, searched: 0, bySource: {}, grouped: 0 };

@@ -28,7 +28,7 @@ export interface RowKeys {
 export const KIND_LABEL: Record<PickKind, string> = { owner: 'Landlord', network: 'Group', manager: 'Manager' };
 
 const text = (v: unknown): string => (isMissing(v) ? '' : String(v).trim());
-const onRecord = (key: string): boolean => key !== '' && key !== 'unknown';
+const onRecord = (key: string): boolean => key !== '';
 
 /** The key tables.ts writes to data-manager: managers have no export key, so the lowercased name. */
 export const managerKey = (name: unknown): string => text(name).toLowerCase();

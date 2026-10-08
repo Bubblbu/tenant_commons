@@ -8,12 +8,12 @@ describe('computeCoverage', () => {
   const records = [
     rec(1, { units: 100, owner_key: 'a', owner_source: 'registry', network_source: 'claims' }),
     rec(2, { units: 50, owner_key: 'b', owner_source: 'licence', network_source: 'licence' }),
-    rec(3, { units: 30, owner_key: 'unknown', owner_source: null }),
+    rec(3, { units: 30, owner_key: null, owner_source: null }),
     rec(4, { units: null, owner_key: null, registry_no_filing: '2026-10-06' }),
     rec(5, { units: 20, owner_key: 'c', owner_source: 'sro_list', source: 'overlay_sro' }),
   ];
 
-  it('counts building rows only, treating "unknown" as no landlord', () => {
+  it('counts building rows only, treating a null key as no landlord', () => {
     expect(computeCoverage(records)).toEqual({
       buildings: 4,
       units: 180,

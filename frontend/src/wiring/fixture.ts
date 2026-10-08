@@ -8,7 +8,7 @@ import { markerStyle } from '../markers';
 import type { BlocksCollection, BuildingData, BuildingRecord, FilterConfig, MarkerRecord } from '../types';
 
 interface B {
-  id: number; area: string; owner: string; units: number | null; year: number | null;
+  id: number; area: string; owner: string | null; units: number | null; year: number | null;
   housing: string; issues: number; block: number | null;
   chinatown?: boolean; village?: boolean; manager?: string; searched?: string;
 }
@@ -23,10 +23,10 @@ const BUILDINGS: B[] = [
   { id: 2, area: 'West End', owner: 'acme', units: 12, year: 1990, housing: 'sro', issues: 2, block: 101 },
   { id: 3, area: 'West End', owner: 'birch', units: 8, year: null, housing: '', issues: 0, block: 101, village: true },
   { id: 4, area: 'Downtown', owner: 'birch', units: 120, year: 2005, housing: 'co-op, sro', issues: 0, block: 201 },
-  { id: 5, area: 'Downtown', owner: 'unknown', units: 30, year: 1930, housing: '', issues: 1, block: 201, chinatown: true, manager: 'Tribe Management' },
-  { id: 6, area: 'Downtown', owner: 'unknown', units: null, year: 1912, housing: 'co-op', issues: 0, block: 201 },
+  { id: 5, area: 'Downtown', owner: null, units: 30, year: 1930, housing: '', issues: 1, block: 201, chinatown: true, manager: 'Tribe Management' },
+  { id: 6, area: 'Downtown', owner: null, units: null, year: 1912, housing: 'co-op', issues: 0, block: 201 },
   { id: 7, area: 'Strathcona', owner: 'acme', units: 6, year: 1908, housing: '', issues: 3, block: 301 },
-  { id: 8, area: 'Strathcona', owner: 'unknown', units: 16, year: 1975, housing: '', issues: 0, block: 301, searched: '2026-10-06' },
+  { id: 8, area: 'Strathcona', owner: null, units: 16, year: 1975, housing: '', issues: 0, block: 301, searched: '2026-10-06' },
   { id: 9, area: 'Strathcona', owner: 'birch', units: 60, year: 2015, housing: '', issues: 0, block: 301 },
   { id: 10, area: 'Downtown', owner: 'acme', units: 4, year: 1999, housing: '', issues: 0, block: 301 },
 ];
@@ -34,19 +34,19 @@ const BUILDINGS: B[] = [
 export const ALL_BIDS = BUILDINGS.map((b) => String(b.id));
 
 function record(b: B): BuildingRecord {
-  const o = OWNERS[b.owner];
+  const o = b.owner ? OWNERS[b.owner] : undefined;
   return {
     b_id: b.id,
     address: `${100 + b.id} MAIN ST`,
-    building_name: '',
+    building_name: null,
     local_area: b.area,
     units: b.units,
     year_built: b.year,
     owner_key: b.owner,
-    owner_name: o ? o.name : '',
-    network_key: o ? o.network : 'unknown',
-    network_name: o ? o.networkName : '',
-    managed_by: b.manager ?? '',
+    owner_name: o ? o.name : null,
+    network_key: o ? o.network : null,
+    network_name: o ? o.networkName : null,
+    managed_by: b.manager ?? null,
     registry_no_filing: b.searched ?? null,
     housing_type: b.housing,
     n_issues: b.issues,
@@ -60,7 +60,7 @@ function record(b: B): BuildingRecord {
 }
 
 export const FIXTURE_BUILDING_DATA: BuildingData = {
-  schema_version: 1,
+  schema_version: 2,
   columns: ['b_id', 'address', 'local_area', 'units'],
   records: Object.fromEntries(BUILDINGS.map((b) => [String(b.id), record(b)])),
 };
@@ -70,7 +70,7 @@ const FIXTURE_MARKER_RECORDS: MarkerRecord[] = BUILDINGS.map((b) => ({
   lat: 49.28 + b.id * 0.001,
   lon: -123.12,
   owner_key: b.owner,
-  network_key: OWNERS[b.owner] ? OWNERS[b.owner].network : 'unknown',
+  network_key: b.owner && OWNERS[b.owner] ? OWNERS[b.owner].network : null,
   block_id: b.block,
   units: b.units,
   year_built: b.year,
@@ -96,12 +96,12 @@ function block(id: number, area: string, buildings: number, units: number) {
 
 export const FIXTURE_BLOCKS: BlocksCollection = {
   type: 'FeatureCollection',
-  schema_version: 1,
+  schema_version: 2,
   features: [block(101, 'West End', 3, 60), block(201, 'Downtown', 3, 150), block(301, 'Strathcona', 4, 86), block(401, 'Strathcona', 0, 0)],
 };
 
 export const FIXTURE_FILTER_CONFIG: FilterConfig = {
-  schema_version: 1,
+  schema_version: 2,
   neighbourhoods: [
     { name: 'Downtown', count: 4, units: 154 },
     { name: 'Strathcona', count: 3, units: 82 },

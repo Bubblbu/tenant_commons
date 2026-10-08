@@ -75,7 +75,7 @@ export function buildMapIndex(ctx: WiringContext): MapIndex {
     // Keyed as the landlord tables group them, so a "searched, no registry
     // filing" row selects its own buildings and not the other not-on-record ones.
     const rec = ctx.buildingData?.records[key];
-    const grouped = (k: string | null) => (k && rec ? groupKey(k, rec) : k);
+    const grouped = (k: string | null) => (rec ? groupKey(k, rec) : k);
     const ownerKey = grouped(meta.owner_key);
     if (ownerKey) {
       if (!owners[ownerKey]) owners[ownerKey] = [];

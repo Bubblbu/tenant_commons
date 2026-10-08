@@ -124,7 +124,7 @@ describe('ownership lines', () => {
     const html = renderPopup({ ...lic, network_buildings_on_map: 3 });
     expect(html).toContain('Part of the <strong>Solo Rentals Ltd</strong> ownership group');
     expect(html).toContain('>3 buildings on map<');
-    expect(html).toContain('data-tip="Grouped by business licence name"');
+    expect(html).toContain('data-tip="Grouped by the same owner name"');
   });
 
   it('says "Not on record", with no provenance, when no landlord is known', () => {
