@@ -1,0 +1,818 @@
+{
+  "$defs": {
+    "Building": {
+      "additionalProperties": false,
+      "properties": {
+        "address": {
+          "title": "Address",
+          "type": "string"
+        },
+        "also_known_as": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Also Known As",
+          "type": "array"
+        },
+        "block_id": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Block Id"
+        },
+        "coop": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Coop"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "id": {
+          "title": "Id",
+          "type": "integer"
+        },
+        "in_chinatown": {
+          "title": "In Chinatown",
+          "type": "boolean"
+        },
+        "in_village_plan": {
+          "title": "In Village Plan",
+          "type": "boolean"
+        },
+        "issues": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Issues"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "lat": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Lat"
+        },
+        "listed_in": {
+          "items": {
+            "enum": [
+              "registry",
+              "licence",
+              "sro_inventory",
+              "listing",
+              "claim_registry",
+              "vtu_research",
+              "rental_inventory",
+              "non_market_list",
+              "chf_bc",
+              "rezoning"
+            ],
+            "type": "string"
+          },
+          "title": "Listed In",
+          "type": "array"
+        },
+        "local_area": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Local Area"
+        },
+        "lon": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Lon"
+        },
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Name"
+        },
+        "network_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Network Id"
+        },
+        "origin": {
+          "enum": [
+            "building",
+            "overlay_sro",
+            "overlay_coop"
+          ],
+          "title": "Origin",
+          "type": "string"
+        },
+        "parties": {
+          "items": {
+            "$ref": "#/$defs/Party"
+          },
+          "title": "Parties",
+          "type": "array"
+        },
+        "registry_search": {
+          "$ref": "#/$defs/RegistrySearch"
+        },
+        "rezoning": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Rezoning"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "sro": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Sro"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "units": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Units"
+        },
+        "units_basis": {
+          "anyOf": [
+            {
+              "enum": [
+                "inventory",
+                "licence_fee",
+                "sro_rooms"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Units Basis"
+        },
+        "value": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Value"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "year_built": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Year Built"
+        }
+      },
+      "required": [
+        "id",
+        "origin",
+        "address",
+        "name",
+        "also_known_as",
+        "local_area",
+        "block_id",
+        "lat",
+        "lon",
+        "in_chinatown",
+        "in_village_plan",
+        "units",
+        "units_basis",
+        "year_built",
+        "listed_in",
+        "value",
+        "issues",
+        "parties",
+        "network_id",
+        "registry_search",
+        "coop",
+        "sro",
+        "rezoning"
+      ],
+      "title": "Building",
+      "type": "object"
+    },
+    "BuildingRecordsFile": {
+      "additionalProperties": false,
+      "properties": {
+        "records": {
+          "additionalProperties": {
+            "$ref": "#/$defs/Building"
+          },
+          "title": "Records",
+          "type": "object"
+        },
+        "schema_version": {
+          "const": 2,
+          "title": "Schema Version",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "schema_version",
+        "records"
+      ],
+      "title": "BuildingRecordsFile",
+      "type": "object"
+    },
+    "Coop": {
+      "additionalProperties": false,
+      "properties": {
+        "ownership_model": {
+          "enum": [
+            "non_profit",
+            "equity"
+          ],
+          "title": "Ownership Model",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "open_waitlist",
+            "closed"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "url": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Url"
+        }
+      },
+      "required": [
+        "status",
+        "ownership_model",
+        "url"
+      ],
+      "title": "Coop",
+      "type": "object"
+    },
+    "Evidence": {
+      "additionalProperties": false,
+      "properties": {
+        "registry": {
+          "title": "Registry",
+          "type": "integer"
+        },
+        "vtu_research": {
+          "title": "Vtu Research",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "registry",
+        "vtu_research"
+      ],
+      "title": "Evidence",
+      "type": "object"
+    },
+    "Issues": {
+      "additionalProperties": false,
+      "properties": {
+        "count": {
+          "minimum": 1,
+          "title": "Count",
+          "type": "integer"
+        },
+        "url": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Url"
+        }
+      },
+      "required": [
+        "count",
+        "url"
+      ],
+      "title": "Issues",
+      "type": "object"
+    },
+    "Network": {
+      "additionalProperties": false,
+      "properties": {
+        "entities": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Entities",
+          "type": "array"
+        },
+        "evidence": {
+          "$ref": "#/$defs/Evidence"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "name_source": {
+          "enum": [
+            "claim",
+            "default"
+          ],
+          "title": "Name Source",
+          "type": "string"
+        },
+        "tier": {
+          "enum": [
+            "confirmed",
+            "name_match"
+          ],
+          "title": "Tier",
+          "type": "string"
+        },
+        "totals": {
+          "$ref": "#/$defs/NetworkTotals"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "name_source",
+        "tier",
+        "evidence",
+        "entities",
+        "totals"
+      ],
+      "title": "Network",
+      "type": "object"
+    },
+    "NetworkTotals": {
+      "additionalProperties": false,
+      "properties": {
+        "buildings": {
+          "title": "Buildings",
+          "type": "integer"
+        },
+        "open_issues": {
+          "title": "Open Issues",
+          "type": "integer"
+        },
+        "properties_on_title": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Properties On Title"
+        },
+        "units": {
+          "title": "Units",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "buildings",
+        "units",
+        "open_issues",
+        "properties_on_title"
+      ],
+      "title": "NetworkTotals",
+      "type": "object"
+    },
+    "NetworksFile": {
+      "additionalProperties": false,
+      "properties": {
+        "networks": {
+          "additionalProperties": {
+            "$ref": "#/$defs/Network"
+          },
+          "title": "Networks",
+          "type": "object"
+        },
+        "schema_version": {
+          "const": 2,
+          "title": "Schema Version",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "schema_version",
+        "networks"
+      ],
+      "title": "NetworksFile",
+      "type": "object"
+    },
+    "Party": {
+      "additionalProperties": false,
+      "properties": {
+        "entity_key": {
+          "title": "Entity Key",
+          "type": "string"
+        },
+        "interest": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Interest"
+        },
+        "kind": {
+          "default": null,
+          "title": "Kind",
+          "type": "null"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "pids": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Pids",
+          "type": "array"
+        },
+        "role": {
+          "enum": [
+            "owner",
+            "interest_holder",
+            "manager",
+            "licensee"
+          ],
+          "title": "Role",
+          "type": "string"
+        },
+        "same_as": {
+          "anyOf": [
+            {
+              "enum": [
+                "owner",
+                "manager"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Same As"
+        },
+        "sources": {
+          "items": {
+            "$ref": "#/$defs/Source"
+          },
+          "title": "Sources",
+          "type": "array"
+        }
+      },
+      "required": [
+        "role",
+        "name",
+        "entity_key",
+        "kind",
+        "interest",
+        "pids",
+        "same_as",
+        "sources"
+      ],
+      "title": "Party",
+      "type": "object"
+    },
+    "RegistrySearch": {
+      "additionalProperties": false,
+      "properties": {
+        "date": {
+          "anyOf": [
+            {
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Date"
+        },
+        "status": {
+          "enum": [
+            "filed",
+            "no_filing",
+            "not_searched"
+          ],
+          "title": "Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "status",
+        "date"
+      ],
+      "title": "RegistrySearch",
+      "type": "object"
+    },
+    "Rezoning": {
+      "additionalProperties": false,
+      "properties": {
+        "category": {
+          "title": "Category",
+          "type": "string"
+        },
+        "detail": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Detail"
+        },
+        "status": {
+          "enum": [
+            "approved",
+            "rezoning",
+            "upcoming"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "url": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Url"
+        }
+      },
+      "required": [
+        "status",
+        "category",
+        "detail",
+        "url"
+      ],
+      "title": "Rezoning",
+      "type": "object"
+    },
+    "Source": {
+      "additionalProperties": false,
+      "properties": {
+        "as_of": {
+          "anyOf": [
+            {
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "As Of"
+        },
+        "type": {
+          "enum": [
+            "registry",
+            "licence",
+            "sro_inventory",
+            "listing",
+            "claim_registry",
+            "vtu_research",
+            "rental_inventory",
+            "non_market_list",
+            "chf_bc",
+            "rezoning"
+          ],
+          "title": "Type",
+          "type": "string"
+        },
+        "url": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Url"
+        }
+      },
+      "required": [
+        "type",
+        "as_of",
+        "url"
+      ],
+      "title": "Source",
+      "type": "object"
+    },
+    "Sro": {
+      "additionalProperties": false,
+      "properties": {
+        "occupancy": {
+          "anyOf": [
+            {
+              "enum": [
+                "open",
+                "closed"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Occupancy"
+        },
+        "operator_sector": {
+          "anyOf": [
+            {
+              "enum": [
+                "private",
+                "non_profit",
+                "government",
+                "chinese_society"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Operator Sector"
+        },
+        "owner_sector": {
+          "anyOf": [
+            {
+              "enum": [
+                "private",
+                "non_profit",
+                "government",
+                "chinese_society"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Owner Sector"
+        },
+        "rooms": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Rooms"
+        }
+      },
+      "required": [
+        "rooms",
+        "occupancy",
+        "owner_sector",
+        "operator_sector"
+      ],
+      "title": "Sro",
+      "type": "object"
+    },
+    "Value": {
+      "additionalProperties": false,
+      "properties": {
+        "building": {
+          "title": "Building",
+          "type": "integer"
+        },
+        "land": {
+          "title": "Land",
+          "type": "integer"
+        },
+        "land_share": {
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Land Share",
+          "type": "number"
+        },
+        "land_share_pctl": {
+          "maximum": 100,
+          "minimum": 0,
+          "title": "Land Share Pctl",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "land",
+        "building",
+        "land_share",
+        "land_share_pctl"
+      ],
+      "title": "Value",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Schema root only: one place the frontend's types are generated from.",
+  "properties": {
+    "building_records": {
+      "$ref": "#/$defs/BuildingRecordsFile"
+    },
+    "networks": {
+      "$ref": "#/$defs/NetworksFile"
+    }
+  },
+  "required": [
+    "building_records",
+    "networks"
+  ],
+  "title": "Contract",
+  "type": "object"
+}
