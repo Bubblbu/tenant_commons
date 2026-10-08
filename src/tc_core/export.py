@@ -39,6 +39,7 @@ from .claims import resolve_entity_clusters
 from .contract import SCHEMA_VERSION, BuildingRecordsFile, NetworksFile
 from .db import query_frame
 from .export_contract import LandShares, build_building, build_networks, land_share
+from .export_parties import match_key
 from .geometry import parse_geom
 from .ingest.building_names import pick_building_name
 from .ingest.overlay_write import BUILDING_OVERLAY_COLUMNS
@@ -176,6 +177,7 @@ def reconstruct_points(
         for col in ("listings", "registry_owner_pids", "interest_holders")
     )
     merged = fill_owner_from_sro(merged)
+    merged = regroup_registry_owners(merged)
     merged = fallback_group_to_owner(merged)
     merged = apply_building_names(merged, _load_building_names(conn))
 
@@ -414,6 +416,27 @@ def apply_building_names(df: pl.DataFrame, names: dict[int, list[tuple[str, str]
     return df.with_columns(
         building_name=pl.Series([p[0] for p in picked], dtype=pl.String),
         other_names=_objects(p[1] for p in picked),
+    )
+
+
+def regroup_registry_owners(df: pl.DataFrame) -> pl.DataFrame:
+    """A registry owner whose building was grouped only by a *different*
+    licence holder's name is its own group instead: the popup would
+    otherwise say the licence holder "holds" a building the registry says
+    someone else owns. A licence naming the owner (any spelling) keeps its
+    group; claims networks are never touched."""
+    mismatch = pl.Series(
+        [
+            src == "registry" and net == "licence" and match_key(str(owner)) != match_key(str(lic))
+            for src, net, owner, lic in zip(
+                df["owner_source"], df["network_source"], df["owner_name"], df["licence_holder"]
+            )
+        ],
+        dtype=pl.Boolean,
+    )
+    return _where(
+        df, pl.lit(mismatch), network_key=pl.col("owner_key"), network_name=pl.col("owner_name"),
+        network_source="registry",
     )
 
 

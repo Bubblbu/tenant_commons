@@ -164,3 +164,19 @@ def test_interest_holders_typed_and_reporting_bodies_excluded(tmp_path):
         {"name": "VALLEJO COURT LIMITED PARTNERSHIP", "interest": "settlor", "pids": ["011-111-111"]},
     ]
     assert "Secret City" not in repr(holders)
+
+
+def test_withheld_names_are_never_published_even_if_a_name_is_present(tmp_path):
+    """LOTR s. 30(4) withholds some identities; a name field filled in anyway
+    (e.g. from partial name parts) must still not surface."""
+    conn = _conn()
+    conn.executemany(
+        "INSERT INTO raw_lotr_ownership (pid, reporting_body_name, type_of_interest, holder_name, "
+        "individual_is_full_name_omitted, obscure_message, data_fetch_status, ingested_at) "
+        "VALUES ('011-111-111', 'A LTD.', 'INTEREST_HOLDER', ?, ?, ?, 'SUCCESS', 'now')",
+        [("WITHHELD, PERSON", "1", None),
+         ("OBSCURED, PERSON", "0", "Information unavailable under s. 30(4)"),
+         ("PUBLIC, PERSON", "0", None)],
+    )
+    holders = build_interest_holders(conn, _pid_map(tmp_path, [("011111111", "1 main st")]))
+    assert [h["name"] for h in holders["1 main st"]] == ["PUBLIC, PERSON"]

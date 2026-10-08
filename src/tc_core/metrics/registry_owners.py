@@ -142,7 +142,10 @@ def build_interest_holders(
     rows = conn.execute(
         "SELECT pid, reporting_body_name, type_of_interest, holder_name FROM raw_lotr_ownership "
         "WHERE holder_name IS NOT NULL AND TRIM(holder_name) != '' AND pid IS NOT NULL "
-        "AND (data_fetch_status IS NULL OR data_fetch_status = 'SUCCESS')"
+        "AND (data_fetch_status IS NULL OR data_fetch_status = 'SUCCESS') "
+        # Identities withheld under LOTR s. 30(4) stay withheld, whatever the name field holds.
+        "AND COALESCE(LOWER(individual_is_full_name_omitted), '0') NOT IN ('1', 'true') "
+        "AND COALESCE(TRIM(obscure_message), '') = ''"
     ).fetchall()
     found: dict[str, dict[tuple[str, str], set[str]]] = defaultdict(lambda: defaultdict(set))
     spellings: dict[str, Counter] = defaultdict(Counter)
