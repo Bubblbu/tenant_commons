@@ -15,9 +15,15 @@ the frontend against `fixtures/` with Node alone.
 `../data/derived/artifacts`, produced by `uv run python scripts/rebuild_data.py`
 from the repo root). It is served at `/data/` by `npm run dev` and copied into
 `dist/data/` by `npm run build`. Contract: `filter_config.json`,
-`marker_metadata.json`, `building_records.json` and `blocks.geojson` each carry
-`schema_version` (checked at load); `local-area-boundary.geojson` is the City's
-file, passed through.
+`marker_metadata.json`, `building_records.json`, `networks.json` and
+`blocks.geojson` each carry `schema_version` (checked at load);
+`local-area-boundary.geojson` is the City's file, passed through.
+`building_records.json` and `networks.json` follow `tc_core/contract.py`; their
+TypeScript types (`src/contract.gen.ts`) are generated from
+`src/contract.schema.json` with `npm run gen:types` (regenerate the schema
+first with `uv run python scripts/write_contract_schema.py`). Tables, filters
+and the CSV export read a flat view of each building (`src/flat.ts`); the popup
+(`src/popup/`) reads the nested record.
 
 ## Commands
 

@@ -291,7 +291,14 @@ Sections kept here for now since that's the best guess available.
 - **Format/known quirks:** the file's own `match_method` column is an
   upstream address-matching flag from whoever combined the source lists —
   unrelated to and not used by this project's own address-key matching in
-  `src/tc_core/ingest/overlays.py`.
+  `src/tc_core/ingest/overlays.py`. The file came out of a PDF, and text
+  extraction damaged some cells: words split ("N on-Profit", "P rivate"), a
+  sector label spilled into the operator cell with a stray letter of the
+  owner name ("vP rivate", "SPrivate"), and long names cut off ("Atira
+  Women's Resourc"). Raw and overlay tables keep the text as published; the
+  export reads it through `src/tc_core/sro_text.py` (sector parsing, spilled
+  labels become no operator) and expands abbreviations and truncations via
+  `export.py::SRO_NAME_ALIASES`.
 - **Provenance/original retained:** **not yet** — no original document is
   currently kept. Per the retain-originals convention above, the source
   document(s) this was combined from should be saved under
@@ -445,7 +452,12 @@ not the City's Open Data portal, not FOI, not VTU's own systems.
   information) or redacted under LOTR s. 30(4) (holder identity withheld).
   Individual names arrive pre-combined as `"LAST, GIVEN"` in `holder_name`.
   See `ingest/lotr_claims.py`'s docstring for how these are filtered before
-  becoming claims.
+  becoming claims. The public export also lists each building's interest
+  holders (`metrics/registry_owners.py::build_interest_holders`): rows typed
+  `INTEREST_HOLDER`, `RB_TRUSTEE_*`, `RB_TRUST_SETTLOR_*` or `RB_PARTNER_*`
+  whose holder isn't the reporting body itself, published as name, interest
+  type and PIDs only — that query reads no residence, citizenship or address
+  column.
 - **Provenance/original retained:** locally only — see Sensitivity above.
   `raw_lotr_ownership` stores the export verbatim in SQLite for
   browsability (see `ingest/raw_lotr.py`), but that database is itself

@@ -2,7 +2,7 @@
 
 *Living document. Update this as decisions change — it's meant to be edited, not archived.*
 
-Last updated: 2026-10-06
+Last updated: 2026-10-08
 
 ---
 
@@ -93,12 +93,14 @@ Raw source tables (Open Data extract, FOI list, NationBuilder export, ownership_
 ### Sensitivity model (Q11)
 **Field-level flags, tagged incrementally, default-public.** Not every field classified up front (too much upfront work for the time budget) — instead, known-sensitive fields are flagged now (VTU membership counts/IDs, tenant names/identifying details in claim notes), everything else defaults to public, and new fields get flagged *at the moment they're added* if they touch tenant identity or membership. This is a discipline to maintain, not just a one-time setup.
 
-**Public ownership data (2026-09-23).** LOTR reporting bodies and interest holders — including private individuals — are shown on the public map as the province publishes them; owners can seek removal through the registry's own channels. Claim provenance in public artifacts is limited to source *types* and counts: `public_registry` shows as "provincial registry", every other type collapses to "VTU research" so the map never signals that a tenant reported on a landlord, and `source_note` never leaves the database. A network's entity names are public even when only VTU research links them (ruling 2026-09-24) (a canary test in `tests/test_export_ownership.py` enforces this). Full provenance is for the internal app. Owners and operators named in the City's SRO inventory (an FOI release), including private individuals, are shown as published on the same basis (ruling 2026-09-24); the export only expands the inventory's abbreviations (`export.py::SRO_NAME_ALIASES`).
+**Public ownership data (2026-09-23).** LOTR reporting bodies and interest holders — including private individuals — are shown on the public map as the province publishes them; owners can seek removal through the registry's own channels. Claim provenance in public artifacts is limited to source *types* and counts: `public_registry` shows as "provincial registry", every other type collapses to "VTU research" so the map never signals that a tenant reported on a landlord, and `source_note` never leaves the database. A network's entity names are public even when only VTU research links them (ruling 2026-09-24) (a canary test in `tests/test_export_ownership.py` enforces this). Full provenance is for the internal app. Owners and operators named in the City's SRO inventory (an FOI release), including private individuals, are shown as published on the same basis (ruling 2026-09-24); the export only expands the inventory's abbreviations (`export.py::SRO_NAME_ALIASES`). LOTR interest holders (including trustees, settlors and partners) are published with name, interest type and PIDs only; residence, citizenship and registered-address fields are never exported (`metrics/registry_owners.py::build_interest_holders` reads none of them; canary in `tests/test_export_ownership.py`).
 
 ### Export mechanism (Q12)
 Two paths, sharing the same underlying "filter to public fields" logic in `tc_core`:
 1. **Ad hoc export button** (in the internal app) — download a filtered CSV/JSON of whatever's currently in view, for sharing with e.g. a Toronto union or a funder.
 2. **Automated public feed** — the same filter logic feeds the public map's build step directly (`tc_core` → filter to public fields → JSON → public site build reads it). Keeps the public map in sync with real data without manual copy-paste.
+
+The public contract is `tc_core/contract.py` (Pydantic models, `extra="forbid"`, no sentinel strings — missing is null): it is the allowlist of public fields for `building_records.json` and `networks.json`, and a record that doesn't validate fails the export. Buildings carry their parties in roles (owner on title, interest holder, manager, licensee) with source types and dates — see docs/superpowers/specs/2026-10-08-building-popup-and-contract-v2-design.md. `scripts/write_contract_schema.py` writes `frontend/src/contract.schema.json`; `npm run gen:types` generates the frontend's types from it.
 
 ---
 
@@ -205,6 +207,7 @@ Risks to actively manage (see Section 7): the "good enough" trap, premature demo
 **Public map**
 - [x] Wire in claims-derived landlord clustering (grouping shell companies under a real owner where confirmed)
 - [x] Separate each building's owner (LOTR reporting body or licence holder) from its landlord network, with provenance indicators — see docs/superpowers/specs/2026-09-23-ownership-layers-design.md
+- [x] Popup v2: tabbed Summary / Ownership chain / Building on export contract v2 — see docs/superpowers/specs/2026-10-08-building-popup-and-contract-v2-design.md
 - [ ] Polish filters/sidebar to match or exceed current site's functionality (neighbourhood, assessed value, unit sliders)
 - [ ] Marker clustering/canvas rendering if point count warrants it
 
@@ -221,4 +224,4 @@ Risks to actively manage (see Section 7): the "good enough" trap, premature demo
 ## Open questions / not yet decided
 *(add here as they come up)*
 
-- **Buildings spanning several parcels/folios (raised 2026-10-06).** `prepare/buildings.py::collapse_parcels()` is a stopgap: it sums assessed values and tax across a building's folios and takes every other column from the highest-value folio. That fixed values being picked at random per run, but it still flattens the building to one parcel's attributes. Air space parcels can have different owners (179 Main St: a private company holds Lot A, Community Builders Benevolence Group holds Air Space Parcel 2 for social housing), and the export's `registered_owners`/`registry_pids` lists don't record which owner holds which parcel, so the popup's "+N co-owners" can't tell joint owners of one parcel from separate owners of separate parcels. Revisit `collapse_parcels()` together with a parcel-level ownership model. Related, paused mid-brainstorm: classifying every building by ownership sector (public / non-profit & co-op / private / mixed) plus a market/non-market flag, inferred classifications shown with their basis; recommended approach is a standalone `tc_core/metrics/sector.py` that works per parcel and ingests the unused City-owned properties dataset (`raw/cov_open_data/city-owned-properties.csv`, joins on folio's first 8 digits = land coordinate).
+- **Buildings spanning several parcels/folios (raised 2026-10-06).** `prepare/buildings.py::collapse_parcels()` is a stopgap: it sums assessed values and tax across a building's folios and takes every other column from the highest-value folio. That fixed values being picked at random per run, but it still flattens the building to one parcel's attributes. *Ownership half resolved 2026-10-08:* each owner and interest-holder party now carries its own PIDs, so the popup says "jointly owned by A and B" for one parcel and lists owners per parcel otherwise (air space parcels like 179 Main St). Values and other attributes are still flattened — revisit `collapse_parcels()` for those. Related, paused mid-brainstorm: classifying every building by ownership sector (public / non-profit & co-op / private / mixed) plus a market/non-market flag, inferred classifications shown with their basis; recommended approach is a standalone `tc_core/metrics/sector.py` that works per parcel and ingests the unused City-owned properties dataset (`raw/cov_open_data/city-owned-properties.csv`, joins on folio's first 8 digits = land coordinate).
