@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import sqlite3
 from collections import Counter, defaultdict
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from ..normalize import sanitize_owner
 from .portfolios import _normalize_pid, pid_addr_keys
@@ -24,6 +24,9 @@ class RegistryOwnership:
     pids: list[str]
     # Date the registry record was retrieved (Samwise order date), not a filing date.
     retrieved: str | None
+    # Each owner's own PIDs (as filed), so joint owners of one parcel can be
+    # told apart from owners of separate parcels.
+    owner_pids: dict[str, list[str]] = field(default_factory=dict)
 
 
 def build_registry_owners(
@@ -40,6 +43,7 @@ def build_registry_owners(
     spellings: dict[str, Counter] = defaultdict(Counter)
     filed: dict[str, set[str]] = defaultdict(set)
     retrieved: dict[str, str] = {}
+    filed_spelling: dict[str, str] = {}
     for pid, name, created in rows:
         addr_keys = keys_by_pid.get(_normalize_pid(pid))
         if not addr_keys:
@@ -51,6 +55,7 @@ def build_registry_owners(
         for addr_key in addr_keys:
             body_pids[addr_key][body].add(_normalize_pid(pid))
             filed[addr_key].add(pid.strip())
+            filed_spelling[_normalize_pid(pid)] = pid.strip()
             if day > retrieved.get(addr_key, ""):
                 retrieved[addr_key] = day
 
@@ -66,6 +71,9 @@ def build_registry_owners(
             owners=[display(body) for body in ranked],
             pids=sorted(filed[addr_key]),
             retrieved=retrieved.get(addr_key),
+            owner_pids={
+                display(body): sorted(filed_spelling[p] for p in bodies[body]) for body in ranked
+            },
         )
     return result
 
@@ -104,3 +112,61 @@ def build_registry_searches(
             if searched_on > result.get(addr_key, ""):
                 result[addr_key] = searched_on
     return result
+
+
+# type_of_interest prefixes -> the public interest label. RB_CORPORATION (and a
+# trustee row naming the reporting body itself) is the owner, not someone behind it.
+_INTERESTS = (
+    ("INTEREST_HOLDER", "interest holder"),
+    ("RB_TRUSTEE_", "trustee"),
+    ("RB_TRUST_SETTLOR_", "settlor"),
+    ("RB_PARTNER_", "partner"),
+)
+
+
+def _interest(type_of_interest: str | None) -> str | None:
+    for prefix, label in _INTERESTS:
+        if type_of_interest and type_of_interest.startswith(prefix):
+            return label
+    return None
+
+
+def build_interest_holders(
+    conn: sqlite3.Connection, pid_address_map_path: str
+) -> dict[str, list[dict]]:
+    """{addr_key: [{name, interest, pids}]} — who stands behind the reporting
+    bodies on a building's PIDs. Public: name and interest type only. The
+    query reads no residence, citizenship or address column, so none can
+    reach an artifact from here."""
+    keys_by_pid = pid_addr_keys(conn, pid_address_map_path)
+    rows = conn.execute(
+        "SELECT pid, reporting_body_name, type_of_interest, holder_name FROM raw_lotr_ownership "
+        "WHERE holder_name IS NOT NULL AND TRIM(holder_name) != '' AND pid IS NOT NULL "
+        "AND (data_fetch_status IS NULL OR data_fetch_status = 'SUCCESS')"
+    ).fetchall()
+    found: dict[str, dict[tuple[str, str], set[str]]] = defaultdict(lambda: defaultdict(set))
+    spellings: dict[str, Counter] = defaultdict(Counter)
+    for pid, body, type_of_interest, holder in rows:
+        interest = _interest(type_of_interest)
+        holder = holder.strip()
+        if interest is None or sanitize_owner(holder) == sanitize_owner(body):
+            continue
+        key = sanitize_owner(holder)
+        spellings[key][holder] += 1
+        for addr_key in keys_by_pid.get(_normalize_pid(pid), ()):
+            found[addr_key][(key, interest)].add(pid.strip())
+
+    def display(key: str) -> str:
+        counts = spellings[key]
+        top = max(counts.values())
+        return min(name for name, n in counts.items() if n == top)
+
+    return {
+        addr_key: [
+            {"name": display(key), "interest": interest, "pids": sorted(pids)}
+            for (key, interest), pids in sorted(
+                holders.items(), key=lambda kv: (-len(kv[1]), display(kv[0][0]))
+            )
+        ]
+        for addr_key, holders in found.items()
+    }

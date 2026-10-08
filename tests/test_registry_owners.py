@@ -4,7 +4,7 @@ Registry (spec 2026-09-23-ownership-layers-design.md §3)."""
 from __future__ import annotations
 
 from tc_core.db import get_connection, init_db
-from tc_core.metrics.registry_owners import build_registry_owners
+from tc_core.metrics.registry_owners import build_interest_holders, build_registry_owners
 
 
 def _conn():
@@ -120,3 +120,47 @@ def test_a_strata_lot_filing_reaches_a_building_whose_address_point_carries_the_
     _lotr(conn, "003-786-901", "1136 PROPERTIES LTD.")
     owners = build_registry_owners(conn, _pid_map(tmp_path, []))
     assert owners["1120 pacific st"].owners == ["1136 PROPERTIES LTD."]
+
+
+def _lotr_typed(conn, rows):
+    """Rows of (pid, reporting body, type_of_interest, holder); every row also
+    carries a residence city that must never surface."""
+    conn.executemany(
+        "INSERT INTO raw_lotr_ownership (pid, reporting_body_name, type_of_interest, holder_name, "
+        "individual_principal_residence_city, order_created_date, data_fetch_status, ingested_at) "
+        "VALUES (?, ?, ?, ?, 'Secret City', '2026-05-28 16:10:39', 'SUCCESS', 'now')",
+        rows,
+    )
+
+
+def test_owner_pids_separate_joint_from_per_parcel_owners(tmp_path):
+    conn = _conn()
+    _lotr_typed(conn, [
+        ("011-111-111", "A HOLDINGS LTD.", "RB_CORPORATION", "A HOLDINGS LTD."),
+        ("011-111-111", "B HOLDINGS LTD.", "RB_CORPORATION", "B HOLDINGS LTD."),
+        ("022-222-222", "B HOLDINGS LTD.", "RB_CORPORATION", "B HOLDINGS LTD."),
+    ])
+    pid_map = _pid_map(tmp_path, [("011111111", "1 main st"), ("022222222", "1 main st")])
+    reg = build_registry_owners(conn, pid_map)["1 main st"]
+    assert reg.owner_pids == {
+        "B HOLDINGS LTD.": ["011-111-111", "022-222-222"],
+        "A HOLDINGS LTD.": ["011-111-111"],
+    }
+
+
+def test_interest_holders_typed_and_reporting_bodies_excluded(tmp_path):
+    conn = _conn()
+    _lotr_typed(conn, [
+        ("011-111-111", "EZELIYA HOLDINGS INC.", "RB_CORPORATION", "EZELIYA HOLDINGS INC."),
+        ("011-111-111", "EZELIYA HOLDINGS INC.", "INTEREST_HOLDER", "KARA, JAMIL"),
+        ("011-111-111", "Wong, Allen", "RB_TRUSTEE_INDIVIDUAL", "Wong, Allen"),
+        ("011-111-111", "VALLEJO COURT LTD.", "RB_TRUST_SETTLOR_CORPORATION", "VALLEJO COURT LIMITED PARTNERSHIP"),
+        ("011-111-111", "X LTD.", "INTEREST_HOLDER", None),
+    ])
+    pid_map = _pid_map(tmp_path, [("011111111", "1 main st")])
+    holders = build_interest_holders(conn, pid_map)["1 main st"]
+    assert holders == [
+        {"name": "KARA, JAMIL", "interest": "interest holder", "pids": ["011-111-111"]},
+        {"name": "VALLEJO COURT LIMITED PARTNERSHIP", "interest": "settlor", "pids": ["011-111-111"]},
+    ]
+    assert "Secret City" not in repr(holders)
