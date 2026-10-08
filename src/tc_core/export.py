@@ -43,6 +43,7 @@ from .metrics.membership_metrics import compute_building_member_metrics
 from .metrics.portfolios import build_landlord_portfolios
 from .metrics.registry_owners import build_registry_owners, build_registry_searches
 from .normalize import sanitize_owner
+from .sro_text import is_leaked_label
 
 
 def _missing(v) -> bool:
@@ -227,17 +228,14 @@ SRO_NAME_ALIASES = {
     "PHS": "PHS Community Services Society",
     "Lookout": "Lookout Housing and Health Society",
 }
-# Values that describe a kind of owner or operator rather than naming one
-# ("Private" in the operator column means the owner runs the building).
-SRO_CATEGORY_WORDS = {"private", "government", "non-profit"}
-
-
 def clean_sro_name(name) -> str | None:
-    """Display form of an SRO owner/operator name; None when it names no one."""
+    """Display form of an SRO owner/operator name; None when it names no one
+    (a sector label such as "Private" — the owner runs the building — or one
+    split or spilled by the PDF extraction, see sro_text.py)."""
     if _missing(name):
         return None
     text = str(name).strip()
-    if not text or text.lower() in SRO_CATEGORY_WORDS:
+    if not text or is_leaked_label(text):
         return None
     return SRO_NAME_ALIASES.get(text, text)
 
