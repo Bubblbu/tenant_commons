@@ -100,7 +100,7 @@ def test_interest_holders_are_typed():
         registry_owner_pids=[{"name": "EZELIYA HOLDINGS INC.", "pids": ["011-111-111"]}],
         interest_holders=[{"name": "KARA, JAMIL", "interest": "trustee", "pids": ["011-111-111"]}],
     ), {})
-    holder = [p for p in parties if p.role == "interest_holder"][0]
+    holder = next(p for p in parties if p.role == "interest_holder")
     assert (holder.name, holder.interest, holder.pids) == ("KARA, JAMIL", "trustee", ["011-111-111"])
 
 
