@@ -1,4 +1,5 @@
 /** Ownership tab — the organizer's chain: network → on title → this building (spec 2026-10-08 §6). */
+import { formatAddress } from '../address';
 import type { Building, Party } from '../contract.gen';
 import { escapeHtml } from '../html';
 import { provenanceIcon } from '../provenance';
@@ -85,6 +86,6 @@ function managerAside(b: Building, ctx: PopupContext): string {
 
 export function renderOwnership(b: Building, ctx: PopupContext): string {
   const chain = networkNode(b, ctx) + titleNode(b, ctx) +
-    node('bldg', 'This building', `<span class="popup-muted">${escapeHtml(b.address)}</span>`);
+    node('bldg', 'This building', `<span class="popup-muted">${escapeHtml(formatAddress(b.address))}</span>`);
   return `<div class="chain">${chain}</div>${managerAside(b, ctx)}`;
 }

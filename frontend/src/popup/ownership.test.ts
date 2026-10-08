@@ -65,3 +65,10 @@ describe('renderOwnership', () => {
     expect(t).toContain('No filing in the land title registry (searched 2026-10-06)');
   });
 });
+
+describe('renderOwnership, chain terminus', () => {
+  it('formats the building address like the header', () => {
+    const d = dom(renderOwnership(YORK, CTX));
+    expect(d.querySelector('.node.bldg')!.textContent).toContain('2145 York Ave');
+  });
+});

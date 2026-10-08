@@ -30,3 +30,10 @@
 .tc-popup .popup-issue-num { color: #b5332c; }
 .tc-popup details summary { color: #2a6fb0; font-size: 12px; cursor: pointer; }
 .tc-popup details ul { margin: 2px 0 0; padding-left: 16px; font-size: 12px; max-height: 120px; overflow-y: auto; }
+.tc-popup .popup-lbl { font-size: 10.5px; text-transform: uppercase; letter-spacing: .04em; color: #888; margin: 10px 0 2px; }
+.tc-popup .value-bar { position: relative; height: 7px; border-radius: 4px; background: #d9dde3; overflow: hidden; margin: 3px 0 0; }
+.tc-popup .value-bar .fill { height: 100%; background: #c0603a; }
+.tc-popup .value-bar .median { position: absolute; top: 0; width: 1px; height: 7px; background: rgba(255,255,255,.85); box-shadow: 0 0 0 .5px rgba(0,0,0,.25); }
+.tc-popup .median-row { position: relative; height: 12px; }
+.tc-popup .median-label { position: absolute; transform: translateX(-50%); white-space: nowrap; font-size: 9.5px; color: #999; }
+.tc-popup .median-label::before { content: ''; position: absolute; left: 50%; top: -3px; width: 1px; height: 3px; background: #bbb; }
