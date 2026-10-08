@@ -1,5 +1,5 @@
-"""The City's SRO inventory fills the landlord of buildings no other source
-names, and its abbreviated names are expanded for display."""
+"""The City's SRO inventory names the owner of buildings the registry doesn't
+(over a licence holder too), and its abbreviated names are expanded for display."""
 
 from types import SimpleNamespace
 
@@ -34,7 +34,8 @@ def test_sro_owner_fills_a_building_no_other_source_names():
     assert (row.network_key, row.network_name, row.network_source) == ("bc-housing", "BC Housing", "sro_list")
 
 
-def test_sro_owner_never_replaces_a_registry_or_licence_owner():
+def test_sro_owner_outranks_a_licence_owner_and_its_licence_group():
+    # Marble Arch: BC Housing owns it (SRO inventory); PHS only holds the licence.
     df = _frame(
         owner_name="PHS Community Services Society",
         owner_key="phs-community-services-society",
@@ -44,8 +45,36 @@ def test_sro_owner_never_replaces_a_registry_or_licence_owner():
         network_source="licence",
     )
     row = _first(fill_owner_from_sro(df))
-    assert row.owner_name == "PHS Community Services Society"
-    assert row.owner_source == "licence"
+    assert (row.owner_name, row.owner_key, row.owner_source) == ("BC Housing", "bc-housing", "sro_list")
+    assert (row.network_key, row.network_name, row.network_source) == ("bc-housing", "BC Housing", "sro_list")
+
+
+def test_sro_owner_never_replaces_a_registry_owner_or_claims_network():
+    df = _frame(
+        owner_name="REAL OWNER LTD.",
+        owner_key="real-owner-ltd",
+        owner_source="registry",
+        network_key="net:real",
+        network_name="Real Group",
+        network_source="claims",
+    )
+    row = _first(fill_owner_from_sro(df))
+    assert (row.owner_name, row.owner_source) == ("REAL OWNER LTD.", "registry")
+    assert (row.network_key, row.network_source) == ("net:real", "claims")
+
+
+def test_licence_owner_in_a_claims_network_keeps_the_network():
+    df = _frame(
+        owner_name="PHS Community Services Society",
+        owner_key="phs-community-services-society",
+        owner_source="licence",
+        network_key="net:phs",
+        network_name="PHS Group",
+        network_source="claims",
+    )
+    row = _first(fill_owner_from_sro(df))
+    assert row.owner_name == "BC Housing"
+    assert (row.network_key, row.network_source) == ("net:phs", "claims")
 
 
 def test_building_without_an_sro_owner_stays_not_on_record():

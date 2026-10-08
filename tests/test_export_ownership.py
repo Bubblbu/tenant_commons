@@ -253,3 +253,28 @@ def test_search_notes_never_reach_any_artifact(tmp_path):
     out = _export(tmp_path, _searches)
     for path in out.iterdir():
         assert "CANARY-search-note" not in path.read_text(encoding="utf-8"), path.name
+
+
+def test_points_carry_per_owner_pids_and_interest_holders(tmp_path):
+    from datetime import datetime, timezone
+
+    from tc_core.export import reconstruct_points
+
+    conn = sqlite3.connect(":memory:")
+    init_db(conn)
+    pid_map = _seed(conn, tmp_path)
+    conn.execute(
+        "INSERT INTO raw_lotr_ownership (pid, reporting_body_name, type_of_interest, holder_name, "
+        "data_fetch_status, ingested_at) VALUES ('008-173-613', 'ST. GEORGE ESTATES LTD.', "
+        "'INTEREST_HOLDER', 'RENER, GEORGE', 'SUCCESS', 'now')"
+    )
+    points = reconstruct_points(conn, datetime(2026, 1, 1, tzinfo=timezone.utc), pid_map)
+    rows = {r["address"]: r for r in points.iter_rows(named=True)}
+    st_george = rows["522 e 8th ave"]
+    assert st_george["registry_owner_pids"] == [{"name": "ST. GEORGE ESTATES LTD.", "pids": ["008-173-613"]}]
+    assert st_george["interest_holders"] == [
+        {"name": "RENER, GEORGE", "interest": "interest holder", "pids": ["008-173-613"]}
+    ]
+    assert rows["1 solo st"]["registry_owner_pids"] == []
+    assert rows["1 solo st"]["interest_holders"] == []
+    assert rows["999 nowhere rd"]["interest_holders"] == []

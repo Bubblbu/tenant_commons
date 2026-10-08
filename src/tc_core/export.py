@@ -41,7 +41,9 @@ from .ingest.overlay_write import BUILDING_OVERLAY_COLUMNS
 from .metrics.building_metrics import BUILDING_METRICS, build_building_metrics
 from .metrics.membership_metrics import compute_building_member_metrics
 from .metrics.portfolios import build_landlord_portfolios
-from .metrics.registry_owners import build_registry_owners, build_registry_searches
+from .metrics.registry_owners import (
+    build_interest_holders, build_registry_owners, build_registry_searches,
+)
 from .normalize import sanitize_owner
 from .sro_text import is_leaked_label
 
@@ -131,6 +133,8 @@ def reconstruct_points(
     merged = _assign_ownership(merged, registry, portfolios)
     # "Searched the registry, no filing": public as a date only (search notes stay internal).
     no_filing = build_registry_searches(conn, pid_address_map_path) if pid_address_map_path else {}
+    # Who stands behind the owners: name and interest type only (spec 2026-10-08 §3).
+    holders = build_interest_holders(conn, pid_address_map_path) if pid_address_map_path else {}
     building_listings = _load_building_listings(conn, listing_aliases or {})
     merged = merged.with_columns(
         registry_no_filing=pl.Series(
@@ -138,6 +142,7 @@ def reconstruct_points(
             dtype=pl.String,
         ),
         listings=_objects(building_listings.get(int(b), []) for b in merged["b_id"]),
+        interest_holders=_objects(holders.get(key, []) for key in merged["addr_key"]),
     )
     merged = apply_property_managers(merged, property_managers or set())
 
@@ -147,7 +152,8 @@ def reconstruct_points(
             "issues_details",
             "member_count", "has_vtu_member", "member_share_building",
             "owner_name", "owner_key", "owner_source", "registered_owners", "registry_pids",
-            "registry_retrieved", "registry_no_filing", "licence_holder", "managed_by",
+            "registry_retrieved", "registry_no_filing", "registry_owner_pids", "interest_holders",
+            "licence_holder", "managed_by",
             "managed_by_source", "listings", "network_key", "network_name",
             "network_source", "network_name_source", "network_entities",
             "network_properties_on_title", "network_evidence",
@@ -158,9 +164,10 @@ def reconstruct_points(
         ]
     )
     merged = _append_overlay_housing(conn, merged)
-    # Overlay records have no listings; keep the column a list throughout.
+    # Overlay records have no listings or registry data; keep these columns lists throughout.
     merged = merged.with_columns(
-        listings=_objects(v if isinstance(v, list) else [] for v in merged["listings"].to_list())
+        _objects(v if isinstance(v, list) else [] for v in merged[col].to_list()).alias(col)
+        for col in ("listings", "registry_owner_pids", "interest_holders")
     )
     merged = fill_owner_from_sro(merged)
     merged = fallback_group_to_owner(merged)
@@ -197,6 +204,10 @@ def _assign_ownership(df: pl.DataFrame, registry: dict, portfolios: dict) -> pl.
     return df.with_columns(
         registered_owners=_objects(r.owners if r else [] for r in reg),
         registry_pids=_objects(r.pids if r else [] for r in reg),
+        registry_owner_pids=_objects(
+            [{"name": n, "pids": r.owner_pids.get(n, [])} for n in r.owners] if r else []
+            for r in reg
+        ),
         registry_retrieved=text(r.retrieved if r else None for r in reg),
         owner_name=text(owner_name),
         owner_key=text(owner_key),
@@ -241,13 +252,11 @@ def clean_sro_name(name) -> str | None:
 
 
 def fill_owner_from_sro(df: pl.DataFrame) -> pl.DataFrame:
-    """Expands SRO owner/operator names, and makes the SRO owner the landlord
-    of buildings that neither the registry nor a licence names.
-
-    Never replaces a registry or licence owner: when sources
-    disagree (BC Housing on title, PHS as licensee), choosing between them is
-    the headline rule of the roles spec, not this fallback. Such a building's
-    group is itself, as for a licence-only landlord.
+    """Expands SRO owner/operator names, and makes the SRO inventory's owner
+    the building's owner wherever the registry doesn't name one — over a
+    licence holder too (spec 2026-10-08 §3: BC Housing owns Marble Arch; PHS
+    only holds the licence). A licence-name group becomes the SRO owner's own
+    name group. Registry owners and claims networks are never replaced.
     """
     df = df.with_columns(
         pl.col(col).map_elements(clean_sro_name, return_dtype=pl.String, skip_nulls=False)
@@ -257,7 +266,8 @@ def fill_owner_from_sro(df: pl.DataFrame) -> pl.DataFrame:
     if "sro_owner" not in df.columns:
         return df
     df = df.with_columns(
-        _fill=(pl.col("owner_key") == "unknown").fill_null(False) & pl.col("sro_owner").is_not_null()
+        _fill=pl.col("sro_owner").is_not_null()
+        & ((pl.col("owner_key") == "unknown") | (pl.col("owner_source") == "licence")).fill_null(False)
     )
     df = _where(
         df,
@@ -266,7 +276,9 @@ def fill_owner_from_sro(df: pl.DataFrame) -> pl.DataFrame:
         owner_key=pl.col("sro_owner").map_elements(sanitize_owner, return_dtype=pl.String),
         owner_source="sro_list",
     )
-    group = pl.col("_fill") & (pl.col("network_key") == "unknown").fill_null(False)
+    group = pl.col("_fill") & (
+        (pl.col("network_key") == "unknown") | (pl.col("network_source") == "licence")
+    ).fill_null(False)
     return _where(
         df, group, network_key=pl.col("owner_key"), network_name=pl.col("owner_name"),
         network_source="sro_list",
@@ -455,6 +467,8 @@ def _append_overlay_housing(
         network_name=pl.lit("(Unknown)"),
         registered_owners=_objects([] for _ in range(n)),
         registry_pids=_objects([] for _ in range(n)),
+        registry_owner_pids=_objects([] for _ in range(n)),
+        interest_holders=_objects([] for _ in range(n)),
         member_count=pl.lit(0),
         member_count_all=pl.lit(0),
         has_vtu_member=pl.lit(False),
