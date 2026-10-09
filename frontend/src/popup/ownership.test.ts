@@ -8,12 +8,28 @@ const dom = (html: string) => { const d = document.createElement('div'); d.inner
 const text = (html: string) => dom(html).textContent!.replace(/\s+/g, ' ');
 
 describe('renderOwnership', () => {
-  it('draws network → on title → this building, manager outside the chain', () => {
+  it('draws network → this building, with who holds title and who manages it inside the building', () => {
     const d = dom(renderOwnership(YORK, CTX));
-    const roles = [...d.querySelectorAll('.chain .node .role')].map((n) => n.textContent);
-    expect(roles).toEqual(['Network', 'On title', 'This building']);
-    expect(d.querySelector('.chain')!.textContent).not.toContain('Cascadia');
-    expect(d.querySelector('.popup-aside')!.textContent).toContain('Cascadia Apartment Rentals');
+    const nodes = [...d.querySelectorAll('.chain > .node > .role')].map((n) => n.textContent);
+    expect(nodes).toEqual(['Network', 'This building · 2145 York Ave']);
+    const rows = [...d.querySelectorAll('.node.bldg .popup-k')].map((k) => k.textContent);
+    expect(rows).toEqual(['On title', 'Managed by']);
+    expect(d.querySelector('.node.net')!.textContent).not.toContain('Cascadia');
+    expect(d.querySelector('.node.bldg')!.textContent).toContain('Cascadia Apartment Rentals');
+    expect(d.querySelector('.popup-aside')).toBeNull();
+  });
+
+  it('shows the building alone, outside a chain, when there is no network', () => {
+    const d = dom(renderOwnership(BIDWELL, CTX));
+    expect(d.querySelector('.chain')).toBeNull();
+    expect(d.querySelector('.node.bldg')).not.toBeNull();
+    expect(text(d.innerHTML)).toContain('Managed by Not on record');
+  });
+
+  it('adds a Licensed to row only for a licensee that is neither owner nor manager', () => {
+    const rows = (b: typeof YORK) => [...dom(renderOwnership(b, CTX)).querySelectorAll('.node.bldg .popup-k')].map((k) => k.textContent);
+    expect(rows(MARBLE_ARCH)).toEqual(['On title', 'Managed by', 'Licensed to']);
+    expect(rows(YORK)).not.toContain('Licensed to');
   });
 
   it('shows network evidence and the portfolio card', () => {
@@ -79,13 +95,6 @@ describe('renderOwnership', () => {
     const t = text(renderOwnership({ ...OVERLAY, registry_search: { status: 'no_filing', date: '2026-10-06' } }, CTX));
     expect(t).toContain('Not on record');
     expect(t).toContain('No filing in the land title registry (searched 2026-10-06)');
-  });
-});
-
-describe('renderOwnership, chain terminus', () => {
-  it('formats the building address like the header', () => {
-    const d = dom(renderOwnership(YORK, CTX));
-    expect(d.querySelector('.node.bldg')!.textContent).toContain('2145 York Ave');
   });
 });
 

@@ -77,32 +77,44 @@ function licenceLine(b: Building, role: 'owner' | 'manager', shownName: string, 
   return muted(`Licensed as ${escapeHtml(lic.name)}${icon(lic, ctx)}`);
 }
 
-function titleNode(b: Building, ctx: PopupContext): string {
+const row = (label: string, body: string) =>
+  `<div class="popup-row"><span class="popup-k">${label}</span> <div class="popup-v">${body}</div></div>`;
+const NOT_ON_RECORD = '<span class="popup-muted">Not on record</span>';
+
+/** Who holds title (and who stands behind them), or a registry search that found no filing. */
+function onTitle(b: Building, ctx: PopupContext): string {
   const owners = roles(b, 'owner');
   const searched = b.registry_search.status === 'no_filing' && b.registry_search.date
     ? muted(escapeHtml(`No filing in the land title registry (searched ${b.registry_search.date})`)) : '';
-  if (!owners.length) return node('', 'On title', `<span class="popup-muted">Not on record</span>${searched}`);
+  if (!owners.length) return row('On title', NOT_ON_RECORD + searched);
   const holders = roles(b, 'interest_holder').map((h) => escapeHtml(`${h.name}${h.interest ? ` (${h.interest})` : ''}`));
-  return node('', 'On title', ownersBody(owners, ctx) + licenceLine(b, 'owner', owners[0].name, ctx) + searched +
+  return row('On title', ownersBody(owners, ctx) + licenceLine(b, 'owner', owners[0].name, ctx) + searched +
     collapsed(plural(holders.length, 'interest holder', 'interest holders'), holders));
 }
 
-function managerAside(b: Building, ctx: PopupContext): string {
-  const managers = roles(b, 'manager');
-  const lic = roles(b, 'licensee')[0];
-  const unmatched = lic && lic.same_as === null
-    ? `<div>Licensed to ${escapeHtml(lic.name)}${icon(lic, ctx)}</div>` : '';
-  const items = managers.map((m) => {
+/** Who runs the building day to day. */
+function managedBy(b: Building, ctx: PopupContext): string {
+  const managers = roles(b, 'manager').map((m) => {
     const listing = m.sources.find((s) => s.type === 'listing');
     const seen = listing?.as_of ? muted(escapeHtml(`company website, seen ${monthYear(listing.as_of)}`)) : '';
     return `<div><strong>${linked(m.name, listing?.url ?? null)}</strong>${icon(m, ctx)}${seen}${licenceLine(b, 'manager', m.name, ctx)}</div>`;
   }).join('');
-  if (!items && !unmatched) return '';
-  return `<div class="popup-aside">${items ? `<div class="role">Manages</div>${items}` : ''}${unmatched}</div>`;
+  return row('Managed by', managers || NOT_ON_RECORD);
+}
+
+/** The City's landlord of record, when it is neither the owner nor the manager. */
+function licensedTo(b: Building, ctx: PopupContext): string {
+  const lic = roles(b, 'licensee')[0];
+  return lic && lic.same_as === null ? row('Licensed to', `${escapeHtml(lic.name)}${icon(lic, ctx)}`) : '';
+}
+
+function buildingNode(b: Building, ctx: PopupContext): string {
+  return node('bldg', `This building · ${escapeHtml(formatAddress(b.address))}`,
+    onTitle(b, ctx) + managedBy(b, ctx) + licensedTo(b, ctx));
 }
 
 export function renderOwnership(b: Building, ctx: PopupContext): string {
-  const chain = networkNode(b, ctx) + titleNode(b, ctx) +
-    node('bldg', 'This building', `<span class="popup-muted">${escapeHtml(formatAddress(b.address))}</span>`);
-  return `<div class="chain">${chain}</div>${managerAside(b, ctx)}`;
+  const network = networkNode(b, ctx);
+  // The chain line runs from the network into this building; alone, there is no chain.
+  return network ? `<div class="chain">${network}${buildingNode(b, ctx)}</div>` : buildingNode(b, ctx);
 }

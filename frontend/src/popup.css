@@ -23,7 +23,8 @@
 .tc-popup .chain .node.net::before { background: #b5332c; border-color: #b5332c; }
 .tc-popup .chain .node.bldg::before { border-radius: 2px; background: #888; }
 .tc-popup .role { font-size: 10.5px; text-transform: uppercase; letter-spacing: .04em; color: #888; }
-.tc-popup .popup-aside { margin-top: 10px; padding-top: 8px; border-top: 1px dashed #ddd; }
+.tc-popup .node.bldg .popup-row { margin-top: 4px; }
+.tc-popup .popup-v { flex: 1; min-width: 0; }
 .tc-popup .popup-stats { display: flex; gap: 12px; margin-top: 4px; border: 1px solid #e3e3e3; border-radius: 8px; padding: 6px 10px; }
 .tc-popup .popup-stats b { display: block; font-size: 15px; }
 .tc-popup .popup-stats span { font-size: 11px; color: #777; }
