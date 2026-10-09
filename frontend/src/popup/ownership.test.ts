@@ -97,3 +97,17 @@ describe('renderOwnership, City records', () => {
     expect(t).not.toContain('0 registry');
   });
 });
+
+describe('renderOwnership, highlight the network', () => {
+  it('offers a toggle on the network node, keyed by the network', () => {
+    const btn = dom(renderOwnership(YORK, CTX)).querySelector('.network-highlight')!;
+    expect(btn.tagName).toBe('BUTTON');
+    expect(btn.getAttribute('data-network')).toBe('net:cressey');
+    expect(btn.getAttribute('aria-pressed')).toBe('false');
+    expect(btn.textContent).toBe('Highlight on map');
+  });
+
+  it('has no toggle without a network node', () => {
+    expect(dom(renderOwnership(BIDWELL, CTX)).querySelector('.network-highlight')).toBeNull();
+  });
+});

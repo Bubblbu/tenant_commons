@@ -71,7 +71,11 @@ export class FakeMap {
   }
   getBounds(): { contains: () => boolean } { return { contains: () => true }; }
   invalidateSize(): this { return this; }
-  private fire(event: string): void { (this.handlers.get(event) ?? []).forEach((fn) => fn()); }
+  private fire(event: string, payload?: unknown): void {
+    (this.handlers.get(event) ?? []).forEach((fn) => (fn as (e?: unknown) => void)(payload));
+  }
+  /** Like Leaflet's popupopen: the event carries the popup, whose getElement() is its container. */
+  firePopupOpen(el: HTMLElement): void { this.fire('popupopen', { popup: { getElement: () => el } }); }
 }
 
 let frames: FrameRequestCallback[] = [];

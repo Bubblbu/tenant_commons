@@ -44,6 +44,8 @@ function networkNode(b: Building, ctx: PopupContext): string {
   return node('net', 'Network',
     `<strong>${escapeHtml(net.name)}</strong> <span class="popup-tier${weak ? ' weak' : ''}">${escapeHtml(LABELS.tier[net.tier])}</span>` +
     muted(escapeHtml(evidence)) + card +
+    // wiring/network-highlight.ts ties this to the network's Networks-table selection.
+    `<button type="button" class="network-highlight" data-network="${escapeHtml(net.id)}" aria-pressed="false">Highlight on map</button>` +
     entityLists(net.entities));
 }
 
