@@ -25,7 +25,8 @@
 .tc-popup .role { font-size: 10.5px; text-transform: uppercase; letter-spacing: .04em; color: #888; }
 .tc-popup .node.bldg .popup-row { margin-top: 4px; }
 .tc-popup .popup-v { flex: 1; min-width: 0; }
-.tc-popup .popup-stats { display: flex; gap: 12px; margin-top: 4px; border: 1px solid #e3e3e3; border-radius: 8px; padding: 6px 10px; }
+.tc-popup .net-card { margin-top: 4px; border: 1px solid #e3e3e3; border-radius: 8px; padding: 6px 10px; }
+.tc-popup .popup-stats { display: flex; gap: 12px; }
 .tc-popup .popup-stats b { display: block; font-size: 15px; }
 .tc-popup .popup-stats span { font-size: 11px; color: #777; }
 .tc-popup .popup-issue-num { color: #b5332c; }
@@ -41,9 +42,8 @@
 .tc-popup .popup-pids { margin-top: 2px; }
 .tc-popup details.popup-inline { display: inline; }
 .tc-popup details.popup-inline[open] { display: block; }
-.tc-popup .net-actions { margin-top: 4px; }
 .tc-popup .net-entities-intro { margin-top: 6px; }
-.tc-popup .net-actions { display: flex; flex-wrap: wrap; gap: 4px; }
+.tc-popup .net-actions { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; padding-top: 6px; border-top: 1px solid #eee; }
 .tc-popup .network-highlight, .tc-popup .network-table { flex: none; white-space: nowrap; border: 1px solid #c9d6ea; background: #f3f7fd; color: #2a6fb0; border-radius: 6px; padding: 2px 8px; font: inherit; font-size: 12px; cursor: pointer; }
 .tc-popup .network-highlight[aria-pressed="true"] { background: #2a6fb0; border-color: #2a6fb0; color: #fff; }
 .tc-popup .network-highlight:focus-visible, .tc-popup .network-table:focus-visible { outline: 2px solid #6b8fd6; outline-offset: 1px; }

@@ -138,10 +138,10 @@ describe('renderOwnership, highlight the network', () => {
     expect(btn.textContent).toBe('Highlight on map');
   });
 
-  it('sits beside the network name, before the evidence', () => {
-    const head = dom(renderOwnership(YORK, CTX)).querySelector('.net-head')!;
-    expect(head.querySelector('strong')!.textContent).toBe('Cressey Development Group');
-    expect(head.querySelector('.network-highlight')).not.toBeNull();
+  it('sits in the network card, under its totals', () => {
+    const card = dom(renderOwnership(YORK, CTX)).querySelector('.node.net .net-card')!;
+    expect(card.querySelector('.popup-stats')!.nextElementSibling!.className).toBe('net-actions');
+    expect(card.querySelectorAll('.net-actions button')).toHaveLength(2);
   });
 
   it('offers "View in table" beside it, keyed by the network', () => {
