@@ -16,6 +16,7 @@ import { createStatus, initCsvExport, watchMap } from './status-export';
 import { initLiveTables } from './tables-live';
 import { initLocate } from './locate';
 import { initNetworkHighlight } from './network-highlight';
+import { initNetworkTable } from './network-table';
 import type { WiringContext } from './types';
 
 export type { WiringContext } from './types';
@@ -46,6 +47,7 @@ export function startWiring(ctx: WiringContext, doc: Document = document): void 
   initCsvExport(index, ctx.map, ctx.buildingData, doc);
   initLocate(index, ctx.map, doc);
   initNetworkHighlight(ctx.map, doc);
+  initNetworkTable(ctx.landlordFilter, doc);
 
   doc.getElementById('filter-reset')?.addEventListener('click', () => {
     pass.resetFilters();

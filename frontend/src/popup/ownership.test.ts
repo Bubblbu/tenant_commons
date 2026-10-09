@@ -129,6 +129,12 @@ describe('renderOwnership, highlight the network', () => {
     expect(head.querySelector('.network-highlight')).not.toBeNull();
   });
 
+  it('offers "View in table" beside it, keyed by the network', () => {
+    const btn = dom(renderOwnership(YORK, CTX)).querySelector('.net-actions .network-table')!;
+    expect(btn.getAttribute('data-network')).toBe('net:cressey');
+    expect(btn.textContent).toBe('View in table');
+  });
+
   it('has no toggle without a network node', () => {
     expect(dom(renderOwnership(BIDWELL, CTX)).querySelector('.network-highlight')).toBeNull();
   });

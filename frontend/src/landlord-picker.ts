@@ -139,6 +139,8 @@ export interface LandlordFilter {
   picked(): PickOption[];
   /** Replaces the tiles; notifies listeners only if the selection changed. */
   set(picked: PickOption[]): void;
+  /** The suggestion for a landlord, group or manager key, if it has buildings. */
+  find(kind: PickKind, key: string): PickOption | undefined;
   onChange(listener: () => void): void;
 }
 
@@ -279,6 +281,7 @@ export function initLandlordPicker(options: PickOption[], els: PickerElements): 
       renderTiles();
       if (!same) changed();
     },
+    find: (kind, key) => options.find((o) => o.kind === kind && o.key === key),
     onChange: (listener) => listeners.push(listener),
   };
 }
