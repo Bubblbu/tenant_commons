@@ -24,7 +24,9 @@ describe('buildingRow', () => {
         'data-year-built="1965" data-search="12 oak &amp; elm st west end 40 example &quot;holdings&quot; example group sro" ' +
         'data-housing-type="sro" data-n-issues="" data-has-owner="1">' +
         '<td class="select-cell"><input type="checkbox" class="row-select" data-type="building" data-target="7"></td>' +
-        '<td>12 Oak &amp; Elm St</td><td></td><td data-sort-value="West End">West End</td>' +
+        '<td data-sort-value="12 Oak &amp; Elm St">12 Oak &amp; Elm St ' +
+        '<button type="button" class="locate-btn" data-locate="7" aria-label="Show 12 Oak &amp; Elm St on the map" ' +
+        'title="Show on the map">⌖</button></td><td></td><td data-sort-value="West End">West End</td>' +
         '<td data-sort-value="40">40</td>' +
         '<td>Example &quot;Holdings&quot;<div class="cell-sub">Group: Example Group</div></td>' +
         '<td data-sort-value="1965">1965</td><td data-sort-value=""></td></tr>',
@@ -59,12 +61,12 @@ describe('buildingRow', () => {
 
   it('shows the building name, and finds it by any of its names', () => {
     const row = buildingRow(rec({ building_name: 'Maple Apartments', other_names: ['The Maple Apts'] }));
-    expect(row).toContain('<td>A</td><td>Maple Apartments</td>');
+    expect(row).toContain('⌖</button></td><td>Maple Apartments</td>');
     expect(row).toMatch(/data-search="[^"]*maple apartments the maple apts/);
   });
 
   it('shows the address in readable form', () => {
-    expect(buildingRow(rec({ address: '350 e 6th ave' }))).toContain('<td>350 E 6th Ave</td>');
+    expect(buildingRow(rec({ address: '350 e 6th ave' }))).toContain('<td data-sort-value="350 E 6th Ave">350 E 6th Ave <button');
   });
 
   it('shows a building with no known landlord as not on record, not as a landlord', () => {

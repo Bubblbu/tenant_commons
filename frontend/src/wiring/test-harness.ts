@@ -42,6 +42,8 @@ export class FakeLayer {
   bringToFront(): this { this.unpaint(); this.paint.push(this); return this; }
   bringToBack(): this { this.unpaint(); this.paint.unshift(this); return this; }
   getLatLng(): { lat: number; lng: number } | null { return this.latlng; }
+  popupOpen = false;
+  openPopup(): this { this.popupOpen = true; return this; }
   addTo(map: FakeMap): this { map.addLayer(this); return this; }
   eachLayer(fn: (l: FakeLayer) => void): void { this.children.forEach(fn); }
   addLayer(l: FakeLayer): this { this.children.push(l); this.paint.push(l); return this; }
@@ -59,7 +61,14 @@ export class FakeMap {
   /** Like Leaflet: a marker inside a group on the map counts as on the map. */
   hasLayer(l: FakeLayer): boolean { return this.layers.has(l) || [...this.layers].some((g) => g.children.includes(l)); }
   on(event: string, fn: () => void): this { this.handlers.set(event, [...(this.handlers.get(event) ?? []), fn]); return this; }
-  getZoom(): number { return 14; }
+  zoom = 14;
+  view: { lat: number; lng: number; zoom: number } | null = null;
+  getZoom(): number { return this.zoom; }
+  setView(at: { lat: number; lng: number }, zoom: number): this {
+    this.view = { lat: at.lat, lng: at.lng, zoom };
+    this.zoom = zoom;
+    return this;
+  }
   getBounds(): { contains: () => boolean } { return { contains: () => true }; }
   invalidateSize(): this { return this; }
   private fire(event: string): void { (this.handlers.get(event) ?? []).forEach((fn) => fn()); }

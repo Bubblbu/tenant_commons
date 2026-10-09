@@ -145,6 +145,7 @@ export function buildingRow(r: BuildingRecord): string {
     .join(' ');
   const a = escapeHtml(area);
   const h = escapeHtml(housing);
+  const address = formatAddress(r.address);
   const chinatown = f.chinatown ? '1' : '';
   const village = f.village ? '1' : '';
   return (
@@ -158,7 +159,9 @@ export function buildingRow(r: BuildingRecord): string {
     `data-housing-type="${h}" data-n-issues="${nIssues}" data-has-owner="${onRecord ? '1' : ''}">` +
     `<td class="select-cell"><input type="checkbox" class="row-select" ` +
     `data-type="building" data-target="${bid}"></td>` +
-    `<td>${escapeHtml(formatAddress(r.address))}</td>` +
+    `<td data-sort-value="${escapeHtml(address)}">${escapeHtml(address)} ` +
+    `<button type="button" class="locate-btn" data-locate="${bid}" ` +
+    `aria-label="${escapeHtml(`Show ${address} on the map`)}" title="Show on the map">⌖</button></td>` +
     `<td>${escapeHtml(text(r.building_name))}</td>` +
     `<td data-sort-value="${a}">${a}</td>` +
     `<td data-sort-value="${units}">${units}</td>` +

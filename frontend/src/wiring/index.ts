@@ -14,6 +14,7 @@ import { buildMetricControls } from './metric-controls';
 import { initSelection } from './selection';
 import { createStatus, initCsvExport, watchMap } from './status-export';
 import { initLiveTables } from './tables-live';
+import { initLocate } from './locate';
 import type { WiringContext } from './types';
 
 export type { WiringContext } from './types';
@@ -42,6 +43,7 @@ export function startWiring(ctx: WiringContext, doc: Document = document): void 
   filterPass = pass;
   const display = initDisplay(ctx, markers, blocks, restack, pass.apply, doc);
   initCsvExport(index, ctx.map, ctx.buildingData, doc);
+  initLocate(index, ctx.map, doc);
 
   doc.getElementById('filter-reset')?.addEventListener('click', () => {
     pass.resetFilters();
