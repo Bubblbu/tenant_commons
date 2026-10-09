@@ -41,6 +41,8 @@
 .tc-popup .popup-pids { margin-top: 6px; }
 .tc-popup details.popup-inline { display: inline; }
 .tc-popup details.popup-inline[open] { display: block; }
-.tc-popup .network-highlight { margin-top: 5px; border: 1px solid #c9d6ea; background: #f3f7fd; color: #2a6fb0; border-radius: 6px; padding: 2px 8px; font: inherit; font-size: 12px; cursor: pointer; }
+.tc-popup .net-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 8px; }
+.tc-popup .net-entities-intro { margin-top: 6px; }
+.tc-popup .network-highlight { flex: none; white-space: nowrap; border: 1px solid #c9d6ea; background: #f3f7fd; color: #2a6fb0; border-radius: 6px; padding: 2px 8px; font: inherit; font-size: 12px; cursor: pointer; }
 .tc-popup .network-highlight[aria-pressed="true"] { background: #2a6fb0; border-color: #2a6fb0; color: #fff; }
 .tc-popup .network-highlight:focus-visible { outline: 2px solid #6b8fd6; outline-offset: 1px; }

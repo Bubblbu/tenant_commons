@@ -49,6 +49,13 @@ describe('renderOwnership', () => {
     expect(details[2].textContent).toContain('ROE, RICHARD (trustee)');
   });
 
+  it('introduces the people and companies as the entities the network links', () => {
+    const d = dom(renderOwnership(YORK, CTX));
+    const intro = d.querySelector('.net-entities-intro')!;
+    expect(intro.textContent).toMatch(/linked/i);
+    expect(intro.nextElementSibling!.tagName).toBe('DETAILS');
+  });
+
   it('lists companies by the buildings they own on the map, others last', () => {
     const items = [...dom(renderOwnership(YORK, CTX)).querySelectorAll('details')[1].querySelectorAll('li')]
       .map((li) => li.textContent!.replace(/\s+/g, ' ').replace(/i$/, '').trim());
@@ -114,6 +121,12 @@ describe('renderOwnership, highlight the network', () => {
     expect(btn.getAttribute('data-network')).toBe('net:cressey');
     expect(btn.getAttribute('aria-pressed')).toBe('false');
     expect(btn.textContent).toBe('Highlight on map');
+  });
+
+  it('sits beside the network name, before the evidence', () => {
+    const head = dom(renderOwnership(YORK, CTX)).querySelector('.net-head')!;
+    expect(head.querySelector('strong')!.textContent).toBe('Cressey Development Group');
+    expect(head.querySelector('.network-highlight')).not.toBeNull();
   });
 
   it('has no toggle without a network node', () => {

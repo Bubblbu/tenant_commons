@@ -26,8 +26,9 @@ function entityItem(e: NetworkEntity): string {
 function entityLists(entities: NetworkEntity[]): string {
   const people = entities.filter((e) => e.kind === 'person');
   const companies = entities.filter((e) => e.kind === 'company');
-  return collapsed(plural(people.length, 'person', 'people'), people.map(entityItem)) +
+  const lists = collapsed(plural(people.length, 'person', 'people'), people.map(entityItem)) +
     collapsed(plural(companies.length, 'company', 'companies'), companies.map(entityItem));
+  return lists && `<div class="popup-muted net-entities-intro">Linked in this network:</div>${lists}`;
 }
 
 function networkNode(b: Building, ctx: PopupContext): string {
@@ -41,12 +42,11 @@ function networkNode(b: Building, ctx: PopupContext): string {
     `<div><b>${t.buildings}</b><span>buildings</span></div>` +
     `<div><b>${t.units.toLocaleString('en-US')}</b><span>units</span></div>` +
     `<div><b class="popup-issue-num">${t.open_issues}</b><span>open issues</span></div></div>`;
-  return node('net', 'Network',
-    `<strong>${escapeHtml(net.name)}</strong> <span class="popup-tier${weak ? ' weak' : ''}">${escapeHtml(LABELS.tier[net.tier])}</span>` +
-    muted(escapeHtml(evidence)) + card +
-    // wiring/network-highlight.ts ties this to the network's Networks-table selection.
-    `<button type="button" class="network-highlight" data-network="${escapeHtml(net.id)}" aria-pressed="false">Highlight on map</button>` +
-    entityLists(net.entities));
+  // wiring/network-highlight.ts ties the button to the network's Networks-table selection.
+  const head = `<div class="net-head"><div><strong>${escapeHtml(net.name)}</strong> ` +
+    `<span class="popup-tier${weak ? ' weak' : ''}">${escapeHtml(LABELS.tier[net.tier])}</span></div>` +
+    `<button type="button" class="network-highlight" data-network="${escapeHtml(net.id)}" aria-pressed="false">Highlight on map</button></div>`;
+  return node('net', 'Network', head + muted(escapeHtml(evidence)) + card + entityLists(net.entities));
 }
 
 function registryLine(p: Party): string {
