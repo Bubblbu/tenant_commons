@@ -29,6 +29,7 @@ import {
 import { initLegendToggle, renderLegend } from './legend';
 import { markerStyle } from './markers';
 import { initPopupTabs, renderPopup } from './popup/index';
+import { belowPopup } from './popup/below';
 import { initTipDismiss } from './provenance';
 import { initClearButton } from './search-clear';
 import { initTableSearch } from './table-search';
@@ -73,13 +74,11 @@ async function main(): Promise<void> {
   };
   // Lazy: the markup is built on first open, from the building as published.
   const buildings = createBuildingLayers(styled, (marker, m) => {
-    marker.bindPopup(
-      () => {
-        const b = artifacts.buildings[String(m.b_id)];
-        return b ? renderPopup(b, popupCtx) : '';
-      },
-      { maxWidth: 320 },
-    );
+    // Below the pin, so switching tabs moves only the popup's bottom edge.
+    marker.bindPopup(belowPopup({ maxWidth: 320 }).setContent(() => {
+      const b = artifacts.buildings[String(m.b_id)];
+      return b ? renderPopup(b, popupCtx) : '';
+    }));
   });
   initPopupTabs(document);
   buildings.buildings.addTo(map);

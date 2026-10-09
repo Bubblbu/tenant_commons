@@ -58,7 +58,7 @@ export function renderPopup(b: Building, ctx: PopupContext): string {
   const bodies = TABS.map(([id]) =>
     `<div role="tabpanel" class="tc-panel" id="tc-panel-${id}" aria-labelledby="tc-tab-${id}"${id === remembered ? '' : ' hidden'}>${panels[id]}</div>`,
   ).join('');
-  return `<div class="tc-popup">${header(b)}<div role="tablist" class="tc-tabs">${tabs}</div><div class="tc-panels">${bodies}</div></div>`;
+  return `<div class="tc-popup">${header(b)}<div role="tablist" class="tc-tabs">${tabs}</div>${bodies}</div>`;
 }
 
 function select(popup: Element, id: TabId, focus: boolean): void {
