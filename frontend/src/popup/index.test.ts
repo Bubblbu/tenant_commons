@@ -5,6 +5,12 @@ import { currentTab, initPopupTabs, renderPopup, resetTabMemory } from './index'
 
 beforeEach(() => resetTabMemory());
 
+const text = (html: string) => {
+  const d = document.createElement('div');
+  d.innerHTML = html;
+  return d.textContent!.replace(/\s+/g, ' ');
+};
+
 function mount(html: string): HTMLElement {
   document.body.innerHTML = html;
   return document.body.firstElementChild as HTMLElement;
@@ -60,5 +66,32 @@ describe('renderPopup', () => {
     const evil = '<img src=x onerror=alert(1)>';
     const html = renderPopup({ ...YORK, name: evil, parties: YORK.parties.map((p) => ({ ...p, name: evil })) }, CTX);
     expect(html).not.toContain('<img');
+  });
+});
+
+describe('renderPopup header, parcels', () => {
+  it('shows the building\'s PID', () => {
+    expect(text(renderPopup(YORK, CTX))).toContain('PID 007-273-924');
+  });
+
+  it('collapses a long PID list behind the first three', () => {
+    const pids = ['001-000-001', '001-000-002', '001-000-003', '001-000-004', '001-000-005'];
+    const html = renderPopup({ ...YORK, pids }, CTX);
+    expect(text(html)).toContain('PIDs 001-000-001, 001-000-002, 001-000-003');
+    const more = mount(html).querySelector<HTMLDetailsElement>('.popup-pids details')!;
+    expect(more.querySelector('summary')!.textContent).toBe('+2 more');
+    expect(more.open).toBe(false);
+    expect(more.textContent).toContain('001-000-005');
+  });
+
+  it('sits in the header, under the building details and above the tabs', () => {
+    const el = mount(renderPopup(YORK, CTX));
+    const pids = el.querySelector('.popup-pids')!;
+    expect(pids.previousElementSibling!.className).toBe('popup-sub');
+    expect(pids.nextElementSibling!.className).toBe('tc-tabs');
+  });
+
+  it('says nothing about parcels when none is known', () => {
+    expect(text(renderPopup(BIDWELL, CTX))).not.toContain('PID');
   });
 });

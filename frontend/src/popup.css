@@ -38,7 +38,7 @@
 .tc-popup .median-row { position: relative; height: 12px; }
 .tc-popup .median-label { position: absolute; transform: translateX(-50%); white-space: nowrap; font-size: 9.5px; color: #999; }
 .tc-popup .median-label::before { content: ''; position: absolute; left: 50%; top: -3px; width: 1px; height: 3px; background: #bbb; }
-.tc-popup .popup-pids { margin-top: 6px; }
+.tc-popup .popup-pids { margin-top: 2px; }
 .tc-popup details.popup-inline { display: inline; }
 .tc-popup details.popup-inline[open] { display: block; }
 .tc-popup .net-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 8px; }

@@ -44,25 +44,3 @@ describe('renderSummary', () => {
     expect(t).toContain('Only building we know of for this owner');
   });
 });
-
-describe('renderSummary, parcels', () => {
-  it('shows the building\'s PID', () => {
-    expect(text(renderSummary(YORK, CTX))).toContain('PID 007-273-924');
-  });
-
-  it('collapses a long PID list behind the first three', () => {
-    const pids = ['001-000-001', '001-000-002', '001-000-003', '001-000-004', '001-000-005'];
-    const html = renderSummary({ ...YORK, pids }, CTX);
-    expect(text(html)).toContain('PIDs 001-000-001, 001-000-002, 001-000-003');
-    const d = document.createElement('div');
-    d.innerHTML = html;
-    const more = d.querySelector('details')!;
-    expect(more.querySelector('summary')!.textContent).toBe('+2 more');
-    expect(more.open).toBe(false);
-    expect(more.textContent).toContain('001-000-005');
-  });
-
-  it('says nothing about parcels when none is known', () => {
-    expect(text(renderSummary(BIDWELL, CTX))).not.toContain('PID');
-  });
-});

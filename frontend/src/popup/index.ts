@@ -25,12 +25,25 @@ let remembered: TabId = 'summary';
 export const currentTab = (): TabId => remembered;
 export const resetTabMemory = (): void => { remembered = 'summary'; };
 
+const SHOWN_PIDS = 3;
+
+/** The building's parcels: a few PIDs inline (for a registry search), the rest collapsed. */
+function parcels(b: Building): string {
+  if (!b.pids.length) return '';
+  const label = b.pids.length === 1 ? 'PID' : 'PIDs';
+  const shown = b.pids.slice(0, SHOWN_PIDS).join(', ');
+  const rest = b.pids.slice(SHOWN_PIDS);
+  const more = rest.length
+    ? ` <details class="popup-inline"><summary>+${rest.length} more</summary>${escapeHtml(rest.join(', '))}</details>` : '';
+  return `<div class="popup-muted popup-pids">${escapeHtml(`${label} ${shown}`)}${more}</div>`;
+}
+
 function header(b: Building): string {
   const units = b.units === null ? '' : `${b.units.toLocaleString('en-US')} ${b.sro && b.units_basis !== 'licence_fee' ? 'rooms' : 'units'}`;
   const sub = [b.name ?? '', b.local_area ?? '', units, b.year_built === null ? '' : `built ${b.year_built}`]
     .filter(Boolean).join(' · ');
   return `<div class="popup-address">${escapeHtml(formatAddress(b.address))}</div>` +
-    (sub ? `<div class="popup-sub">${escapeHtml(sub)}</div>` : '');
+    (sub ? `<div class="popup-sub">${escapeHtml(sub)}</div>` : '') + parcels(b);
 }
 
 export function renderPopup(b: Building, ctx: PopupContext): string {
