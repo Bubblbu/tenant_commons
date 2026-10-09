@@ -34,7 +34,7 @@ describe('renderOwnership', () => {
 
   it('shows network evidence and the portfolio card', () => {
     const t = text(renderOwnership(YORK, CTX));
-    expect(t).toContain('7 registry filings + 9 VTU research claims');
+    expect(t).toContain('One landlord: its companies and people are linked by 7 registry filings and 9 VTU research claims.');
     expect(t).toMatch(/10\s*buildings/);
     expect(t).toMatch(/609\s*units/);
     expect(t).toMatch(/2\s*open issues/);
@@ -109,8 +109,23 @@ describe('renderOwnership, City records', () => {
   it('counts City records as their own evidence, leaving out empty kinds', () => {
     const net = { ...NETWORKS['net:cressey'], evidence: { registry: 0, city_records: 4, vtu_research: 1 } };
     const t = text(renderOwnership(YORK, { ...CTX, networks: { ...NETWORKS, 'net:cressey': net } }));
-    expect(t).toContain('4 City records + 1 VTU research claim');
+    expect(t).toContain('linked by 4 City records and 1 VTU research claim.');
     expect(t).not.toContain('0 registry');
+  });
+
+  it('explains only the sources it counts, on hover', () => {
+    const net = { ...NETWORKS['net:cressey'], evidence: { registry: 0, city_records: 4, vtu_research: 1 } };
+    const d = dom(renderOwnership(YORK, { ...CTX, networks: { ...NETWORKS, 'net:cressey': net } }));
+    const tip = d.querySelector('.node.net > .popup-muted .prov')!.getAttribute('data-tip')!;
+    expect(tip).toContain("City record: the City's SRO inventory");
+    expect(tip).toContain('VTU research:');
+    expect(tip).not.toContain('Registry filing');
+  });
+
+  it('says a name-matched network is not confirmed', () => {
+    const net = { ...NETWORKS['net:cressey'], tier: 'name_match' as const };
+    const t = text(renderOwnership(YORK, { ...CTX, networks: { ...NETWORKS, 'net:cressey': net } }));
+    expect(t).toContain('Buildings owned under the same name. Nothing yet confirms they are one landlord.');
   });
 });
 

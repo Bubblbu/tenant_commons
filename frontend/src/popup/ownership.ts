@@ -1,6 +1,6 @@
 /** Ownership tab — the organizer's chain: network → on title → this building (spec 2026-10-08 §6). */
 import { formatAddress } from '../address';
-import type { Building, NetworkEntity, Party } from '../contract.gen';
+import type { Building, Network, NetworkEntity, Party } from '../contract.gen';
 import { escapeHtml } from '../html';
 import { evidenceParts, provenanceIcon } from '../provenance';
 import { LABELS } from './labels';
@@ -31,12 +31,28 @@ function entityLists(entities: NetworkEntity[]): string {
   return lists && `<div class="popup-muted net-entities-intro">Linked in this network:</div>${lists}`;
 }
 
+const SOURCE_MEANING: [keyof Network['evidence'], string][] = [
+  ['registry', 'Registry filing: the BC Land Owner Transparency Registry links them on a title.'],
+  ['city_records', "City record: the City's SRO inventory names the person behind a company."],
+  ['vtu_research', "VTU research: links found in VTU's own ownership research."],
+];
+
+/** Why these landlords are one network, in a sentence that stands on its own. */
+function networkBasis(net: Network): string {
+  if (net.tier !== 'confirmed') {
+    return escapeHtml('Buildings owned under the same name. Nothing yet confirms they are one landlord.');
+  }
+  const parts = evidenceParts(net.evidence, 'registry filing');
+  const listed = parts.length > 1 ? `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}` : parts[0];
+  const meaning = SOURCE_MEANING.filter(([k]) => net.evidence[k] > 0).map(([, m]) => m).join(' ');
+  return escapeHtml(`One landlord: its companies and people are linked by ${listed ?? 'ownership claims'}.`) +
+    (meaning ? provenanceIcon(meaning, 'Sources') : '');
+}
+
 function networkNode(b: Building, ctx: PopupContext): string {
   const net = b.network_id ? ctx.networks[b.network_id] : undefined;
   if (!net || (net.tier !== 'confirmed' && net.totals.buildings <= 1)) return '';
   const weak = net.tier !== 'confirmed';
-  const evidence = weak ? 'Grouped by the same owner name'
-    : evidenceParts(net.evidence, 'registry filing').join(' + ');
   const t = net.totals;
   const card = `<div class="popup-stats">` +
     `<div><b>${t.buildings}</b><span>buildings</span></div>` +
@@ -48,7 +64,7 @@ function networkNode(b: Building, ctx: PopupContext): string {
     `<span class="popup-tier${weak ? ' weak' : ''}">${escapeHtml(LABELS.tier[net.tier])}</span></div>` +
     `<div class="net-actions"><button type="button" class="network-highlight" data-network="${escapeHtml(net.id)}" aria-pressed="false">Highlight on map</button>` +
     `<button type="button" class="network-table" data-network="${escapeHtml(net.id)}">View in table</button></div></div>`;
-  return node('net', 'Network', head + muted(escapeHtml(evidence)) + card + entityLists(net.entities));
+  return node('net', 'Network', head + muted(networkBasis(net)) + card + entityLists(net.entities));
 }
 
 function registryLine(p: Party): string {
