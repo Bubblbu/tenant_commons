@@ -392,7 +392,7 @@
       "properties": {
         "entities": {
           "items": {
-            "type": "string"
+            "$ref": "#/$defs/NetworkEntity"
           },
           "title": "Entities",
           "type": "array"
@@ -438,6 +438,43 @@
         "totals"
       ],
       "title": "Network",
+      "type": "object"
+    },
+    "NetworkEntity": {
+      "additionalProperties": false,
+      "description": "One entity in a network: spellings that differ only in punctuation or\ncase, or that a confirmed same_entity claim links, are one entity.",
+      "properties": {
+        "also_named": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Also Named",
+          "type": "array"
+        },
+        "buildings": {
+          "title": "Buildings",
+          "type": "integer"
+        },
+        "kind": {
+          "enum": [
+            "person",
+            "company"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "also_named",
+        "kind",
+        "buildings"
+      ],
+      "title": "NetworkEntity",
       "type": "object"
     },
     "NetworkTotals": {

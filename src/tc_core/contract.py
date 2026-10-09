@@ -139,13 +139,23 @@ class NetworkTotals(_Model):
     properties_on_title: Int | None
 
 
+class NetworkEntity(_Model):
+    """One entity in a network: spellings that differ only in punctuation or
+    case, or that a confirmed same_entity claim links, are one entity."""
+
+    name: Text  # the registry's spelling where there is one
+    also_named: list[Text]
+    kind: Literal["person", "company"]
+    buildings: Int  # buildings on the map it owns (on title, jointly, or per the SRO inventory)
+
+
 class Network(_Model):
     id: Text
     name: Text
     name_source: Literal["claim", "default"]
     tier: Literal["confirmed", "name_match"]
     evidence: Evidence
-    entities: list[Text]
+    entities: list[NetworkEntity]
     totals: NetworkTotals
 
 

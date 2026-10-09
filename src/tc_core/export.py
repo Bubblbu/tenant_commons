@@ -51,6 +51,7 @@ from .metrics.registry_owners import (
     build_registry_owners,
     build_registry_searches,
     building_pids,
+    entity_kinds,
 )
 from .normalize import sanitize_owner
 from .sro_names import SroName, load_sro_names
@@ -1042,5 +1043,8 @@ def _contract_records(
             str(int(r["b_id"])): build_building(r, shares=shares, clusters=clusters) for r in rows
         },
     )
-    nets = NetworksFile(schema_version=SCHEMA_VERSION, networks=build_networks(rows))
+    nets = NetworksFile(
+        schema_version=SCHEMA_VERSION,
+        networks=build_networks(rows, clusters=clusters, kinds=entity_kinds(conn)),
+    )
     return buildings.model_dump(mode="json"), nets.model_dump(mode="json"), shares.median

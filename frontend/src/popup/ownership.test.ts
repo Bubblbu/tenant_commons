@@ -24,12 +24,28 @@ describe('renderOwnership', () => {
     expect(t).toMatch(/2\s*open issues/);
   });
 
-  it('collapses linked entities and interest holders, with interest types', () => {
+  it('collapses the network people, its companies and the interest holders, with interest types', () => {
     const d = dom(renderOwnership(YORK, CTX));
     const details = [...d.querySelectorAll('details')];
-    expect(details.map((x) => x.querySelector('summary')!.textContent)).toEqual(['18 linked entities', '2 interest holders']);
+    expect(details.map((x) => x.querySelector('summary')!.textContent)).toEqual(
+      ['2 people', '16 companies', '2 interest holders']);
     expect(details.every((x) => !x.open)).toBe(true);
-    expect(details[1].textContent).toContain('ROE, RICHARD (trustee)');
+    expect(details[2].textContent).toContain('ROE, RICHARD (trustee)');
+  });
+
+  it('lists companies by the buildings they own on the map, others last', () => {
+    const items = [...dom(renderOwnership(YORK, CTX)).querySelectorAll('details')[1].querySelectorAll('li')]
+      .map((li) => li.textContent!.replace(/\s+/g, ' ').replace(/i$/, '').trim());
+    expect(items[0]).toBe('Victoria Place Apts. Ltd. 2 buildings');
+    expect(items[1]).toBe('Yorkshire Place Apts. Ltd. 1 building');
+    expect(items[2]).toBe('Cressey Holding 0 Ltd not on the map');
+  });
+
+  it('gives other spellings of an entity on hover', () => {
+    const d = dom(renderOwnership(YORK, CTX));
+    const people = d.querySelectorAll('details')[0];
+    expect(people.textContent).toContain('Cressey, Norman Edward');
+    expect(people.querySelector('.prov')!.getAttribute('data-tip')).toBe('Also named: Norman Cressey');
   });
 
   it('shows the owner with PID, registry date and "Licensed as" for a differently spelled licence', () => {

@@ -115,3 +115,42 @@ def test_network_evidence_carries_city_records():
         network_evidence={"registry": 1, "city_records": 4, "vtu_research": 0}, units=10, n_issues=0,
     )])
     assert nets["net:wall"].evidence.city_records == 4
+
+
+def _wall_rows():
+    base = dict(network_key="net:wall", network_name="1235922 B.C. LTD.", network_source="claims",
+                network_name_source=None, network_properties_on_title=3,
+                network_evidence={"registry": 2, "city_records": 1, "vtu_research": 0}, n_issues=0,
+                network_entities=["1030163 B.C. LTD.", "1030163 BC Ltd", "Chris Wall",
+                                  "WALL, CHRISTOPHER ROBERT", "UNITED ROOMS INC.", "Cressey Development Corp",
+                                  "Cressey Development Corporation"])
+    return [
+        {**base, "units": 10, "owner_name": "1030163 B.C. LTD.", "owner_source": "registry",
+         "registry_owner_pids": [{"name": "1030163 B.C. LTD.", "pids": ["1"]}]},
+        {**base, "units": 5, "owner_name": "1030163 BC Ltd", "owner_source": "sro_list",
+         "registry_owner_pids": [], "sro_owners": ["1030163 BC Ltd"]},
+        {**base, "units": 0, "owner_name": "Someone Else Ltd", "owner_source": "licence", "registry_owner_pids": []},
+    ]
+
+
+def test_network_entities_merge_spellings_and_same_entity_claims():
+    clusters = {"Chris Wall": "Chris Wall / WALL, CHRISTOPHER ROBERT",
+                "WALL, CHRISTOPHER ROBERT": "Chris Wall / WALL, CHRISTOPHER ROBERT"}
+    kinds = {"WALL, CHRISTOPHER ROBERT": "person", "1030163 B.C. LTD.": "company"}
+    ents = build_networks(_wall_rows(), clusters=clusters, kinds=kinds)["net:wall"].entities
+    got = [(e.name, e.also_named, e.kind, e.buildings) for e in ents]
+    assert got == [
+        ("WALL, CHRISTOPHER ROBERT", ["Chris Wall"], "person", 0),
+        ("1030163 B.C. LTD.", ["1030163 BC Ltd"], "company", 2),  # registry spelling; both buildings
+        # Punctuation-only variants merge; different words (Corp/Corporation) do not.
+        ("Cressey Development Corp", [], "company", 0),
+        ("Cressey Development Corporation", [], "company", 0),
+        ("UNITED ROOMS INC.", [], "company", 0),
+    ]
+
+
+def test_entity_kind_falls_back_to_the_name():
+    ents = build_networks(_wall_rows(), clusters={}, kinds={})["net:wall"].entities
+    kinds = {e.name: e.kind for e in ents}
+    assert kinds["Chris Wall"] == "person" and kinds["UNITED ROOMS INC."] == "company"
+    assert kinds["1030163 B.C. LTD."] == "company"

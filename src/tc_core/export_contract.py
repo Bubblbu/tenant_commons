@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import bisect
 import math
+import re
 from collections.abc import Iterable, Mapping
 from statistics import median
 
@@ -13,6 +14,7 @@ from .contract import (
     Evidence,
     Issues,
     Network,
+    NetworkEntity,
     NetworkTotals,
     RegistrySearch,
     Rezoning,
@@ -167,10 +169,70 @@ def build_building(row: Mapping[str, object], *, shares: LandShares, clusters: M
     )
 
 
-def build_networks(rows: Iterable[Mapping[str, object]]) -> dict[str, Network]:
+_COMPANY_WORDS = re.compile(
+    r"\b(ltd|limited|inc|incorporated|corp|corporation|co|company|society|association|"
+    r"partnership|holdings?|properties|group|foundation|trust|enterprises|ventures|"
+    r"investments?|realty|developments?|management|hotel|apartments|gp)\b",
+    re.IGNORECASE,
+)
+
+
+def _name_key(name: str) -> str:
+    """Spellings differing only in punctuation or case ("1030163 B.C. LTD." /
+    "1030163 BC Ltd"); stricter than export_parties.match_key, which would
+    also join "Development Corp" and "Developments Ltd"."""
+    return re.sub(r"[^a-z0-9]", "", name.lower())
+
+
+def _guess_kind(name: str) -> str:
+    return "company" if _COMPANY_WORDS.search(name) or re.search(r"\d{5,}", name) else "person"
+
+
+def _owner_names(row: Mapping[str, object]) -> list[str]:
+    """The building's owners: on title, else its SRO-listed (joint) owners."""
+    registry = row.get("registry_owner_pids") or []
+    if registry:
+        return [e["name"] for e in registry]
+    if row.get("owner_source") == "sro_list":
+        return list(row.get("sro_owners") or []) or [n for n in [_text(row.get("owner_name"))] if n]
+    return []
+
+
+def _network_entities(
+    names: list[str], members: list[Mapping[str, object]],
+    clusters: Mapping[str, str], kinds: Mapping[str, str],
+) -> list[NetworkEntity]:
+    groups: dict[str, list[str]] = {}
+    for name in names:
+        key = clusters.get(name) or _name_key(name)
+        groups.setdefault(key, []).append(name)
+    # A name's group, whether reached by spelling or by a same_entity claim.
+    group_of = {_name_key(n): k for k, ns in groups.items() for n in ns}
+    owned: dict[str, int] = dict.fromkeys(groups, 0)
+    for row in members:
+        for key in {group_of.get(_name_key(n)) for n in _owner_names(row)} - {None}:
+            owned[key] += 1
+    entities = []
+    for key, spellings in groups.items():
+        registry = sorted(n for n in spellings if n in kinds)
+        name = registry[0] if registry else sorted(spellings)[0]
+        kind = next((kinds[n] for n in registry), None) or _guess_kind(name)
+        entities.append(NetworkEntity(
+            name=name, also_named=sorted(n for n in spellings if n != name), kind=kind, buildings=owned[key],
+        ))
+    return sorted(entities, key=lambda e: (e.kind != "person", -e.buildings, e.name))
+
+
+def build_networks(
+    rows: Iterable[Mapping[str, object]],
+    clusters: Mapping[str, str] | None = None,
+    kinds: Mapping[str, str] | None = None,
+) -> dict[str, Network]:
     """One record per network key on the map: claims networks are
     `confirmed`; every other grouping (licence name, SRO owner, an owner on
-    its own) is a `name_match`."""
+    its own) is a `name_match`. `clusters` is claims.resolve_entity_clusters()
+    output; `kinds` maps registry names to "person"/"company"."""
+    clusters, kinds = clusters or {}, kinds or {}
     networks: dict[str, Network] = {}
     for key, members in _group_rows(rows).items():
         first = members[0]
@@ -184,7 +246,10 @@ def build_networks(rows: Iterable[Mapping[str, object]]) -> dict[str, Network]:
             evidence=Evidence(registry=int(evidence.get("registry", 0)),
                               city_records=int(evidence.get("city_records", 0)),
                               vtu_research=int(evidence.get("vtu_research", 0))),
-            entities=[e for e in (_text(v) for v in (first.get("network_entities") or [])) if e],
+            entities=_network_entities(
+                [e for e in (_text(v) for v in (first.get("network_entities") or [])) if e],
+                members, clusters, kinds,
+            ),
             totals=NetworkTotals(
                 buildings=len(members),
                 units=sum(_int(r.get("units")) or 0 for r in members),

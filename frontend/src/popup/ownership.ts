@@ -1,6 +1,6 @@
 /** Ownership tab — the organizer's chain: network → on title → this building (spec 2026-10-08 §6). */
 import { formatAddress } from '../address';
-import type { Building, Party } from '../contract.gen';
+import type { Building, NetworkEntity, Party } from '../contract.gen';
 import { escapeHtml } from '../html';
 import { evidenceParts, provenanceIcon } from '../provenance';
 import { LABELS } from './labels';
@@ -14,6 +14,21 @@ const node = (cls: string, role: string, body: string) =>
   `<div class="node ${cls}"><div class="role">${role}</div>${body}</div>`;
 const collapsed = (label: string, items: string[]) =>
   items.length ? `<details><summary>${escapeHtml(label)}</summary><ul>${items.map((i) => `<li>${i}</li>`).join('')}</ul></details>` : '';
+
+function entityItem(e: NetworkEntity): string {
+  const aka = e.also_named.length ? provenanceIcon(`Also named: ${e.also_named.join('; ')}`) : '';
+  const held = e.kind === 'person' ? ''
+    : ` <span class="popup-muted">${e.buildings ? plural(e.buildings, 'building', 'buildings') : 'not on the map'}</span>`;
+  return `${escapeHtml(e.name)}${held}${aka}`;
+}
+
+/** The network's people, then its companies (most buildings on the map first, as exported). */
+function entityLists(entities: NetworkEntity[]): string {
+  const people = entities.filter((e) => e.kind === 'person');
+  const companies = entities.filter((e) => e.kind === 'company');
+  return collapsed(plural(people.length, 'person', 'people'), people.map(entityItem)) +
+    collapsed(plural(companies.length, 'company', 'companies'), companies.map(entityItem));
+}
 
 function networkNode(b: Building, ctx: PopupContext): string {
   const net = b.network_id ? ctx.networks[b.network_id] : undefined;
@@ -29,7 +44,7 @@ function networkNode(b: Building, ctx: PopupContext): string {
   return node('net', 'Network',
     `<strong>${escapeHtml(net.name)}</strong> <span class="popup-tier${weak ? ' weak' : ''}">${escapeHtml(LABELS.tier[net.tier])}</span>` +
     muted(escapeHtml(evidence)) + card +
-    collapsed(plural(net.entities.length, 'linked entity', 'linked entities'), net.entities.map(escapeHtml)));
+    entityLists(net.entities));
 }
 
 function registryLine(p: Party): string {

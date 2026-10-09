@@ -192,3 +192,17 @@ def test_building_pids_come_from_every_address_point_and_are_dashed(tmp_path):
         "139 e cordova st": ["004-410-785", "004-410-786"],
         "1 main st": ["011-111-111"],
     }
+
+
+def test_entity_kinds_come_from_the_registrys_holder_type():
+    from tc_core.metrics.registry_owners import entity_kinds
+
+    conn = _conn()
+    conn.executemany(
+        "INSERT INTO raw_lotr_ownership (pid, reporting_body_name, type_of_interest, holder_type, holder_name, "
+        "data_fetch_status, ingested_at) VALUES ('1', ?, ?, ?, ?, 'SUCCESS', 'now')",
+        [("A LTD.", "RB_CORPORATION", "CORPORATION", "A LTD."),
+         ("A LTD.", "INTEREST_HOLDER", "INDIVIDUAL", "DOE, JANE"),
+         ("Wong, Allen", "RB_TRUSTEE_INDIVIDUAL", "INDIVIDUAL", "Wong, Allen")],
+    )
+    assert entity_kinds(conn) == {"A LTD.": "company", "DOE, JANE": "person", "Wong, Allen": "person"}

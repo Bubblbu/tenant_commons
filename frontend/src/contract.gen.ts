@@ -75,15 +75,19 @@ export type LandShare = number;
 export type LandSharePctl = number;
 export type YearBuilt = number | null;
 export type SchemaVersion = 2;
-export type Entities = string[];
+export type AlsoNamed = string[];
+export type Buildings = number;
+export type Kind1 = "person" | "company";
+export type Name2 = string;
+export type Entities = NetworkEntity[];
 export type CityRecords = number;
 export type Registry = number;
 export type VtuResearch = number;
 export type Id1 = string;
-export type Name2 = string;
+export type Name3 = string;
 export type NameSource = "claim" | "default";
 export type Tier = "confirmed" | "name_match";
-export type Buildings = number;
+export type Buildings1 = number;
 export type OpenIssues = number;
 export type PropertiesOnTitle = number | null;
 export type Units1 = number;
@@ -234,10 +238,23 @@ export interface Network {
   entities: Entities;
   evidence: Evidence;
   id: Id1;
-  name: Name2;
+  name: Name3;
   name_source: NameSource;
   tier: Tier;
   totals: NetworkTotals;
+}
+/**
+ * One entity in a network: spellings that differ only in punctuation or
+ * case, or that a confirmed same_entity claim links, are one entity.
+ *
+ * This interface was referenced by `Contract`'s JSON-Schema
+ * via the `definition` "NetworkEntity".
+ */
+export interface NetworkEntity {
+  also_named: AlsoNamed;
+  buildings: Buildings;
+  kind: Kind1;
+  name: Name2;
 }
 /**
  * Confirmed claims linking the network, by public source category:
@@ -257,7 +274,7 @@ export interface Evidence {
  * via the `definition` "NetworkTotals".
  */
 export interface NetworkTotals {
-  buildings: Buildings;
+  buildings: Buildings1;
   open_issues: OpenIssues;
   properties_on_title: PropertiesOnTitle;
   units: Units1;

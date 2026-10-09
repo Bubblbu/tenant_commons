@@ -14,10 +14,18 @@ const base = (b: Partial<Building> & Pick<Building, 'id' | 'address'>): Building
 
 export const NETWORKS: Record<string, Network> = {
   'net:cressey': { id: 'net:cressey', name: 'Cressey Development Group', name_source: 'claim', tier: 'confirmed',
-    evidence: { registry: 7, city_records: 0, vtu_research: 9 }, entities: Array.from({ length: 18 }, (_, i) => `Entity ${i}`),
+    evidence: { registry: 7, city_records: 0, vtu_research: 9 },
+    entities: [
+      { name: 'Cressey, Norman Edward', also_named: ['Norman Cressey'], kind: 'person', buildings: 0 },
+      { name: 'Cressey, Scott Edward', also_named: [], kind: 'person', buildings: 0 },
+      { name: 'Victoria Place Apts. Ltd.', also_named: [], kind: 'company', buildings: 2 },
+      { name: 'Yorkshire Place Apts. Ltd.', also_named: ['Yorkshire Place Apt Ltd'], kind: 'company', buildings: 1 },
+      ...Array.from({ length: 14 }, (_, i) => ({ name: `Cressey Holding ${i} Ltd`, also_named: [], kind: 'company' as const, buildings: 0 })),
+    ],
     totals: { buildings: 10, units: 609, open_issues: 2, properties_on_title: 10 } },
   'net:lotus': { id: 'net:lotus', name: 'Lotus Capital', name_source: 'claim', tier: 'confirmed',
-    evidence: { registry: 55, city_records: 0, vtu_research: 8 }, entities: ['A', 'B'],
+    evidence: { registry: 55, city_records: 0, vtu_research: 8 },
+    entities: [{ name: 'A Ltd', also_named: [], kind: 'company', buildings: 1 }],
     totals: { buildings: 10, units: 500, open_issues: 3, properties_on_title: 11 } },
   'bc-housing': { id: 'bc-housing', name: 'BC Housing', name_source: 'default', tier: 'name_match',
     evidence: { registry: 0, city_records: 0, vtu_research: 0 }, entities: [],

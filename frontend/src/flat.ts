@@ -43,7 +43,7 @@ export function flatten(b: Building, networks: Record<string, Network>): Buildin
     network_name: net?.name ?? null,
     network_source: net ? (net.tier === 'confirmed' ? 'claims' : 'name_match') : null,
     network_name_source: net?.name_source ?? null,
-    network_entities: net?.entities ?? null,
+    network_entities: net ? net.entities.map((e) => e.name) : null,
     network_evidence: net ? net.evidence : null,
     network_evidence_registry: net ? net.evidence.registry : null,
     network_evidence_city: net ? net.evidence.city_records : null,

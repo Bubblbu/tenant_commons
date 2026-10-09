@@ -88,7 +88,11 @@ def test_building_owner_is_its_registry_body_within_a_claims_network(tmp_path):
     net = network(out, rec)
     assert (net["id"], net["name"], net["tier"], net["name_source"]) == (
         "net:glr-properties-ltd", "GLR PROPERTIES LTD.", "confirmed", "default")
-    assert net["entities"] == ["GLR PROPERTIES LTD.", "RENER, GEORGE", "ST. GEORGE ESTATES LTD."]
+    assert [(e["name"], e["kind"], e["buildings"]) for e in net["entities"]] == [
+        ("RENER, GEORGE", "person", 0),
+        ("GLR PROPERTIES LTD.", "company", 1),
+        ("ST. GEORGE ESTATES LTD.", "company", 1),
+    ]
     assert net["totals"]["buildings"] == 2
     assert net["totals"]["properties_on_title"] == 3
     assert net["evidence"] == {"registry": 2, "city_records": 0, "vtu_research": 1}
