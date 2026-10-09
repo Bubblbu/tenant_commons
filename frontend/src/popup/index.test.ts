@@ -23,6 +23,11 @@ describe('renderPopup', () => {
     expect(html).toContain('Yorkshire Apartments · Kitsilano · 43 units · built 1979');
   });
 
+  it('stacks the panels in one container, so switching tabs keeps the popup size', () => {
+    const el = mount(renderPopup(YORK, CTX));
+    expect(el.querySelectorAll('.tc-panels > .tc-panel')).toHaveLength(3);
+  });
+
   it('opens on Summary, with three tabs', () => {
     const el = mount(renderPopup(YORK, CTX));
     const tabs = [...el.querySelectorAll('[role="tab"]')].map((t) => t.textContent);
