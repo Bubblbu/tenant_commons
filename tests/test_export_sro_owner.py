@@ -99,3 +99,35 @@ def test_missing_sro_values_stay_null_for_non_sro_buildings():
     df = _frame(sro_owner=None, sro_operator=None)
     row = _first(fill_owner_from_sro(df))
     assert row.sro_owner is None and row.sro_operator is None
+
+
+from tc_core.sro_names import parse_sro_names
+
+NAMES = parse_sro_names("""\
+Chris Wall - 1030163 BC Ltd => 1030163 BC Ltd | behind: Chris Wall
+Bob Leung and Richard Chang => owners: Bob Leung; Richard Chang
+Ging, Huie S (15 year lease to Chris Wall) => Ging, Huie S | manager: Chris Wall
+""")
+
+
+def test_curated_names_correct_the_sro_owner():
+    row = _first(fill_owner_from_sro(_frame(sro_owner="Chris Wall - 1030163 BC Ltd"), NAMES))
+    assert (row.owner_name, row.owner_key) == ("1030163 BC Ltd", "1030163-bc-ltd")
+    assert row.sro_owners == ["1030163 BC Ltd"]
+
+
+def test_joint_sro_owners_are_kept_apart():
+    row = _first(fill_owner_from_sro(_frame(sro_owner="Bob Leung and Richard Chang"), NAMES))
+    assert row.owner_name == "Bob Leung"
+    assert row.sro_owners == ["Bob Leung", "Richard Chang"]
+
+
+def test_a_named_lessee_runs_the_building():
+    row = _first(fill_owner_from_sro(
+        _frame(sro_owner="Ging, Huie S (15 year lease to Chris Wall)", sro_operator="Private"), NAMES))
+    assert (row.owner_name, row.sro_operator) == ("Ging, Huie S", "Chris Wall")
+
+
+def test_buildings_without_an_sro_owner_have_no_sro_owners():
+    row = _first(fill_owner_from_sro(_frame(sro_owner=None), NAMES))
+    assert row.sro_owners == []

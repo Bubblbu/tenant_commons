@@ -297,8 +297,14 @@ Sections kept here for now since that's the best guess available.
   owner name ("vP rivate", "SPrivate"), and long names cut off ("Atira
   Women's Resourc"). Raw and overlay tables keep the text as published; the
   export reads it through `src/tc_core/sro_text.py` (sector parsing, spilled
-  labels become no operator) and expands abbreviations and truncations via
-  `export.py::SRO_NAME_ALIASES`.
+  labels become no operator), expands abbreviations via
+  `sro_names.py::SRO_NAME_ALIASES`, and applies the reviewed corrections in
+  `src/tc_core/sro_names.txt` (committed): cut-off or misspelt names, joint
+  owners (`owners: A; B`), the person behind a numbered company
+  (`behind: X`, imported as `city_record` claims by
+  `scripts/update_sro_claims.py`) and a named lessee (`manager: X`). An SRO
+  owner name also reaches its building for landlord-network grouping, like a
+  licence holder's name (`metrics/portfolios.py::_sro_owner_addr_keys`).
 - **Provenance/original retained:** **not yet** — no original document is
   currently kept. Per the retain-originals convention above, the source
   document(s) this was combined from should be saved under

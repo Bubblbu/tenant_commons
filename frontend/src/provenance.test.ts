@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { EXPLAINERS, initTipDismiss, ownerRowProvenance, provenanceIcon, tipPlacement } from './provenance';
+import { EXPLAINERS, initTipDismiss, networkProvenance, ownerRowProvenance, provenanceIcon, tipPlacement } from './provenance';
 
 describe('ownerRowProvenance', () => {
   it('names a single source plainly', () => {
@@ -90,5 +90,14 @@ describe('provenanceIcon', () => {
     expect(html).toContain('data-tip="A &quot;quoted&quot; &lt;b&gt;"');
     expect(html).toContain('aria-label="Source: A &quot;quoted&quot; &lt;b&gt;"');
     expect(html).not.toContain('<b>');
+  });
+});
+
+describe('networkProvenance, three kinds of evidence', () => {
+  it('lists them as a sentence', () => {
+    expect(networkProvenance({ b_id: 1, network_source: 'claims', network_name_source: 'default',
+      network_evidence: { registry: 2, city_records: 1, vtu_research: 3 } })).toBe(
+      'Grouped from 2 provincial registry filings, 1 City record and 3 VTU research claims. ' +
+      'Name: default (entity with the most properties).');
   });
 });

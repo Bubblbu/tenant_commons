@@ -39,3 +39,29 @@ def test_claims_networks_and_licence_owners_untouched():
     assert claims.network_key == "net:z"
     licence = _first(regroup_registry_owners(_frame(owner_source="licence")))
     assert licence.network_key == "y-properties-ltd"
+
+
+def test_overlay_point_joins_its_claims_network_without_a_registry_filing():
+    from tc_core.export import apply_registry_to_overlays
+    from tc_core.metrics.portfolios import Portfolio
+
+    df = pl.DataFrame({
+        "source": ["overlay_sro"], "addr_key": ["117 main st"],
+        "owner_name": ["(Unknown)"], "owner_key": ["unknown"], "owner_source": [None],
+        "registered_owners": [[]], "registry_pids": [[]], "registry_retrieved": [None],
+        "registry_owner_pids": [[]], "interest_holders": [[]], "registry_no_filing": [None],
+        "network_key": ["unknown"], "network_name": ["(Unknown)"], "network_source": [None],
+        "network_name_source": [None], "network_entities": [None],
+        "network_properties_on_title": [None], "network_evidence": [None],
+    }, schema_overrides={c: pl.Object for c in (
+        "registered_owners", "registry_pids", "registry_owner_pids", "interest_holders",
+        "network_entities", "network_evidence")} | {
+        "owner_source": pl.String, "registry_retrieved": pl.String, "registry_no_filing": pl.String,
+        "network_source": pl.String, "network_name_source": pl.String,
+        "network_properties_on_title": pl.Int64})
+    port = Portfolio(portfolio_key="hansum", portfolio_name="Shun Chi Company Ltd.", name_source="default",
+                     entities=["Shun Chi Company Ltd."], addr_keys={"117 main st"},
+                     evidence={"registry": 0, "city_records": 1, "vtu_research": 0})
+    row = _first(apply_registry_to_overlays(df, {}, {"117 main st": port}, {}, {}))
+    assert (row.network_key, row.network_source) == ("net:hansum", "claims")
+    assert row.owner_source is None  # no filing: the owner still comes from the SRO list

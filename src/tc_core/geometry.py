@@ -11,7 +11,8 @@ from __future__ import annotations
 import json
 from typing import Any, Optional
 
-from shapely.geometry import base as shapely_base, shape
+from shapely.geometry import base as shapely_base
+from shapely.geometry import shape
 
 
 def parse_geom(raw: Any) -> Optional[shapely_base.BaseGeometry]:

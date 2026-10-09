@@ -28,7 +28,7 @@ describe('buildingViews', () => {
       network_id: 'n1', registry_search: { status: 'not_searched', date: null }, coop: null, sro: null, rezoning: null,
     };
     const n1: Network = { id: 'n1', name: 'N', name_source: 'default', tier: 'name_match',
-      evidence: { registry: 0, vtu_research: 0 }, entities: [],
+      evidence: { registry: 0, city_records: 0, vtu_research: 0 }, entities: [],
       totals: { buildings: 1, units: 5, open_issues: 0, properties_on_title: null } };
     const views = buildingViews(
       { schema_version: 2, records: { '7': b } },

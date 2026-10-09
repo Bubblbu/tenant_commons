@@ -38,7 +38,8 @@ from ..normalize import (
     parse_lat_lon,
     sanitize_owner,
 )
-from .listing_buildings import BUILDING_SCHEMA, BUILDING_SOURCE as LISTING_SOURCE, listing_building_rows
+from .listing_buildings import BUILDING_SCHEMA, listing_building_rows
+from .listing_buildings import BUILDING_SOURCE as LISTING_SOURCE
 from .manager_listings import usable_listings
 from .overlay_sources import load_secondary_address_index
 

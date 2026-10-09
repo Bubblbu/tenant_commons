@@ -4,7 +4,7 @@ import { FLAT_COLUMNS, flatten } from './flat';
 
 const network: Network = {
   id: 'net:cressey', name: 'Cressey Development Group', name_source: 'claim', tier: 'confirmed',
-  evidence: { registry: 7, vtu_research: 9 }, entities: ['A', 'B'],
+  evidence: { registry: 7, city_records: 0, vtu_research: 9 }, entities: ['A', 'B'],
   totals: { buildings: 10, units: 609, open_issues: 2, properties_on_title: 10 },
 };
 
@@ -32,7 +32,7 @@ describe('flatten', () => {
       b_id: 1, source: 'building', address: '2145 york ave', building_name: 'Yorkshire Apartments',
       owner_key: 'yorkshire-place-apts-ltd', owner_name: 'Yorkshire Place Apts. Ltd.', owner_source: 'registry',
       network_key: 'net:cressey', network_name: 'Cressey Development Group', network_source: 'claims',
-      network_evidence: { registry: 7, vtu_research: 9 }, network_name_source: 'claim',
+      network_evidence: { registry: 7, city_records: 0, vtu_research: 9 }, network_name_source: 'claim',
       managed_by: 'Cascadia Apartment Rentals', housing_type: 'sro', n_issues: 1,
       value_land: 8721000, value_bldg: 11437000, registry_no_filing: null,
     });
@@ -59,5 +59,11 @@ describe('flatten', () => {
       const v = f[col];
       expect(v === null || ['string', 'number', 'boolean'].includes(typeof v), col).toBe(true);
     }
+  });
+});
+
+describe('flatten, evidence', () => {
+  it('gives City records their own CSV column', () => {
+    expect(FLAT_COLUMNS).toContain('network_evidence_city');
   });
 });

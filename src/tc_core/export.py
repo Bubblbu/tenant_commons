@@ -48,12 +48,13 @@ from .metrics.membership_metrics import compute_building_member_metrics
 from .metrics.portfolios import build_landlord_portfolios
 from .metrics.registry_owners import (
     build_interest_holders,
-    building_pids,
     build_registry_owners,
     build_registry_searches,
+    building_pids,
 )
 from .normalize import sanitize_owner
-from .sro_text import is_leaked_label
+from .sro_names import SroName, load_sro_names
+from .sro_names import clean_sro_name as _clean_sro_name
 
 
 def _missing(v) -> bool:
@@ -243,34 +244,32 @@ def _assign_ownership(df: pl.DataFrame, registry: dict, portfolios: dict) -> pl.
     )
 
 
-# The SRO inventory abbreviates and truncates names; expand the ones that recur.
-# Anything else is shown as published.
-SRO_NAME_ALIASES = {
-    "BCH": "BC Housing",
-    "COV": "City of Vancouver",
-    "Atira Property Managem": "Atira Property Management",
-    "PHS": "PHS Community Services Society",
-    "Lookout": "Lookout Housing and Health Society",
-}
 def clean_sro_name(name) -> str | None:
     """Display form of an SRO owner/operator name; None when it names no one
-    (a sector label such as "Private" — the owner runs the building — or one
-    split or spilled by the PDF extraction, see sro_text.py)."""
-    if _missing(name):
-        return None
-    text = str(name).strip()
-    if not text or is_leaked_label(text):
-        return None
-    return SRO_NAME_ALIASES.get(text, text)
+    (see sro_names.py::clean_sro_name)."""
+    return _clean_sro_name(None if _missing(name) else name)
 
 
-def fill_owner_from_sro(df: pl.DataFrame) -> pl.DataFrame:
+def _sro_operator(operator: str | None, owner: SroName | None, names: dict[str, SroName]) -> str | None:
+    """The operator as corrected; where the inventory names none, the lessee
+    or operator the owner's corrected entry names (306 Jackson Ave: Chris Wall)."""
+    if operator is None:
+        return owner.manager if owner else None
+    return names[operator].owners[0] if operator in names else operator
+
+
+def fill_owner_from_sro(df: pl.DataFrame, names: dict[str, SroName] | None = None) -> pl.DataFrame:
     """Expands SRO owner/operator names, and makes the SRO inventory's owner
     the building's owner wherever the registry doesn't name one — over a
     licence holder too (spec 2026-10-08 §3: BC Housing owns Marble Arch; PHS
     only holds the licence). A licence-name group becomes the SRO owner's own
     name group. Registry owners and claims networks are never replaced.
+
+    `names` (sro_names.txt) corrects published names: the first of joint
+    owners becomes sro_owner and all of them sro_owners; a named lessee or
+    operator fills sro_operator where the inventory names none.
     """
+    names = load_sro_names() if names is None else names
     df = df.with_columns(
         pl.col(col).map_elements(clean_sro_name, return_dtype=pl.String, skip_nulls=False)
         for col in ("sro_owner", "sro_operator")
@@ -278,6 +277,16 @@ def fill_owner_from_sro(df: pl.DataFrame) -> pl.DataFrame:
     )
     if "sro_owner" not in df.columns:
         return df
+    corrected = [names.get(o) if o is not None else None for o in df["sro_owner"]]
+    df = df.with_columns(
+        sro_owners=_objects(
+            (c.owners if c else [o]) if o is not None else [] for o, c in zip(df["sro_owner"], corrected)
+        ),
+        sro_owner=pl.Series([c.owners[0] if c else o for o, c in zip(df["sro_owner"], corrected)], dtype=pl.String),
+        sro_operator=pl.Series(
+            [_sro_operator(op, c, names) for op, c in zip(df["sro_operator"], corrected)], dtype=pl.String
+        ),
+    )
     df = df.with_columns(
         _fill=pl.col("sro_owner").is_not_null()
         & ((pl.col("owner_key") == "unknown") | (pl.col("owner_source") == "licence")).fill_null(False)
@@ -429,9 +438,10 @@ def apply_registry_to_overlays(
 ) -> pl.DataFrame:
     """SRO/co-op points that matched no building get the registry layers
     buildings get in _assign_ownership: the owner on title, who stands behind
-    it, a claims network and the search date. Before this, a researched PID
-    under an overlay point (139 E Cordova St) never reached the map. They
-    have no licence, so nothing else changes."""
+    it, a claims network (reached through a filing or the SRO owner's name)
+    and the search date. Before this, a researched PID under an overlay
+    point (139 E Cordova St) never reached the map. They have no licence,
+    so nothing else changes."""
     overlay = [src != "building" for src in df["source"]]
     if not any(overlay):
         return df
@@ -447,16 +457,17 @@ def apply_registry_to_overlays(
             continue
         reg, port = registry.get(key), portfolios.get(key)
         cols["interest_holders"][i] = holders.get(key, [])
-        if not reg:
+        if reg:
+            cols["owner_name"][i] = reg.owners[0]
+            cols["owner_key"][i] = sanitize_owner(reg.owners[0])
+            cols["owner_source"][i] = "registry"
+            cols["registered_owners"][i] = reg.owners
+            cols["registry_pids"][i] = reg.pids
+            cols["registry_retrieved"][i] = reg.retrieved
+            cols["registry_owner_pids"][i] = [{"name": n, "pids": reg.owner_pids.get(n, [])} for n in reg.owners]
+        else:
             cols["registry_no_filing"][i] = no_filing.get(key)
-            continue
-        cols["owner_name"][i] = reg.owners[0]
-        cols["owner_key"][i] = sanitize_owner(reg.owners[0])
-        cols["owner_source"][i] = "registry"
-        cols["registered_owners"][i] = reg.owners
-        cols["registry_pids"][i] = reg.pids
-        cols["registry_retrieved"][i] = reg.retrieved
-        cols["registry_owner_pids"][i] = [{"name": n, "pids": reg.owner_pids.get(n, [])} for n in reg.owners]
+        # A claims network reaches a point through a filing or its SRO owner's name.
         if port:
             cols["network_key"][i] = f"net:{port.portfolio_key}"
             cols["network_name"][i] = port.portfolio_name

@@ -6,7 +6,6 @@ not used to drop rows, so the table stays fully browsable (see schema notes).
 
 from __future__ import annotations
 
-import json
 import sqlite3
 from datetime import datetime, timezone
 

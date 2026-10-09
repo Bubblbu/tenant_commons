@@ -47,16 +47,25 @@ export function listingProvenance(seen: string): string {
   return seen ? `Company website, seen ${seen}` : 'Company website';
 }
 
+/**
+ * The confirmed claims behind a network, by public source category, leaving
+ * out the empty ones: ["2 provincial registry filings", "1 City record"].
+ */
+export function evidenceParts(ev: unknown, registry = 'provincial registry filing'): string[] {
+  const e = (ev ?? {}) as Record<string, unknown>;
+  const count = (k: string) => num(e[k]) ?? 0;
+  return [
+    count('registry') ? plural(count('registry'), registry, `${registry}s`) : '',
+    count('city_records') ? plural(count('city_records'), 'City record', 'City records') : '',
+    count('vtu_research') ? plural(count('vtu_research'), 'VTU research claim', 'VTU research claims') : '',
+  ].filter(Boolean);
+}
+
 export function networkProvenance(r: BuildingRecord): string {
   if (str(r.network_source) !== 'claims') return 'Grouped by the same owner name';
-  const ev = (r.network_evidence ?? {}) as Record<string, unknown>;
-  const registry = num(ev.registry) ?? 0;
-  const research = num(ev.vtu_research) ?? 0;
-  const parts = [
-    registry ? plural(registry, 'provincial registry filing', 'provincial registry filings') : '',
-    research ? plural(research, 'VTU research claim', 'VTU research claims') : '',
-  ].filter(Boolean);
-  const grouped = parts.length ? `Grouped from ${parts.join(' and ')}.` : 'Grouped from ownership claims.';
+  const parts = evidenceParts(r.network_evidence);
+  const listed = parts.length > 1 ? `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}` : parts[0];
+  const grouped = parts.length ? `Grouped from ${listed}.` : 'Grouped from ownership claims.';
   const name = str(r.network_name_source) === 'claim'
     ? 'Name: set by claim.'
     : 'Name: default (entity with the most properties).';

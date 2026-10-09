@@ -336,7 +336,12 @@
     },
     "Evidence": {
       "additionalProperties": false,
+      "description": "Confirmed claims linking the network, by public source category:\nprovincial registry filings, City records (e.g. the SRO inventory naming\nthe person behind a company), and VTU research (everything else).",
       "properties": {
+        "city_records": {
+          "title": "City Records",
+          "type": "integer"
+        },
         "registry": {
           "title": "Registry",
           "type": "integer"
@@ -348,6 +353,7 @@
       },
       "required": [
         "registry",
+        "city_records",
         "vtu_research"
       ],
       "title": "Evidence",

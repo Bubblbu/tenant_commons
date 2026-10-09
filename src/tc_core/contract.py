@@ -123,7 +123,12 @@ class Building(_Model):
 
 
 class Evidence(_Model):
+    """Confirmed claims linking the network, by public source category:
+    provincial registry filings, City records (e.g. the SRO inventory naming
+    the person behind a company), and VTU research (everything else)."""
+
     registry: Int
+    city_records: Int
     vtu_research: Int
 
 

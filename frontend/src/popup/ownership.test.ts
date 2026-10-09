@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from 'vitest';
 import type { Building } from '../contract.gen';
-import { BIDWELL, CTX, MARBLE_ARCH, OVERLAY, YORK } from './fixtures';
+import { BIDWELL, CTX, MARBLE_ARCH, NETWORKS, OVERLAY, YORK } from './fixtures';
 import { renderOwnership } from './ownership';
 
 const dom = (html: string) => { const d = document.createElement('div'); d.innerHTML = html; return d; };
@@ -70,5 +70,14 @@ describe('renderOwnership, chain terminus', () => {
   it('formats the building address like the header', () => {
     const d = dom(renderOwnership(YORK, CTX));
     expect(d.querySelector('.node.bldg')!.textContent).toContain('2145 York Ave');
+  });
+});
+
+describe('renderOwnership, City records', () => {
+  it('counts City records as their own evidence, leaving out empty kinds', () => {
+    const net = { ...NETWORKS['net:cressey'], evidence: { registry: 0, city_records: 4, vtu_research: 1 } };
+    const t = text(renderOwnership(YORK, { ...CTX, networks: { ...NETWORKS, 'net:cressey': net } }));
+    expect(t).toContain('4 City records + 1 VTU research claim');
+    expect(t).not.toContain('0 registry');
   });
 });

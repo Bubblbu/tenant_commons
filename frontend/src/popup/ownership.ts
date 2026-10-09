@@ -2,7 +2,7 @@
 import { formatAddress } from '../address';
 import type { Building, Party } from '../contract.gen';
 import { escapeHtml } from '../html';
-import { provenanceIcon } from '../provenance';
+import { evidenceParts, provenanceIcon } from '../provenance';
 import { LABELS } from './labels';
 import { linked, monthYear, plural, sourceText } from './format';
 import type { PopupContext } from './index';
@@ -20,7 +20,7 @@ function networkNode(b: Building, ctx: PopupContext): string {
   if (!net || (net.tier !== 'confirmed' && net.totals.buildings <= 1)) return '';
   const weak = net.tier !== 'confirmed';
   const evidence = weak ? 'Grouped by the same owner name'
-    : `${net.evidence.registry} registry filings + ${net.evidence.vtu_research} VTU research claims`;
+    : evidenceParts(net.evidence, 'registry filing').join(' + ');
   const t = net.totals;
   const card = `<div class="popup-stats">` +
     `<div><b>${t.buildings}</b><span>buildings</span></div>` +

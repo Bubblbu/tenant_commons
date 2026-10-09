@@ -159,7 +159,7 @@ describe('group tables', () => {
   it('tags each network row with where its grouping comes from', () => {
     const html = networkRowsHtml([
       rec({ b_id: 1, network_name: 'GLR', network_key: 'net:glr', network_source: 'claims',
-        network_name_source: 'default', network_evidence: { registry: 3, vtu_research: 0 } }),
+        network_name_source: 'default', network_evidence: { registry: 3, city_records: 0, vtu_research: 0 } }),
       rec({ b_id: 2, network_name: 'Solo', network_key: 'solo', network_source: 'name_match' }),
       rec({ b_id: 3, network_name: null, network_key: null, network_source: null }),
     ]);

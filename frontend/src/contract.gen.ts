@@ -76,6 +76,7 @@ export type LandSharePctl = number;
 export type YearBuilt = number | null;
 export type SchemaVersion = 2;
 export type Entities = string[];
+export type CityRecords = number;
 export type Registry = number;
 export type VtuResearch = number;
 export type Id1 = string;
@@ -239,10 +240,15 @@ export interface Network {
   totals: NetworkTotals;
 }
 /**
+ * Confirmed claims linking the network, by public source category:
+ * provincial registry filings, City records (e.g. the SRO inventory naming
+ * the person behind a company), and VTU research (everything else).
+ *
  * This interface was referenced by `Contract`'s JSON-Schema
  * via the `definition` "Evidence".
  */
 export interface Evidence {
+  city_records: CityRecords;
   registry: Registry;
   vtu_research: VtuResearch;
 }

@@ -15,9 +15,9 @@ import json
 import re
 import sqlite3
 
-from .overlay_sources import load_secondary_address_index
-from .manager_listings import usable_listings
 from ..normalize import AddressMatcher
+from .manager_listings import usable_listings
+from .overlay_sources import load_secondary_address_index
 from .overlays import _match_key
 
 # Operating names first: the name a building runs under (licence, the

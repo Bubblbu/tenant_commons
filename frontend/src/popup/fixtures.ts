@@ -14,16 +14,16 @@ const base = (b: Partial<Building> & Pick<Building, 'id' | 'address'>): Building
 
 export const NETWORKS: Record<string, Network> = {
   'net:cressey': { id: 'net:cressey', name: 'Cressey Development Group', name_source: 'claim', tier: 'confirmed',
-    evidence: { registry: 7, vtu_research: 9 }, entities: Array.from({ length: 18 }, (_, i) => `Entity ${i}`),
+    evidence: { registry: 7, city_records: 0, vtu_research: 9 }, entities: Array.from({ length: 18 }, (_, i) => `Entity ${i}`),
     totals: { buildings: 10, units: 609, open_issues: 2, properties_on_title: 10 } },
   'net:lotus': { id: 'net:lotus', name: 'Lotus Capital', name_source: 'claim', tier: 'confirmed',
-    evidence: { registry: 55, vtu_research: 8 }, entities: ['A', 'B'],
+    evidence: { registry: 55, city_records: 0, vtu_research: 8 }, entities: ['A', 'B'],
     totals: { buildings: 10, units: 500, open_issues: 3, properties_on_title: 11 } },
   'bc-housing': { id: 'bc-housing', name: 'BC Housing', name_source: 'default', tier: 'name_match',
-    evidence: { registry: 0, vtu_research: 0 }, entities: [],
+    evidence: { registry: 0, city_records: 0, vtu_research: 0 }, entities: [],
     totals: { buildings: 33, units: 2000, open_issues: 90, properties_on_title: null } },
   'feliz-enterprises-ltd': { id: 'feliz-enterprises-ltd', name: 'Feliz Enterprises Ltd', name_source: 'default',
-    tier: 'name_match', evidence: { registry: 0, vtu_research: 0 }, entities: [],
+    tier: 'name_match', evidence: { registry: 0, city_records: 0, vtu_research: 0 }, entities: [],
     totals: { buildings: 1, units: 265, open_issues: 0, properties_on_title: null } },
 };
 

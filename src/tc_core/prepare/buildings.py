@@ -17,8 +17,8 @@ from __future__ import annotations
 import polars as pl
 import polars.selectors as cs
 
-from ..paths import DataPaths
 from ..normalize import AddressMatcher, addr_key_from_freeform
+from ..paths import DataPaths
 from .io import load_polars
 from .licence_fees import decode_fee, parse_issued
 

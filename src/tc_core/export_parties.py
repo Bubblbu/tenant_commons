@@ -68,7 +68,10 @@ def _owners(row: Mapping[str, object]) -> list[Party]:
         ]
     name = _text(row.get("owner_name"))
     source = _OWNER_SOURCE.get(_text(row.get("owner_source")) or "")
-    return [_party("owner", name, [Source(type=source)])] if name and source else []
+    if not (name and source):
+        return []
+    joint = row.get("sro_owners") or [] if source == "sro_inventory" else []
+    return [_party("owner", n, [Source(type=source)]) for n in (joint if len(joint) > 1 else [name])]
 
 
 def _managers(row: Mapping[str, object], clusters: Mapping[str, str]) -> list[Party]:

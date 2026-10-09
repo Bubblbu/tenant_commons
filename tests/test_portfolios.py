@@ -201,7 +201,17 @@ def test_evidence_counts_collapse_non_registry_sources(tmp_path):
     _link(conn, "RENER HOLDINGS LTD", "RENER, ANA", source_type="manual_research",
           confidence="unconfirmed")
     p = build_landlord_portfolios(conn, pid_map)["1200 alberni st"]
-    assert p.evidence == {"registry": 1, "vtu_research": 2}
+    assert p.evidence == {"registry": 1, "city_records": 0, "vtu_research": 2}
+
+
+def test_city_records_count_as_their_own_evidence(tmp_path):
+    """The City's SRO inventory names the person behind a company: public,
+    and not VTU's own research (claim source_type city_record)."""
+    conn, pid_map = _glr_setup(tmp_path)
+    _link(conn, "GLR PROPERTIES LTD", "RENER HOLDINGS LTD")
+    _link(conn, "RENER HOLDINGS LTD", "RENER, LUDVIK", source_type="city_record")
+    p = build_landlord_portfolios(conn, pid_map)["1200 alberni st"]
+    assert p.evidence == {"registry": 1, "city_records": 1, "vtu_research": 0}
 
 
 def _contested(tmp_path, pids: list[tuple[str, str, str]], x_first: bool):
@@ -384,3 +394,22 @@ def test_group_name_defaults_to_the_company_with_most_buildings_when_none_is_on_
     _write_pid_address_map(pid_map, [])
 
     assert build_landlord_portfolios(conn, str(pid_map))["1 a st"].portfolio_name == "Beta Ltd"
+
+
+def test_sro_inventory_owner_names_reach_their_buildings(tmp_path):
+    """A building known only from the City's SRO inventory joins the network
+    its (corrected) owner name is claimed into, like a licence name does."""
+    conn = _conn()
+    conn.executemany(
+        "INSERT INTO buildings (addr_key, address, sro_owner, is_sro, created_at, updated_at) "
+        "VALUES (?, ?, ?, 1, 'now', 'now')",
+        [("235 e hastings st", "235 E Hastings St", "Chris Wall - 1030163 BC Ltd"),
+         ("259 powell st", "259 Powell St", "Chris Wall - 0921667 BC Ltd")],
+    )
+    _link(conn, "1030163 BC Ltd", "Chris Wall", source_type="city_record")
+    _link(conn, "0921667 BC Ltd", "Chris Wall", source_type="city_record")
+    pid_map = tmp_path / "pid_address_map.csv"
+    _write_pid_address_map(pid_map, [])
+    portfolios = build_landlord_portfolios(conn, str(pid_map))
+    assert portfolios["235 e hastings st"] is portfolios["259 powell st"]
+    assert portfolios["235 e hastings st"].evidence == {"registry": 0, "city_records": 2, "vtu_research": 0}

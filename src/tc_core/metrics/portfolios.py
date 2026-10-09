@@ -25,10 +25,19 @@ import sqlite3
 from collections import defaultdict
 from dataclasses import dataclass, field
 
-from ..claims import confirmed_common_owner_edges, confirmed_group_edges, network_label_claims
+from ..claims import (
+    confirmed_common_owner_edges,
+    confirmed_group_edges,
+    network_label_claims,
+)
 from ..normalize import addr_key_from_freeform, sanitize_owner
+from ..sro_names import corrected_owner_names, load_sro_names
 
 REGISTRY_SOURCE = "public_registry"
+# Public evidence buckets by claim source_type. Anything not named here
+# (tenant_report, manual_research, ...) is "vtu_research", so the map never
+# signals that a tenant reported on a landlord (CLAUDE.md sensitivity model).
+EVIDENCE_BUCKET = {REGISTRY_SOURCE: "registry", "city_record": "city_records"}
 
 
 def _normalize_pid(pid: str) -> str:
@@ -55,7 +64,8 @@ class Portfolio:
     entities: list[str]
     addr_keys: set[str] = field(default_factory=set)
     # Confirmed common_owner claims inside the cluster, by public source
-    # category: "registry" (public_registry) or "vtu_research" (all others).
+    # category: "registry" (public_registry), "city_records" (city_record) or
+    # "vtu_research" (all others).
     evidence: dict[str, int] = field(default_factory=dict)
     # Buildings reached, not addresses: a building record and its parcel's
     # own address point (512 and 500 Campbell Ave) count once.
@@ -173,6 +183,27 @@ def _clusters(conn: sqlite3.Connection) -> list[list[str]]:
     return clusters
 
 
+def _sro_owner_addr_keys(conn: sqlite3.Connection) -> dict[str, set[str]]:
+    """{sanitize_owner(owner): {addr_key, ...}} from the City's SRO inventory
+    owner names (corrected per sro_names.txt), for buildings and overlay
+    points alike — the same weakest route as a licence name, for companies
+    known only from the inventory (city_record claims name them)."""
+    mapping: dict[str, set[str]] = defaultdict(set)
+    names = load_sro_names()
+    for table in ("buildings", "overlay_housing"):
+        try:
+            rows = conn.execute(
+                f"SELECT addr_key, sro_owner FROM {table} "
+                "WHERE addr_key IS NOT NULL AND sro_owner IS NOT NULL AND TRIM(sro_owner) != ''"
+            ).fetchall()
+        except sqlite3.OperationalError:  # a database built before the overlay columns existed
+            continue
+        for addr_key, owner in rows:
+            for name in corrected_owner_names(owner, names):
+                mapping[sanitize_owner(name)].add(addr_key)
+    return mapping
+
+
 def _licence_addr_keys(conn: sqlite3.Connection) -> dict[str, set[str]]:
     """{sanitize_owner(licensee as filed): {addr_key, ...}} from raw_buildings.bsns_name.
 
@@ -207,14 +238,17 @@ def build_landlord_portfolios(
     labels = network_label_claims(conn)
     clusters = _clusters(conn)
     keys_by_pid = pid_addr_keys(conn, pid_address_map_path)
+    # Name routes, weakest evidence: licence holders and SRO inventory owners.
     licence_keys = _licence_addr_keys(conn)
+    for key, addr_keys in _sro_owner_addr_keys(conn).items():
+        licence_keys.setdefault(key, set()).update(addr_keys)
 
     cluster_of = {entity: i for i, cluster in enumerate(clusters) for entity in cluster}
-    evidence = [{"registry": 0, "vtu_research": 0} for _ in clusters]
+    evidence = [{"registry": 0, "city_records": 0, "vtu_research": 0} for _ in clusters]
     for a, b, source_type in confirmed_common_owner_edges(conn):
         i = cluster_of.get(a)
         if i is not None and cluster_of.get(b) == i:
-            evidence[i]["registry" if source_type == REGISTRY_SOURCE else "vtu_research"] += 1
+            evidence[i][EVIDENCE_BUCKET.get(source_type, "vtu_research")] += 1
 
     portfolios: list[Portfolio] = []
     portfolio_pids: list[set[str]] = []

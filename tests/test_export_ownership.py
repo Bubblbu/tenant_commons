@@ -91,7 +91,7 @@ def test_building_owner_is_its_registry_body_within_a_claims_network(tmp_path):
     assert net["entities"] == ["GLR PROPERTIES LTD.", "RENER, GEORGE", "ST. GEORGE ESTATES LTD."]
     assert net["totals"]["buildings"] == 2
     assert net["totals"]["properties_on_title"] == 3
-    assert net["evidence"] == {"registry": 2, "vtu_research": 1}
+    assert net["evidence"] == {"registry": 2, "city_records": 0, "vtu_research": 1}
 
 
 def test_licence_only_buildings_fall_back_to_the_licence_holder(tmp_path):
@@ -107,7 +107,7 @@ def test_licence_only_buildings_fall_back_to_the_licence_holder(tmp_path):
         "solo-rentals-ltd", "Solo Rentals Ltd", "name_match", "default")
     assert net["totals"]["buildings"] == 2
     assert net["totals"]["properties_on_title"] is None
-    assert net["entities"] == [] and net["evidence"] == {"registry": 0, "vtu_research": 0}
+    assert net["entities"] == [] and net["evidence"] == {"registry": 0, "city_records": 0, "vtu_research": 0}
 
 
 def test_unknown_owners_carry_no_owner_and_no_network(tmp_path):
@@ -329,7 +329,7 @@ def test_v2_research_sources_collapse_and_unconfirmed_networks_stay_out(tmp_path
     assert "tenant_report" not in text and "manual_research" not in text
     assert "Hidden Partner Ltd" not in text
     for net in networks(out).values():
-        assert set(net["evidence"]) == {"registry", "vtu_research"}
+        assert set(net["evidence"]) == {"registry", "city_records", "vtu_research"}
 
 
 def test_v2_has_no_sentinels(tmp_path):

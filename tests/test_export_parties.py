@@ -124,3 +124,12 @@ def test_listing_url_must_be_http_and_seen_must_be_a_date():
 
 def test_overlay_row_has_no_parties():
     assert build_parties(row(), {}) == []
+
+
+def test_joint_sro_owners_become_separate_owner_parties():
+    parties = build_parties(row(
+        owner_name="Bob Leung", owner_source="sro_list", sro_owner="Bob Leung",
+        sro_owners=["Bob Leung", "Richard Chang"],
+    ), {})
+    assert [(p.role, p.name, p.sources[0].type) for p in parties] == [
+        ("owner", "Bob Leung", "sro_inventory"), ("owner", "Richard Chang", "sro_inventory")]

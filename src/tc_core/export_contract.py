@@ -182,6 +182,7 @@ def build_networks(rows: Iterable[Mapping[str, object]]) -> dict[str, Network]:
             name_source="claim" if first.get("network_name_source") == "claim" else "default",
             tier="confirmed" if claims else "name_match",
             evidence=Evidence(registry=int(evidence.get("registry", 0)),
+                              city_records=int(evidence.get("city_records", 0)),
                               vtu_research=int(evidence.get("vtu_research", 0))),
             entities=[e for e in (_text(v) for v in (first.get("network_entities") or [])) if e],
             totals=NetworkTotals(

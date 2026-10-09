@@ -106,3 +106,12 @@ def test_networks_totals_and_tiers():
             c.totals.properties_on_title) == ("confirmed", "claim", 2, 43, 1, 10)
     f = nets["feliz-enterprises-ltd"]
     assert (f.tier, f.name_source, f.entities, f.evidence.registry) == ("name_match", "default", [], 0)
+
+
+def test_network_evidence_carries_city_records():
+    nets = build_networks([dict(
+        network_key="net:wall", network_name="Wall", network_source="claims", network_name_source=None,
+        network_entities=["A", "B"], network_properties_on_title=2,
+        network_evidence={"registry": 1, "city_records": 4, "vtu_research": 0}, units=10, n_issues=0,
+    )])
+    assert nets["net:wall"].evidence.city_records == 4

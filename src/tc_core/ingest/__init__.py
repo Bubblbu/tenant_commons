@@ -39,13 +39,12 @@ import traceback
 from datetime import datetime, timezone
 from typing import Any, Callable
 
-from ..config import load_ingest_config, IngestConfig
+from ..config import IngestConfig, load_ingest_config
 from ..db import get_connection, init_db
 from .block_numbers import ingest_raw_block_numbers
-from .building_names import derive_building_names
 from .blocks import ingest_blocks
+from .building_names import derive_building_names
 from .manager_listings import ingest_manager_listings
-from .strata_lot_pids import ingest_strata_lot_pids
 from .membership import ingest_membership
 from .merge import run_merge
 from .overlay_write import ingest_overlays
@@ -55,6 +54,7 @@ from .raw_buildings import ingest_raw_buildings
 from .raw_coops import ingest_raw_coops
 from .raw_rezoning import ingest_raw_rezoning
 from .raw_sro import ingest_raw_sro
+from .strata_lot_pids import ingest_strata_lot_pids
 from .tracking import new_run_id, record_run
 
 logger = logging.getLogger("tc_core.ingest")

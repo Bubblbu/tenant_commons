@@ -1,7 +1,7 @@
 /** Summary tab — the tenant's first look (spec 2026-10-08 §6). */
 import type { Building, Party } from '../contract.gen';
 import { escapeHtml } from '../html';
-import { provenanceIcon } from '../provenance';
+import { evidenceParts, provenanceIcon } from '../provenance';
 import { LABELS } from './labels';
 import { linked, plural, sourceText } from './format';
 import type { PopupContext } from './index';
@@ -25,7 +25,7 @@ function badges(b: Building): string {
 function ownedBy(b: Building, ctx: PopupContext): string {
   const net = b.network_id ? ctx.networks[b.network_id] : undefined;
   if (net && net.tier === 'confirmed') {
-    const ev = `Grouped from ${net.evidence.registry} registry filings and ${net.evidence.vtu_research} VTU research claims.`;
+    const ev = `Grouped from ${evidenceParts(net.evidence).join(', ')}.`;
     return `<strong>${escapeHtml(net.name)}</strong>${tier('confirmed')}${provenanceIcon(ev)}`;
   }
   const owner = first(b, 'owner');

@@ -20,8 +20,8 @@ from __future__ import annotations
 import geopandas
 import polars as pl
 
-from ..paths import DataPaths
 from ..normalize import addr_key_from_freeform, move_trailing_direction
+from ..paths import DataPaths
 from .io import load_polars
 
 

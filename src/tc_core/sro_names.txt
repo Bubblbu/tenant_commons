@@ -1,0 +1,72 @@
+# Corrections to owner/operator names in the City's SRO inventory (an FOI
+# release; see docs/DATA_SOURCES.md). One line per name that needs one:
+#
+#   <name as published> => <corrected name>
+#   <name as published> => <company> | behind: <person>; <person>
+#   <name as published> => owners: <owner>; <owner>
+#   <name as published> => <owner> | manager: <who runs it>
+#
+# "Name as published" is the text after sro_names.py::SRO_NAME_ALIASES expands
+# the inventory's abbreviations. `behind:` pairs become confirmed common_owner
+# claims with source_type city_record (scripts/update_sro_claims.py), so they
+# group into landlord networks. Names not listed here are shown as published.
+
+0853871 BC Ltd (Khai Van Phung) => 0853871 BC Ltd | behind: Khai Van Phung
+0950327 BC Ltd - Mike Tanasichuk => 0950327 BC Ltd | behind: Mike Tanasichuk
+1296536 BC Ltd (Babak Marzbani) => 1296536 BC Ltd | behind: Babak Marzbani
+Abdul Abdollahi - 0781178 BC Ltd => 0781178 BC Ltd | behind: Abdul Abdollahi
+Amacon - 620 West Pender Holdings Ltd => 620 West Pender Holdings Ltd | behind: Amacon
+Anhart Foundatoin => Anhart Foundation
+Atira => Atira Property Management
+Atira Women's Resourc => Atira Women's Resource Society
+Betty Wu (owner) Shun Shi Co Ltd. => Shun Chi Company Ltd | behind: Betty Wu
+Bob Leung and Richard Chang => owners: Bob Leung; Richard Chang
+Central Cty Foundation => Central City Foundation
+Chang, Alan B; Chang, Douglas B and Chang, Mar => owners: Chang, Alan B; Chang, Douglas B; Chang, Mar…
+Chris Los - Polo Hotel Ltd => Polo Hotel Ltd | behind: Chris Los
+Chris Wall - 0921667 BC Ltd => 0921667 BC Ltd | behind: Chris Wall
+Chris Wall - 1030163 BC Ltd => 1030163 BC Ltd | behind: Chris Wall
+Chris Wall - 1078022 BC LTD => 1078022 BC LTD | behind: Chris Wall
+Chris Wall - 1166605 B.C. Ltd => 1166605 B.C. Ltd | behind: Chris Wall
+Chris Wall - 1186832 BC Ltd => 1186832 BC Ltd | behind: Chris Wall
+Chris Wall - 1235922 BC Ltd => 1235922 BC Ltd | behind: Chris Wall
+Deborah Jane Harden & Robert Wiliam Harden => owners: Deborah Jane Harden; Robert Wiliam Harden
+Diao Yuying M and Yang Shuping => owners: Diao Yuying M; Yang Shuping
+Ging, Huie S (15 year lease to Chris Wall) => Ging, Huie S | manager: Chris Wall
+Giovanni & Catherine Casu - Casu Holdings Ltd => Casu Holdings Ltd | behind: Giovanni Casu; Catherine Casu
+Helen Poon - Rose Hotels Ltd => Rose Hotels Ltd | behind: Helen Poon
+Holborn => Holborn Group
+Kam C Woo & Lin D Woo => owners: Kam C Woo; Lin D Woo
+Kim Thanh Nguyen => Nguyen, Kim Thanh
+Landco 932 Properties LTD => 932 Properties LTD | behind: Landco
+Laudisio - 0750062 BC Ltd => 0750062 BC Ltd | behind: Laudisio
+Laudisio - 1226668 BC LTD => 1226668 BC LTD | behind: Laudisio
+MING SUN BENEVOLENTSOCIETY => MING SUN BENEVOLENT SOCIETY
+MPA => MPA Motivation Power & Achievement Society
+Mario Laudisio & Gianni Laudisio => owners: Mario Laudisio; Gianni Laudisio
+Mario and Anna Laudisio - Man Kei Enterprises Ltd => Man Kei Enterprises Ltd | behind: Mario Laudisio; Anna Laudisio
+Mark Shieh - Happy Harvest Inc => Happy Harvest Inc | behind: Mark Shieh
+Mike Goyal - 1001438 BC Ltd => 1001438 BC Ltd | behind: Mike Goyal
+Peter Plett - Colonial Enterprises Ltd => Colonial Enterprises Ltd | behind: Peter Plett
+Peter Plett - Fortin Holdings Ltd => Fortin Holdings Ltd | behind: Peter Plett
+Peter Plett - Pepple Enterprises Ltd => Pepple Enterprises Ltd | behind: Peter Plett
+Phl Kim - 0733603 BC Ltd => 0733603 BC Ltd | behind: Phil Kim
+ROSE GARDEN COOPERATIVE HOUSING SOCIE => ROSE GARDEN COOPERATIVE HOUSING SOCIETY
+Raincity => RainCity Housing and Support Society
+Raincty Housing And Support Society => RainCity Housing and Support Society
+Sahota - Northstar Internation Motor Hotel Ltd => Northstar Internation Motor Hotel Ltd | behind: Sahota
+Sahota - Regal Eighty Management Corp => Regal Eighty Management Corp | behind: Sahota
+Sahota - Yang-Myung Holdings Ltd => Yang-Myung Holdings Ltd | behind: Sahota
+Shirley Su Yi & Tai Cheun Lam & Yuet Ha Cheung => owners: Shirley Su Yi; Tai Cheun Lam; Yuet Ha Cheung
+Shun Chi Co LTD => Shun Chi Company Ltd
+Chris Wall - 1208149 BD L => 1208149 BC LTD | behind: Chris Wall
+Soterra - Five West Hastings Holdings Ltd => Five West Hastings Holdings Ltd | behind: Soterra
+Soterra - Laurelwood Ventures Inc => Laurelwood Ventures Inc | behind: Soterra
+Steve Lippman - 228 E Pender Holdings Ltd => 228 E Pender Holdings Ltd | behind: Steve Lippman
+Steve Lippman - 55 Powel Street Holdings Ltd => 55 Powel Street Holdings Ltd | behind: Steve Lippman
+Steve Lippman - 634 East Georgia St Holdings Ltd => 634 East Georgia St Holdings Ltd | behind: Steve Lippman
+Steve Lippman 291 East Georgia Holdings Ltd (Ste => 291 East Georgia Holdings Ltd | behind: Steve Lippman
+Vancouver Native Hous => Vancouver Native Housing Society
+Yahya Nickpour - 0927000 BC LTD => 0927000 BC LTD | behind: Yahya Nickpour
+Yahya Nickpour - Persepolis Investments Inc => Persepolis Investments Inc | behind: Yahya Nickpour
+Shun Chi Company Ltd. Chris Wall - 1208149 BD L => Shun Chi Company Ltd.
