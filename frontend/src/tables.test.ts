@@ -26,7 +26,9 @@ describe('buildingRow', () => {
         '<td class="select-cell"><input type="checkbox" class="row-select" data-type="building" data-target="7"></td>' +
         '<td data-sort-value="12 Oak &amp; Elm St">12 Oak &amp; Elm St ' +
         '<button type="button" class="locate-btn" data-locate="7" aria-label="Show 12 Oak &amp; Elm St on the map" ' +
-        'title="Show on the map">⌖</button></td><td></td><td data-sort-value="West End">West End</td>' +
+        'title="Show on the map"><svg class="locate-icon" viewBox="0 0 24 24" width="14" height="14" ' +
+        'aria-hidden="true" focusable="false"><path fill="currentColor" d="M12 2a7 7 0 0 0-7 7c0 5.2 7 13 7 13s7-7.8 7-13a7 7 0 0 0-7-7zm0 9.5A2.5 2.5 0 1 1 12 6.5a2.5 2.5 0 0 1 0 5z"/></svg>' +
+        '</button></td><td></td><td data-sort-value="West End">West End</td>' +
         '<td data-sort-value="40">40</td>' +
         '<td>Example &quot;Holdings&quot;<div class="cell-sub">Group: Example Group</div></td>' +
         '<td data-sort-value="1965">1965</td><td data-sort-value=""></td></tr>',
@@ -61,7 +63,7 @@ describe('buildingRow', () => {
 
   it('shows the building name, and finds it by any of its names', () => {
     const row = buildingRow(rec({ building_name: 'Maple Apartments', other_names: ['The Maple Apts'] }));
-    expect(row).toContain('⌖</button></td><td>Maple Apartments</td>');
+    expect(row).toContain('</svg></button></td><td>Maple Apartments</td>');
     expect(row).toMatch(/data-search="[^"]*maple apartments the maple apts/);
   });
 

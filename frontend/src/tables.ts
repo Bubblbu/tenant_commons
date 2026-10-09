@@ -37,6 +37,12 @@ const intStr = (v: unknown): string => {
 };
 const text = (v: unknown): string => (isMissing(v) ? '' : String(v));
 
+/** A map pin (the locate button's icon); decorative, the button carries the label. */
+const PIN_ICON =
+  '<svg class="locate-icon" viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" focusable="false">' +
+  '<path fill="currentColor" d="M12 2a7 7 0 0 0-7 7c0 5.2 7 13 7 13s7-7.8 7-13a7 7 0 0 0-7-7zm0 9.5A2.5 2.5 0 1 1 12 6.5a2.5 2.5 0 0 1 0 5z"/>' +
+  '</svg>';
+
 /** pandas sort_values(ascending=False): larger first, missing last. Stable. */
 function descMissingLast(a: number | null, b: number | null): number {
   if (a === null && b === null) return 0;
@@ -161,7 +167,7 @@ export function buildingRow(r: BuildingRecord): string {
     `data-type="building" data-target="${bid}"></td>` +
     `<td data-sort-value="${escapeHtml(address)}">${escapeHtml(address)} ` +
     `<button type="button" class="locate-btn" data-locate="${bid}" ` +
-    `aria-label="${escapeHtml(`Show ${address} on the map`)}" title="Show on the map">⌖</button></td>` +
+    `aria-label="${escapeHtml(`Show ${address} on the map`)}" title="Show on the map">${PIN_ICON}</button></td>` +
     `<td>${escapeHtml(text(r.building_name))}</td>` +
     `<td data-sort-value="${a}">${a}</td>` +
     `<td data-sort-value="${units}">${units}</td>` +
