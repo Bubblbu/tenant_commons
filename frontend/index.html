@@ -281,6 +281,13 @@
     user-select: none;
   }
 
+  /* Until the building records load (bootstrap.ts): no tables or filters yet. */
+  body.loading #sidebar-container,
+  body.loading #filters-panel {
+    opacity: 0.5;
+    pointer-events: none;
+  }
+
   #sidebar-tabs {
     display: flex;
     border-bottom: 1px solid #e3e7f0;

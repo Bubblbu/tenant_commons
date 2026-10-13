@@ -85,16 +85,21 @@ export type BoundaryCollection = FeatureCollection<Geometry, BoundaryProperties>
 /** villages_plan_areas.geojson: same shape as a boundary collection (name + polygon), no geo_point_2d. */
 export type VillagesCollection = BoundaryCollection;
 
-export interface Artifacts {
+/** What the map draws: small enough to fetch before anything else. */
+export interface MapArtifacts {
   filterConfig: FilterConfig;
   markers: MarkerRecord[];
+  blocks: BlocksCollection;
+  boundaries: BoundaryCollection;
+  villages: VillagesCollection;
+  chinatown: BoundaryCollection;
+}
+
+/** The building records and networks: the popup, tables and filters read these. */
+export interface BuildingArtifacts {
   /** The flat view (flat.ts) of building_records.json. */
   buildingData: BuildingData;
   /** building_records.json as published: the popup reads these. */
   buildings: Record<string, Building>;
   networks: Record<string, Network>;
-  blocks: BlocksCollection;
-  boundaries: BoundaryCollection;
-  villages: VillagesCollection;
-  chinatown: BoundaryCollection;
 }

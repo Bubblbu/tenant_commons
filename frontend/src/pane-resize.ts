@@ -56,6 +56,44 @@ function writeStored(key: string, width: number | null): void {
   }
 }
 
+/** The page's two panels: the data table on the left, the filters on the right. */
+export function pagePanes(doc: Document): PaneSpec[] | null {
+  const gutter = (pane: string) => doc.querySelector<HTMLElement>('.pane-gutter[data-pane="' + pane + '"]');
+  const dataGutter = gutter('data');
+  const filtersGutter = gutter('filters');
+  const dataPanel = doc.getElementById('sidebar-container');
+  const filtersPanel = doc.getElementById('filters-panel');
+  if (!dataGutter || !filtersGutter || !dataPanel || !filtersPanel) return null;
+  return [
+    { gutter: dataGutter, side: 'left', panel: dataPanel, storageKey: 'tc-data-width', min: 280, max: 1000, defaultWidth: 480 },
+    { gutter: filtersGutter, side: 'right', panel: filtersPanel, storageKey: 'tc-filters-width', min: 240, max: 520, defaultWidth: 300 },
+  ];
+}
+
+/** Sets each panel's width within the window, writing them into `applied`. */
+function layout(panes: PaneSpec[], preferred: number[], applied: number[]): void {
+  // The gutters' own width comes out of the map's share too.
+  const viewport = window.innerWidth - panes.reduce((sum, p) => sum + p.gutter.offsetWidth, 0);
+  panes.forEach((p, i) => {
+    const other = applied.reduce((sum, w, j) => (j === i ? sum : sum + w), 0);
+    applied[i] = clampWidth(preferred[i], p, viewport, other);
+  });
+  // A second pass so the first panel sees the second one's final width.
+  panes.forEach((p, i) => {
+    const other = applied.reduce((sum, w, j) => (j === i ? sum : sum + w), 0);
+    applied[i] = clampWidth(preferred[i], p, viewport, other);
+    p.panel.style.width = `${applied[i]}px`;
+  });
+}
+
+/**
+ * The remembered widths, without the gutters' handlers: bootstrap.ts applies
+ * them before creating the map, so it starts at its final size.
+ */
+export function applyStoredWidths(panes: PaneSpec[]): void {
+  layout(panes, panes.map((p) => readStored(p.storageKey) ?? p.defaultWidth), panes.map(() => 0));
+}
+
 interface Callbacks {
   /** Every applied width change (at most once per frame while dragging). */
   onResize?: () => void;
@@ -69,17 +107,8 @@ export function initPaneResize(panes: PaneSpec[], callbacks: Callbacks = {}): vo
   const applied = panes.map(() => 0);
 
   function apply(): void {
-    // The gutters' own width comes out of the map's share too.
-    const viewport = window.innerWidth - panes.reduce((sum, p) => sum + p.gutter.offsetWidth, 0);
+    layout(panes, preferred, applied);
     panes.forEach((p, i) => {
-      const other = applied.reduce((sum, w, j) => (j === i ? sum : sum + w), 0);
-      applied[i] = clampWidth(preferred[i], p, viewport, other);
-    });
-    // A second pass so the first panel sees the second one's final width.
-    panes.forEach((p, i) => {
-      const other = applied.reduce((sum, w, j) => (j === i ? sum : sum + w), 0);
-      applied[i] = clampWidth(preferred[i], p, viewport, other);
-      p.panel.style.width = `${applied[i]}px`;
       p.gutter.setAttribute('aria-valuenow', String(applied[i]));
       p.gutter.setAttribute('aria-valuemin', String(p.min));
       p.gutter.setAttribute('aria-valuemax', String(p.max));

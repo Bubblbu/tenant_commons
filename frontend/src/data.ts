@@ -1,13 +1,17 @@
-/** Loads the artifact directory once and checks its contract version (spec §4). */
+/**
+ * Loads the artifact directory once and checks its contract version (spec §4).
+ * Two loads, so the map can draw before the much larger building records arrive.
+ */
 import { EXPECTED_SCHEMA_VERSION, artifactUrl } from './config';
 import type { Building, BuildingRecordsFile, Network, NetworksFile } from './contract.gen';
 import { FLAT_COLUMNS, flatten } from './flat';
 import type {
-  Artifacts,
   BlocksCollection,
+  BuildingArtifacts,
   BoundaryCollection,
   BuildingData,
   FilterConfig,
+  MapArtifacts,
   MarkerRecord,
   VillagesCollection,
 } from './types';
@@ -53,12 +57,10 @@ export function buildingViews(
   };
 }
 
-export async function loadArtifacts(): Promise<Artifacts> {
-  const [filterConfig, markerMetadata, buildingData, networks, blocks, boundaries, villages, chinatown] = await Promise.all([
+export async function loadMapArtifacts(): Promise<MapArtifacts> {
+  const [filterConfig, markerMetadata, blocks, boundaries, villages, chinatown] = await Promise.all([
     fetchJson('filter_config.json'),
     fetchJson('marker_metadata.json'),
-    fetchJson('building_records.json'),
-    fetchJson('networks.json'),
     fetchJson('blocks.geojson'),
     fetchJson('local-area-boundary.geojson'),
     fetchJson('villages_plan_areas.geojson'),
@@ -66,8 +68,6 @@ export async function loadArtifacts(): Promise<Artifacts> {
   ]);
   checkSchemaVersion('filter_config.json', filterConfig);
   checkSchemaVersion('marker_metadata.json', markerMetadata);
-  checkSchemaVersion('building_records.json', buildingData);
-  checkSchemaVersion('networks.json', networks);
   checkSchemaVersion('blocks.geojson', blocks);
   // local-area-boundary.geojson, villages_plan_areas.geojson and
   // chinatown_boundary.geojson are passed through unchanged (the City's
@@ -75,10 +75,19 @@ export async function loadArtifacts(): Promise<Artifacts> {
   return {
     filterConfig: filterConfig as FilterConfig,
     markers: (markerMetadata as { markers: MarkerRecord[] }).markers,
-    ...buildingViews(buildingData as BuildingRecordsFile, networks as NetworksFile),
     blocks: blocks as BlocksCollection,
     boundaries: boundaries as BoundaryCollection,
     villages: villages as VillagesCollection,
     chinatown: chinatown as BoundaryCollection,
   };
+}
+
+export async function loadBuildingArtifacts(): Promise<BuildingArtifacts> {
+  const [buildingData, networks] = await Promise.all([
+    fetchJson('building_records.json'),
+    fetchJson('networks.json'),
+  ]);
+  checkSchemaVersion('building_records.json', buildingData);
+  checkSchemaVersion('networks.json', networks);
+  return buildingViews(buildingData as BuildingRecordsFile, networks as NetworksFile);
 }

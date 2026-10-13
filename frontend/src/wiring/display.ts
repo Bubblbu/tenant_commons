@@ -5,7 +5,7 @@
  * what actually hides a building or block.
  */
 import type * as L from 'leaflet';
-import { initPaneResize as initPaneGutters } from '../pane-resize';
+import { initPaneResize as initPaneGutters, pagePanes } from '../pane-resize';
 import type { BlockStyler } from './block-style';
 import type { MarkerStyler, Restack } from './marker-style';
 import type { WiringContext } from './types';
@@ -173,16 +173,9 @@ export function initDisplay(
   }
 
   function initPaneResize(): void {
-    const gutter = (pane: string) => doc.querySelector<HTMLElement>('.pane-gutter[data-pane="' + pane + '"]');
-    const dataGutter = gutter('data');
-    const filtersGutter = gutter('filters');
-    const dataPanel = doc.getElementById('sidebar-container');
-    const filtersPanel = doc.getElementById('filters-panel');
-    if (!dataGutter || !filtersGutter || !dataPanel || !filtersPanel) return;
-    initPaneGutters([
-      { gutter: dataGutter, side: 'left', panel: dataPanel, storageKey: 'tc-data-width', min: 280, max: 1000, defaultWidth: 480 },
-      { gutter: filtersGutter, side: 'right', panel: filtersPanel, storageKey: 'tc-filters-width', min: 240, max: 520, defaultWidth: 300 },
-    ], {
+    const panes = pagePanes(doc);
+    if (!panes) return;
+    initPaneGutters(panes, {
       onResize: updateLegendVisibility,
       onResizeEnd: () => {
         if (mapInstance && typeof mapInstance.invalidateSize === 'function') {
