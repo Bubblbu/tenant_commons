@@ -32,7 +32,7 @@ from pathlib import Path
 
 import numpy as np
 import polars as pl
-from shapely.geometry import Point, shape
+from shapely.geometry import Point, mapping, shape
 from shapely.strtree import STRtree
 
 from .claims import resolve_entity_clusters
@@ -866,6 +866,17 @@ def _round_geometry(geom: dict) -> dict:
     return geom
 
 
+# ~20 cm. The City's block outlines carry a vertex every few metres along
+# straight edges; dropping the ones within this distance of the line removes
+# ~80% of them (blocks.geojson 1.44 -> 0.33 MB gzipped) with no visible change.
+BLOCK_SIMPLIFY_TOLERANCE = 2e-6
+
+
+def _simplify_geometry(geom: dict) -> dict:
+    simplified = shape(geom).simplify(BLOCK_SIMPLIFY_TOLERANCE, preserve_topology=True)
+    return geom if simplified.is_empty else json.loads(json.dumps(mapping(simplified)))
+
+
 def _round_coord(value) -> float | None:
     return None if _missing(value) else round(float(value), COORD_DECIMALS)
 
@@ -955,11 +966,7 @@ def _write_json(path: Path, payload: object) -> None:
 
 
 def _blocks_feature_collection(blocks_df: pl.DataFrame) -> dict:
-    """Emit stored GeoJSON geometry directly — no shapely round trip.
-
-    `blocks.geom` is already GeoJSON text in SQLite, so parsing it into a
-    shapely object only to re-serialize via __geo_interface__ is wasted work.
-    """
+    """Emit the stored GeoJSON geometry, simplified and rounded."""
     property_cols = [
         "block_id",
         "buildings",
@@ -982,7 +989,7 @@ def _blocks_feature_collection(blocks_df: pl.DataFrame) -> dict:
         features.append(
             {
                 "type": "Feature",
-                "geometry": _round_geometry(geom),
+                "geometry": _round_geometry(_simplify_geometry(geom)),
                 "properties": properties,
             }
         )

@@ -229,6 +229,24 @@ def test_block_geometry_is_rounded_to_six_decimals(tmp_path):
     assert geom["coordinates"][0][0] == [-123.062303, 49.243279]
 
 
+def test_block_geometry_drops_vertices_on_straight_edges(tmp_path):
+    conn = sqlite3.connect(":memory:")
+    init_db(conn)
+    square = [[-123.1, 49.2], [-123.1, 49.201], [-123.0995, 49.201], [-123.099, 49.201],
+              [-123.099, 49.2], [-123.1, 49.2]]
+    conn.execute(
+        "INSERT INTO blocks (block_id, geom, ingested_at) VALUES (1, ?, 'now')",
+        (json.dumps({"type": "Polygon", "coordinates": [square]}),),
+    )
+    conn.commit()
+
+    export_artifacts(conn, tmp_path)
+
+    ring = json.loads((tmp_path / "blocks.geojson").read_text())["features"][0]["geometry"]["coordinates"][0]
+    assert [-123.0995, 49.201] not in ring
+    assert len(ring) == 5
+
+
 def test_marker_and_record_coordinates_are_rounded(tmp_path):
     conn = sqlite3.connect(":memory:")
     init_db(conn)
