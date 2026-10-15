@@ -222,7 +222,12 @@ def run(paths: DataPaths) -> None:
             "Current zoning": "zoning",
             "Name": "foi_name",
         }
-    ).with_columns(address=CLEAN("address"))
+    ).with_columns(
+        address=CLEAN("address"),
+        # The FOI spells it "Arbutus-Ridge"; the City's boundaries and property
+        # addresses (the other local_area source) say "Arbutus Ridge".
+        local_area=pl.col("local_area").replace("Arbutus-Ridge", "Arbutus Ridge"),
+    )
     rentals = rentals.unique(subset="address", keep="first").drop("id")
     print("rentals:", rentals.shape)
 
