@@ -50,6 +50,7 @@ from .overlay_write import ingest_overlays
 from .ownership_claims import ingest_ownership_claims
 from .raw_addresses import ingest_raw_addresses
 from .raw_buildings import ingest_raw_buildings
+from .raw_city_owned import ingest_raw_city_owned
 from .raw_coops import ingest_raw_coops
 from .raw_rezoning import ingest_raw_rezoning
 from .raw_sro import ingest_raw_sro
@@ -113,6 +114,11 @@ def run_ingest(conn: sqlite3.Connection, config: IngestConfig) -> dict[str, int]
     if config.rezoning_applications:
         counts["raw_rezoning"] = run_source(
             conn, run_id, "raw_rezoning", ingest_raw_rezoning, conn, config.rezoning_applications
+        )
+    if config.city_owned_properties:
+        counts["raw_city_owned_properties"] = run_source(
+            conn, run_id, "raw_city_owned_properties", ingest_raw_city_owned, conn,
+            config.city_owned_properties,
         )
     # Raw inputs the merge reads: listings add buildings (ingest/listing_buildings.py).
     if config.manager_listings:

@@ -56,6 +56,7 @@ format, cadence, quirks). It stops there.
 | [`block-outlines.csv`](#block-outlinescsv) | Open Data portal | 2026-09-18 | On demand (`fetch_cov_open_data.py`) | `tc_core` |
 | [`block-numbers.csv`](#block-numberscsv) | Open Data portal | 2026-09-18 | On demand (`fetch_cov_open_data.py`) | `tc_core` |
 | [`local-area-boundary.csv`](#local-area-boundarycsv) | Open Data portal | 2026-09-18 | On demand (`fetch_cov_open_data.py`) | none (`tc_core` uses the GeoJSON export) |
+| [`city-owned-properties.csv`](#city-owned-propertiescsv) | Open Data portal | 2026-09-24 | On demand (`fetch_cov_open_data.py`) | `tc_core` |
 | [`sra_housing_combined.csv`](#sra_housing_combinedcsv) | FOI? — unverified ⚠️ | 2026-07-30 (file date) | TODO | `tc_core` |
 | [`rezoning_applications.csv`](#rezoning_applicationscsv) | FOI? — unverified ⚠️ | 2026-07-30 (file date) | TODO | `tc_core` |
 | [`coops_vancouver.csv`](#coops_vancouvercsv) | Third-party online | 2026-08-04 | Periodic (re-run script) | `tc_core` |
@@ -253,6 +254,30 @@ for the full rebuild order.
   `local-area-boundary.geojson`, instead).
 - **Refresh cadence:** rare — official boundaries change infrequently. Last
   fetched 2026-09-18.
+
+---
+
+### `city-owned-properties.csv`
+
+- **What it is:** land the City of Vancouver owns, one row per property
+  (`land_coord`, address, local area, holding fund `type`). Counts at the
+  2026-09-24 fetch: PROPERTY ENDOWMENT FUND 2,664; CAPITAL FUND 1,170;
+  VAHEF (Vancouver Affordable Housing Endowment Fund) 617; Vancouver Public
+  Housing Corp 4.
+- **Origin and access method:** fetched directly from Open Data by
+  `scripts/fetch_cov_open_data.py` (`--only city-owned-properties`).
+- **License/attribution:** Open Government Licence – Vancouver.
+- **Geographic scope:** citywide.
+- **Format/known quirks:** semicolon-separated. `land_coord` is an 8-digit
+  key with leading zeros (type inference drops them; the loader pads them
+  back). It joins to a building through its folio: a folio's first 8 digits
+  are its land coordinate. In the 2026-10-20 build, 226 buildings matched
+  (160 of them VAHEF). City land with a private owner on title is a
+  leasehold (`classification.owner = mixed`, spec 2026-10-20).
+- **Output location:** `raw_city_owned_properties` (`ingest/raw_city_owned.py`).
+- **Consumed by:** `metrics/sector.py::city_owned_buildings` (building
+  classification).
+- **Refresh cadence:** on demand with the other Open Data files.
 
 ---
 

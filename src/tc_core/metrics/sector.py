@@ -249,3 +249,18 @@ def classify_building(
         operator=_operator_axis(parties, classify),
         scale=scale_for(facts.network_buildings, thresholds),
     )
+
+
+def city_owned_buildings(conn: sqlite3.Connection) -> set[int]:
+    """building_ids with a folio on City land: a folio's first 8 digits are
+    its land coordinate, the key of the City-owned properties list."""
+    coords = {r[0] for r in conn.execute(
+        "SELECT land_coord FROM raw_city_owned_properties WHERE land_coord IS NOT NULL")}
+    found: set[int] = set()
+    for building_id, folios in conn.execute(
+        "SELECT b.building_id, r.folio FROM buildings b, json_each(b.source_row_ids) j "
+        "JOIN raw_buildings r ON r.raw_building_id = j.value WHERE r.folio IS NOT NULL"
+    ):
+        if any(f.strip()[:8] in coords for f in folios.split(";")):
+            found.add(building_id)
+    return found
