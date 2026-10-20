@@ -47,13 +47,11 @@ class DataPaths:
         # curated/
         self.ownership_claims = self.curated / "ownership_claims.csv"
         self.landlord_mapping = self.curated / "landlord_mapping.toml"
-        self.chinatown_boundary = self.curated / "chinatown_boundary.geojson"
 
         # derived/
         self.all_rentals = self.interim / "all_rentals.csv"
         self.properties = self.interim / "properties.csv"
         self.buildings = self.derived / "buildings.csv"
-        self.ct_properties = self.derived / "ct_properties.csv"
         self.pid_address_map = self.derived / "pid_address_map.csv"
         self.db = self.derived / "tc_core.db"
         self.artifacts = self.derived / "artifacts"

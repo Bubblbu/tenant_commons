@@ -1,13 +1,10 @@
 """Rebuild derived/interim/properties.csv from the raw Open Data files.
 
 Ported from vhd's scripts/build_properties.py (logic unchanged). Includes the
-VanMaps primary/secondary address resolution (raw/vanmaps/addresses.geojson)
-and the Chinatown boundary flag (curated/chinatown_boundary.geojson).
-
-Note on the Chinatown boundary: only one boundary file survives, an
-"expanded" one. The original notebooks distinguished a narrower
-`boundaries.shp` from a wider `ct_ext.shp`, so `chinatown=True` here may
-cover more addresses than the original ~161-row baseline did.
+VanMaps primary/secondary address resolution (raw/vanmaps/addresses.geojson).
+The vhd script's Chinatown boundary flag is gone: it only fed the retired
+ct_properties.csv (see prepare/buildings.py); the map's Chinatown is an
+overlay area (tc_core/overlay_areas.py).
 
 Differences from the vhd script: paths come from DataPaths, addr_key_from_freeform
 and move_trailing_direction (tc_core.normalize) are imported in place of the
@@ -17,7 +14,6 @@ backup is gone (derived files are regenerable).
 
 from __future__ import annotations
 
-import geopandas
 import polars as pl
 
 from ..normalize import addr_key_from_freeform, move_trailing_direction
@@ -74,7 +70,6 @@ def run(paths: DataPaths) -> None:
     addresses_f = paths.vanmaps_addresses
     property_addresses_f = paths.cov("property-addresses", "geojson")
     property_tax_f = paths.cov("property-tax-report", "geojson")
-    chinatown_boundary_f = paths.chinatown_boundary
     properties_f = paths.properties
     properties_f.parent.mkdir(parents=True, exist_ok=True)
 
@@ -114,25 +109,9 @@ def run(paths: DataPaths) -> None:
         properties,
     )
     print("props after VanMaps join:", props.height)
-
-    # --- Chinatown boundary flag ---
-    print("Loading Chinatown boundary ...")
-    addr_gdf = geopandas.read_file(property_addresses_f)
-    ct_boundary = geopandas.read_file(chinatown_boundary_f)
-    addr_gdf["chinatown"] = addr_gdf["geometry"].within(ct_boundary.iloc[0]["geometry"])
-
-    ct = pl.from_pandas(
-        addr_gdf.loc[addr_gdf["chinatown"], ["civic_number", "std_street", "chinatown"]]
-    )
-    ct = ct.with_columns(
-        address=pl.concat_str(
-            pl.col("civic_number"), pl.lit(" "), pl.col("std_street")
-        ).map_elements(addr_key_from_freeform, return_dtype=pl.Utf8),
-    ).select("address", "chinatown")
-    print("Addresses within Chinatown boundary:", ct.height)
-
-    props = props.join(ct, on="address", how="left").unique()
-    props = props.with_columns(pl.col("chinatown").fill_null(False))
+    # The retired Chinatown-flag join used to end in this; kept so the
+    # row set doesn't change with it.
+    props = props.unique()
 
     # --- property-tax-report.geojson: assessment values ---
     print("Loading property-tax-report.geojson ...")
@@ -177,7 +156,6 @@ def run(paths: DataPaths) -> None:
         "address",
         "primary_address",
         "geo_local_area",
-        "chinatown",
         "address_type",
         "address_status",
         "zoning_district",

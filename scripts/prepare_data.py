@@ -4,7 +4,7 @@
 Stages, in dependency order:
   foi         raw/cov_foi 2023 + 2024 extracts  -> derived/interim/all_rentals.csv
   properties  raw/cov_open_data + raw/vanmaps   -> derived/interim/properties.csv
-  buildings   the above + curated/              -> derived/buildings.csv, ct_properties.csv
+  buildings   the above + curated/              -> derived/buildings.csv
 
 Usage: uv run python scripts/prepare_data.py [--data-dir data] [--stage all]
 """

@@ -1,13 +1,14 @@
 """Rebuild derived/buildings.csv (one row per building, with landlord
-attribution) and derived/ct_properties.csv from refreshed inputs.
+attribution) from refreshed inputs.
 
 Ported from vhd's scripts/build_buildings.py (logic unchanged: address
 cleaning, the FOI/non-market/issues joins, the `Long-term Rental` business
 licence filter, and the
 `secondary_addresses` column), except that licensees keep their filed names
 (no curated/landlord_mapping.toml renaming; see ownership_claims). Removed: the writes of rental_properties.csv,
-nm_rental_properties.csv, address_index.csv and landlord_summary.csv, which
-nothing in this repo reads. vhd's own docstring records why the notebook
+nm_rental_properties.csv, address_index.csv, landlord_summary.csv and (since
+2026-10-20) ct_properties.csv, a Chinatown property list for a past partner
+project, which nothing in this repo reads. vhd's own docstring records why the notebook
 logic was reconstructed the way it was (the undefined `addresses` variable,
 the retired Google Sheets push); that history stays in the archive.
 """
@@ -190,7 +191,6 @@ def run(paths: DataPaths) -> None:
     non_market_housing_f = paths.cov("non-market-housing", "geojson")
     rental_standards_issues_f = paths.cov("rental-standards-current-issues", "geojson")
     buildings_f = paths.buildings
-    ct_properties_f = paths.ct_properties
     buildings_f.parent.mkdir(parents=True, exist_ok=True)
 
     pl.Config.set_tbl_rows(10)
@@ -205,11 +205,6 @@ def run(paths: DataPaths) -> None:
     matcher = AddressMatcher(props["address"].drop_nulls().to_list())
     to_key = lambda a: matcher.match(a) or addr_key_from_freeform(a)
     CLEAN = lambda col: pl.col(col).map_elements(to_key, return_dtype=pl.Utf8)
-
-    # --- Chinatown properties ---
-    ct_props = collapse_parcels(props.filter(pl.col("chinatown")))
-    ct_props.write_csv(ct_properties_f)
-    print(f"ct_properties.csv: {ct_props.height} rows")
 
     # --- Rentals (merged FOI 2023+2024, see tc_core.prepare.foi) ---
     rentals = pl.read_csv(all_rentals_f)
