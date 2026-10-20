@@ -986,6 +986,19 @@ def export_artifacts(
         )
     )
 
+    # Same totals as networks.json's NetworkTotals (units, assessed_value),
+    # per building, for the portfolio sliders' histograms.
+    value = pl.col("value_land").fill_null(0) + pl.col("value_bldg").fill_null(0)
+    has_value = pl.col("value_land").is_not_null() | pl.col("value_bldg").is_not_null()
+    # "unknown" is the key of every building with no landlord on record, not a network.
+    in_network = pl.col("network_key").is_not_null() & ~pl.col("network_key").str.to_lowercase().is_in(
+        ["", "unknown", "(unknown)"]
+    )
+    points_df = points_df.with_columns(
+        portfolio_units=pl.when(in_network).then(pl.col("units").fill_null(0).sum().over("network_key")),
+        portfolio_value=pl.when(in_network & has_value.any().over("network_key"))
+        .then(pl.when(has_value).then(value).otherwise(0).sum().over("network_key")),
+    )
     filter_cfg = reconstruct_filter_config(conn, points_df, blocks_df, now, list(overlay_areas))
     building_payload, network_payload, median_share = _contract_records(conn, points_df, classification)
     filter_cfg["land_share_median"] = median_share

@@ -148,7 +148,7 @@ def _facts(row: Mapping[str, object], coop: Coop | None, sro: Sro | None, listed
         sro_owner_sector=sro.owner_sector if sro else None,
         sro_operator_sector=sro.operator_sector if sro else None,
         on_non_market_list="non_market_list" in listed_in,
-        network_buildings=_int(row.get("network_buildings_on_map")),
+        network_buildings=_int(row.get("network_buildings_on_map")) if _text(row.get("network_key")) else None,
     )
 
 

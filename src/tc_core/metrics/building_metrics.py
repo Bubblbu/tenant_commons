@@ -60,6 +60,28 @@ BUILDING_METRICS = {
         "attr": "year-built",
         "bins": 24,
     },
+    # A building's landlord network on the map (spec 2026-10-20): lower
+    # bounds, since only rental buildings on this map count.
+    "portfolio_units": {
+        "label": "Landlord's units on the map",
+        "format": "number",
+        "type": "int",
+        "step": 1,
+        "attr": "portfolio-units",
+        "bins": 18,
+        "force_log": True,
+        "log_floor": 2.5,
+    },
+    "portfolio_value": {
+        "label": "Landlord's assessed value on the map",
+        "format": "currency",
+        "unit": "$",
+        "type": "float",
+        "step": 5000,
+        "attr": "portfolio-value",
+        "bins": 24,
+        "log_floor": 100000,
+    },
 }
 
 

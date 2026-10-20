@@ -421,3 +421,34 @@ def test_unknown_basis_fails_the_export():
     from tc_core.contract import MarketAxis
     with pytest.raises(ValidationError):
         MarketAxis(value="market", basis=["tenant_report"], inferred=True)
+
+
+def test_filter_config_summarises_portfolio_size_from_network_totals(tmp_path):
+    def valued(conn):
+        conn.execute("UPDATE buildings SET value_land = 1000000, value_bldg = 500000")
+        conn.commit()
+
+    out = _export(tmp_path, extra=valued)
+    cfg = json.loads((out / "filter_config.json").read_text())
+    metrics = cfg["building_metrics"]
+    for key, attr in (("portfolio_units", "portfolio-units"), ("portfolio_value", "portfolio-value")):
+        assert metrics[key]["attr"] == attr
+        assert key in cfg["building_metric_order"]
+    totals = [n["totals"] for n in networks(out).values()]
+    assert metrics["portfolio_value"]["max"] == max(t["assessed_value"] for t in totals)
+    assert metrics["portfolio_units"]["max"] == max(t["units"] for t in totals)
+
+
+def test_buildings_with_no_landlord_are_not_pooled_into_one_portfolio(tmp_path):
+    def nobodies(conn):
+        conn.executemany(
+            "INSERT INTO buildings (addr_key, address, lat, lon, local_area, units, value_land, value_bldg, "
+            "created_at, updated_at) VALUES (?, ?, 49.28, -123.1, 'Mount Pleasant', 900, 5000000, 5000000, 'now', 'now')",
+            [("4 nobody st", "4 nobody st"), ("5 nobody st", "5 nobody st")],
+        )
+        conn.commit()
+
+    out = _export(tmp_path, extra=nobodies)
+    metrics = json.loads((out / "filter_config.json").read_text())["building_metrics"]
+    assert metrics["portfolio_units"]["max"] == max(n["totals"]["units"] for n in networks(out).values())
+    assert records(out)["4 nobody st"]["classification"]["scale"] is None
