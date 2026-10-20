@@ -90,8 +90,11 @@ describe('clearSection', () => {
   });
 
   it('counts active filters per section', () => {
-    expect(sectionCounts(busy, sections)).toEqual({ area: 1, ownership: 2, building: 4, value: 1 });
-    expect(sectionCounts(defaultFilterState(), sections)).toEqual({ area: 0, ownership: 0, building: 0, value: 0 });
+    expect(sectionCounts(busy, sections)).toEqual({ area: 1, ownership: 2, building: 4, value: 1, portfolio: 0 });
+    expect(sectionCounts(defaultFilterState(), sections)).toEqual({ area: 0, ownership: 0, building: 0, value: 0, portfolio: 0 });
+    const classified = { ...defaultFilterState(), ownerTypes: ['private'], legalForms: ['trust'], includeInferred: false };
+    expect(sectionCounts(classified, sections).ownership).toBe(3);
+    expect(clearSection(classified, 'ownership', sections)).toEqual(defaultFilterState());
   });
 });
 

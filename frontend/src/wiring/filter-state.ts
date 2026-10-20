@@ -11,11 +11,17 @@ export interface FilterState {
   onlyIssues: boolean;
   onlyOwned: boolean;
   onlyUnits: boolean;
+  /** Owner types ('private', 'non_profit', ...); a mixed building matches any of its parts. */
+  ownerTypes: string[];
+  legalForms: string[];
+  market: string[];
+  /** Off: only owner types and market values from evidence, not inference. */
+  includeInferred: boolean;
   /** Missing key or null bound = unbounded. */
   thresholds: Record<string, Threshold>;
 }
 
-export type FilterSection = 'area' | 'ownership' | 'building' | 'value';
+export type FilterSection = 'area' | 'ownership' | 'building' | 'value' | 'portfolio';
 
 export interface FilterControls {
   hoodInputs: HTMLInputElement[];
@@ -28,7 +34,10 @@ export interface FilterControls {
 }
 
 export function defaultFilterState(): FilterState {
-  return { hoods: [], housing: [], landlords: [], onlyIssues: false, onlyOwned: false, onlyUnits: false, thresholds: {} };
+  return {
+    hoods: [], housing: [], landlords: [], onlyIssues: false, onlyOwned: false, onlyUnits: false, thresholds: {},
+    ownerTypes: [], legalForms: [], market: [], includeInferred: true,
+  };
 }
 
 /** A handle within half a step of its end of the range means "no bound". */
@@ -47,25 +56,29 @@ function withoutSection(thresholds: Record<string, Threshold>, section: MetricSe
 export function clearSection(state: FilterState, section: FilterSection, metricSection: Record<string, MetricSection>): FilterState {
   switch (section) {
     case 'area': return { ...state, hoods: [] };
-    case 'ownership': return { ...state, landlords: [], onlyOwned: false };
+    case 'ownership':
+      return { ...state, landlords: [], onlyOwned: false, ownerTypes: [], legalForms: [], market: [], includeInferred: true };
     case 'building':
       return { ...state, housing: [], onlyIssues: false, onlyUnits: false, thresholds: withoutSection(state.thresholds, 'building', metricSection) };
     case 'value': return { ...state, thresholds: withoutSection(state.thresholds, 'value', metricSection) };
+    case 'portfolio': return { ...state, thresholds: withoutSection(state.thresholds, 'portfolio', metricSection) };
   }
 }
 
 /** How many filters each Filter by section has on, shown beside its heading. */
 export function sectionCounts(state: FilterState, metricSection: Record<string, MetricSection>): Record<FilterSection, number> {
-  const active: Record<MetricSection, number> = { building: 0, value: 0 };
+  const active: Record<MetricSection, number> = { building: 0, value: 0, portfolio: 0 };
   for (const [k, t] of Object.entries(state.thresholds)) {
     const section = metricSection[k];
     if (section && (t.min !== null || t.max !== null)) active[section] += 1;
   }
   return {
     area: state.hoods.length,
-    ownership: state.landlords.length + (state.onlyOwned ? 1 : 0),
+    ownership: state.landlords.length + (state.onlyOwned ? 1 : 0) + state.ownerTypes.length + state.legalForms.length +
+      state.market.length + (state.includeInferred ? 0 : 1),
     building: state.housing.length + (state.onlyIssues ? 1 : 0) + (state.onlyUnits ? 1 : 0) + active.building,
     value: active.value,
+    portfolio: active.portfolio,
   };
 }
 
@@ -100,6 +113,10 @@ export function readFilterState(c: FilterControls): FilterState {
     onlyIssues: !!c.onlyIssues?.checked,
     onlyOwned: !!c.onlyOwned?.checked,
     onlyUnits: !!c.onlyUnits?.checked,
+    ownerTypes: [],
+    legalForms: [],
+    market: [],
+    includeInferred: true,
     thresholds,
   };
 }

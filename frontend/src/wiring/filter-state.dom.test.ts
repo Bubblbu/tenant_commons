@@ -30,6 +30,7 @@ describe('readFilterState / writeFilterState', () => {
       hoods: ['chinatown'], housing: ['co-op'],
       landlords: [{ kind: 'owner', key: 'acme', label: 'Acme', buildings: 4, detail: '' }],
       onlyIssues: true, onlyOwned: false, onlyUnits: true,
+      ownerTypes: [], legalForms: [], market: [], includeInferred: true,
       thresholds: { units: { min: 20, max: null } },
     };
     writeFilterState(c, state);

@@ -14,6 +14,7 @@ export const FLAT_COLUMNS = [
   'network_key', 'network_name', 'network_source', 'network_buildings_on_map',
   'network_evidence_registry', 'network_evidence_city', 'network_evidence_research',
   'pids', 'registry_no_filing', 'value_land', 'value_bldg', 'bldg_land_ratio', 'land_share_pctl',
+  'owner_type', 'owner_legal_forms', 'market', 'portfolio_units', 'portfolio_value',
   'housing_type', 'rezoning_status', 'n_issues', 'issues_details',
   'areas', 'lat', 'lon',
 ];
@@ -24,6 +25,7 @@ export function flatten(b: Building, networks: Record<string, Network>): Buildin
   const owner = first(b, 'owner');
   const net = b.network_id ? networks[b.network_id] ?? null : null;
   const housing = [b.coop ? 'co-op' : '', b.sro ? 'sro' : ''].filter(Boolean).join(', ');
+  const { owner: ownerType, market } = b.classification;
   return {
     b_id: b.id,
     source: b.origin,
@@ -54,6 +56,15 @@ export function flatten(b: Building, networks: Record<string, Network>): Buildin
     value_bldg: b.value?.building ?? null,
     bldg_land_ratio: b.value && b.value.land > 0 ? b.value.building / b.value.land : null,
     land_share_pctl: b.value?.land_share_pctl ?? null,
+    owner_type: ownerType?.value ?? null,
+    owner_parts: ownerType?.parts.length ? ownerType.parts.join('; ') : null,
+    owner_legal_forms: ownerType?.legal_forms.length ? ownerType.legal_forms.join('; ') : null,
+    owner_inferred: ownerType?.inferred ?? false,
+    market: market?.value ?? null,
+    market_inferred: market?.inferred ?? false,
+    // The landlord's network on the map (spec 2026-10-20): a lower bound.
+    portfolio_units: net?.totals.units ?? null,
+    portfolio_value: net?.totals.assessed_value ?? null,
     housing_type: housing,
     rezoning_status: b.rezoning?.status ?? null,
     n_issues: b.issues?.count ?? null,

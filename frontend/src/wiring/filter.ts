@@ -31,6 +31,15 @@ function baseMatches(f: FilterFields, s: FilterState): boolean {
   // Otherwise the Units slider lets buildings with no count through (see below).
   if (s.onlyUnits && f.metrics.units == null) return false;
   if (s.onlyOwned && !f.hasOwner) return false;
+  if (s.ownerTypes.length > 0) {
+    if (!s.includeInferred && f.ownerInferred) return false;
+    if (!s.ownerTypes.some((t) => f.ownerTypes.includes(t))) return false;
+  }
+  if (s.legalForms.length > 0 && !s.legalForms.some((t) => f.legalForms.includes(t))) return false;
+  if (s.market.length > 0) {
+    if (!s.includeInferred && f.marketInferred) return false;
+    if (!s.market.includes(f.market)) return false;
+  }
   return true;
 }
 

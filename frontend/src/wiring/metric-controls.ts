@@ -1,7 +1,7 @@
 import type { FilterConfig } from '../types';
 import { formatTickValue, formatWithSummary, niceLogTicks, sliderScale, type MetricSummary } from './metric-format';
 
-export type MetricSection = 'building' | 'value';
+export type MetricSection = 'building' | 'value' | 'portfolio';
 
 export interface MetricControl {
   summary: MetricSummary;

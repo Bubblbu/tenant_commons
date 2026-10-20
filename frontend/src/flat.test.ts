@@ -69,3 +69,20 @@ describe('flatten, evidence', () => {
     expect(FLAT_COLUMNS).toContain('network_evidence_city');
   });
 });
+
+describe('flatten, classification', () => {
+  it('flattens classification and portfolio totals into plain columns', () => {
+    const b: Building = { ...york, network_id: 'n1', classification: {
+      owner: { value: 'mixed', legal_forms: ['numbered_company'], parts: ['non_profit', 'private'], reason: 'owners_differ', basis: ['registry'], inferred: false },
+      market: { value: 'market', basis: ['registry'], inferred: true }, operator: null, scale: 'small_portfolio' } };
+    const r = flatten(b, { n1: { ...network, id: 'n1', totals: { ...network.totals, units: 40, assessed_value: 12_000_000 } } });
+    expect([r.owner_type, r.owner_parts, r.owner_legal_forms, r.owner_inferred, r.market, r.market_inferred]).toEqual(
+      ['mixed', 'non_profit; private', 'numbered_company', false, 'market', true]);
+    expect([r.portfolio_units, r.portfolio_value]).toEqual([40, 12_000_000]);
+  });
+
+  it('leaves unknown axes and portfolios null', () => {
+    const r = flatten({ ...york, network_id: null }, {});
+    expect([r.owner_type, r.market, r.portfolio_units, r.portfolio_value]).toEqual([null, null, null, null]);
+  });
+});
