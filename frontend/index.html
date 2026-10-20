@@ -1370,6 +1370,11 @@
     margin-top: 0;
   }
 
+  #filters-panel .filter-subgroup {
+    display: block;
+    margin-top: 14px;
+  }
+
   #filters-panel .filter-collapsible > summary::-webkit-details-marker {
     display: none;
   }
@@ -1631,14 +1636,15 @@
     </section>
     <section class="panel-group">
       <h3>Filter by</h3>
-      <div class="filter-section">
-        <h4 class="filter-heading">Area <span class="filter-count" id="filter-count-area" hidden></span><button type="button" class="filter-section-clear" id="filter-clear-area" hidden>Clear</button></h4>
+      <!-- Every section collapses; a collapsed heading still shows its count and Clear. -->
+      <details class="filter-section filter-collapsible" id="filter-area-details" open>
+        <summary><h4 class="filter-heading">Area <span class="filter-count" id="filter-count-area" hidden></span><button type="button" class="filter-section-clear" id="filter-clear-area" hidden>Clear</button></h4></summary>
         <div class="filter-tags" id="filter-neighbourhoods">
         </div>
         <p class="filter-hint">None ticked shows every area.</p>
-      </div>
-      <div class="filter-section">
-        <h4 class="filter-heading">Ownership <span class="filter-count" id="filter-count-ownership" hidden></span><button type="button" class="filter-section-clear" id="filter-clear-ownership" hidden>Clear</button></h4>
+      </details>
+      <details class="filter-section filter-collapsible" id="filter-landlord-details" open>
+        <summary><h4 class="filter-heading">Landlord <span class="filter-count" id="filter-count-landlord" hidden></span><button type="button" class="filter-section-clear" id="filter-clear-landlord" hidden>Clear</button></h4></summary>
         <ul class="picker-tiles" id="owner-tiles" aria-label="Selected landlords" hidden></ul>
         <div class="search-field landlord-picker">
           <input type="text" id="owner-search" placeholder="Add landlord or group…" autocomplete="off"
@@ -1649,8 +1655,14 @@
         <div class="filter-visual filter-after-picker">
           <label><input type="checkbox" id="filter-only-owned"> Landlord on record</label>
         </div>
-        <div class="filter-chips filter-after-picker" role="group" aria-label="Owner type">
-          <span class="filter-chips-label">Owner type</span>
+        <div class="filter-chips-label filter-subgroup">Portfolio on the map</div>
+        <p class="filter-hint">The landlord's rental buildings on this map only, so a lower bound on what they hold.</p>
+        <div id="filter-portfolio-section" class="filter-building"></div>
+      </details>
+      <details class="filter-section filter-collapsible" id="filter-type-details">
+        <summary><h4 class="filter-heading">Owner type <span class="filter-count" id="filter-count-type" hidden></span><button type="button" class="filter-section-clear" id="filter-clear-type" hidden>Clear</button></h4></summary>
+        <div class="filter-chips" role="group" aria-label="Owner type">
+          <span class="filter-chips-label">Type</span>
           <button type="button" class="filter-chip owner-type-chip" data-owner-type="private" aria-pressed="false">Private</button>
           <button type="button" class="filter-chip owner-type-chip" data-owner-type="non_profit" aria-pressed="false">Non-profit</button>
           <button type="button" class="filter-chip owner-type-chip" data-owner-type="coop" aria-pressed="false">Co-op</button>
@@ -1673,9 +1685,9 @@
           <label><input type="checkbox" id="filter-include-inferred" checked> Include inferred</label>
         </div>
         <p class="filter-hint">Legal form applies to private owners. Inferred: from the rental licence holder or a City housing list, not the land title.</p>
-      </div>
-      <div class="filter-section">
-        <h4 class="filter-heading">Building <span class="filter-count" id="filter-count-building" hidden></span><button type="button" class="filter-section-clear" id="filter-clear-building" hidden>Clear</button></h4>
+      </details>
+      <details class="filter-section filter-collapsible" id="filter-building-details">
+        <summary><h4 class="filter-heading">Building <span class="filter-count" id="filter-count-building" hidden></span><button type="button" class="filter-section-clear" id="filter-clear-building" hidden>Clear</button></h4></summary>
         <div class="filter-chips" role="group" aria-label="Housing type">
           <span class="filter-chips-label">Housing type</span>
           <button type="button" class="filter-chip housing-chip" data-housing="sro" aria-pressed="false">SRO</button>
@@ -1686,15 +1698,10 @@
           <label><input type="checkbox" id="filter-only-units"> Unit count on record</label>
         </div>
         <div id="filter-building-section" class="filter-building"></div>
-      </div>
+      </details>
       <details class="filter-section filter-collapsible" id="filter-value-details">
         <summary><h4 class="filter-heading">Assessed value <span class="filter-count" id="filter-count-value" hidden></span><button type="button" class="filter-section-clear" id="filter-clear-value" hidden>Clear</button></h4></summary>
         <div id="filter-value-section" class="filter-building"></div>
-      </details>
-      <details class="filter-section filter-collapsible" id="filter-portfolio-details">
-        <summary><h4 class="filter-heading">Landlord portfolio <span class="filter-count" id="filter-count-portfolio" hidden></span><button type="button" class="filter-section-clear" id="filter-clear-portfolio" hidden>Clear</button></h4></summary>
-        <p class="filter-hint">The landlord's rental buildings on this map only, so a lower bound on what they hold.</p>
-        <div id="filter-portfolio-section" class="filter-building"></div>
       </details>
     </section>
   </div>

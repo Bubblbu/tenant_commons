@@ -93,7 +93,7 @@ export function initFilterPass(deps: FilterPassDeps, doc: Document): FilterPass 
     };
   });
 
-  const sectionEls = (['area', 'ownership', 'building', 'value', 'portfolio'] as const).reduce(
+  const sectionEls = (['area', 'landlord', 'type', 'building', 'value'] as const).reduce(
     (acc, sec) => {
       acc[sec] = {
         count: doc.getElementById('filter-count-' + sec),
@@ -203,7 +203,7 @@ export function initFilterPass(deps: FilterPassDeps, doc: Document): FilterPass 
   function clearSection(section: FilterSection): void {
     // writeFilterState(landlords.set([])) only replaces the tiles; clear()
     // also empties any typed-but-unpicked search text and closes the list.
-    if (section === 'ownership') controls.landlords?.clear();
+    if (section === 'landlord') controls.landlords?.clear();
     writeFilterState(controls, clearSectionState(readFilterState(controls), section, metricSection));
     apply();
   }
@@ -211,7 +211,7 @@ export function initFilterPass(deps: FilterPassDeps, doc: Document): FilterPass 
     const btn = sectionEls[sec].clear;
     if (!btn) return;
     btn.addEventListener('click', (e) => {
-      // Inside <summary> (Assessed value), don't also toggle the section.
+      // Inside <summary>, don't also toggle the section.
       e.preventDefault();
       clearSection(sec);
     });

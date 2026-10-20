@@ -62,7 +62,7 @@ describe('encodeFilterState', () => {
   });
 });
 
-const sections: Record<string, MetricSection> = { units: 'building', value_land: 'value' };
+const sections: Record<string, MetricSection> = { units: 'building', value_land: 'value', portfolio_units: 'portfolio' };
 
 describe('normalizeThreshold', () => {
   it('reads a handle within half a step of its end as no bound', () => {
@@ -77,24 +77,31 @@ describe('clearSection', () => {
     ...defaultFilterState(),
     hoods: ['west end'], housing: ['sro'], onlyIssues: true, onlyOwned: true, onlyUnits: true,
     landlords: [{ kind: 'owner' as const, key: 'a', label: 'A', buildings: 1, detail: '' }],
-    thresholds: { units: { min: 5, max: null }, value_land: { min: null, max: 9 } },
+    thresholds: { units: { min: 5, max: null }, value_land: { min: null, max: 9 }, portfolio_units: { min: 50, max: null } },
   };
 
   it('clears only the named section', () => {
     expect(clearSection(busy, 'area', sections)).toEqual({ ...busy, hoods: [] });
-    expect(clearSection(busy, 'ownership', sections)).toEqual({ ...busy, landlords: [], onlyOwned: false });
-    expect(clearSection(busy, 'building', sections)).toEqual({
-      ...busy, housing: [], onlyIssues: false, onlyUnits: false, thresholds: { value_land: { min: null, max: 9 } },
+    // Landlord: the picker, "Landlord on record" and the portfolio sliders.
+    expect(clearSection(busy, 'landlord', sections)).toEqual({
+      ...busy, landlords: [], onlyOwned: false,
+      thresholds: { units: { min: 5, max: null }, value_land: { min: null, max: 9 } },
     });
-    expect(clearSection(busy, 'value', sections)).toEqual({ ...busy, thresholds: { units: { min: 5, max: null } } });
+    expect(clearSection(busy, 'building', sections)).toEqual({
+      ...busy, housing: [], onlyIssues: false, onlyUnits: false,
+      thresholds: { value_land: { min: null, max: 9 }, portfolio_units: { min: 50, max: null } },
+    });
+    expect(clearSection(busy, 'value', sections)).toEqual({
+      ...busy, thresholds: { units: { min: 5, max: null }, portfolio_units: { min: 50, max: null } },
+    });
   });
 
   it('counts active filters per section', () => {
-    expect(sectionCounts(busy, sections)).toEqual({ area: 1, ownership: 2, building: 4, value: 1, portfolio: 0 });
-    expect(sectionCounts(defaultFilterState(), sections)).toEqual({ area: 0, ownership: 0, building: 0, value: 0, portfolio: 0 });
-    const classified = { ...defaultFilterState(), ownerTypes: ['private'], legalForms: ['trust'], includeInferred: false };
-    expect(sectionCounts(classified, sections).ownership).toBe(3);
-    expect(clearSection(classified, 'ownership', sections)).toEqual(defaultFilterState());
+    expect(sectionCounts(busy, sections)).toEqual({ area: 1, landlord: 3, type: 0, building: 4, value: 1 });
+    expect(sectionCounts(defaultFilterState(), sections)).toEqual({ area: 0, landlord: 0, type: 0, building: 0, value: 0 });
+    const classified = { ...busy, ownerTypes: ['private'], legalForms: ['trust'], includeInferred: false };
+    expect(sectionCounts(classified, sections).type).toBe(3);
+    expect(clearSection(classified, 'type', sections)).toEqual(busy);
   });
 });
 

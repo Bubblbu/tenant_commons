@@ -21,7 +21,8 @@ export interface FilterState {
   thresholds: Record<string, Threshold>;
 }
 
-export type FilterSection = 'area' | 'ownership' | 'building' | 'value' | 'portfolio';
+/** The sidebar's Filter by sections. The portfolio sliders sit in Landlord; classification in Owner type. */
+export type FilterSection = 'area' | 'landlord' | 'type' | 'building' | 'value';
 
 export interface FilterControls {
   hoodInputs: HTMLInputElement[];
@@ -60,12 +61,12 @@ function withoutSection(thresholds: Record<string, Threshold>, section: MetricSe
 export function clearSection(state: FilterState, section: FilterSection, metricSection: Record<string, MetricSection>): FilterState {
   switch (section) {
     case 'area': return { ...state, hoods: [] };
-    case 'ownership':
-      return { ...state, landlords: [], onlyOwned: false, ownerTypes: [], legalForms: [], market: [], includeInferred: true };
+    case 'landlord':
+      return { ...state, landlords: [], onlyOwned: false, thresholds: withoutSection(state.thresholds, 'portfolio', metricSection) };
+    case 'type': return { ...state, ownerTypes: [], legalForms: [], market: [], includeInferred: true };
     case 'building':
       return { ...state, housing: [], onlyIssues: false, onlyUnits: false, thresholds: withoutSection(state.thresholds, 'building', metricSection) };
     case 'value': return { ...state, thresholds: withoutSection(state.thresholds, 'value', metricSection) };
-    case 'portfolio': return { ...state, thresholds: withoutSection(state.thresholds, 'portfolio', metricSection) };
   }
 }
 
@@ -78,11 +79,10 @@ export function sectionCounts(state: FilterState, metricSection: Record<string, 
   }
   return {
     area: state.hoods.length,
-    ownership: state.landlords.length + (state.onlyOwned ? 1 : 0) + state.ownerTypes.length + state.legalForms.length +
-      state.market.length + (state.includeInferred ? 0 : 1),
+    landlord: state.landlords.length + (state.onlyOwned ? 1 : 0) + active.portfolio,
+    type: state.ownerTypes.length + state.legalForms.length + state.market.length + (state.includeInferred ? 0 : 1),
     building: state.housing.length + (state.onlyIssues ? 1 : 0) + (state.onlyUnits ? 1 : 0) + active.building,
     value: active.value,
-    portfolio: active.portfolio,
   };
 }
 

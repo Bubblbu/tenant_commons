@@ -284,11 +284,11 @@ describe('Clear and Reset', () => {
     expect(h.visible()).toEqual(ALL_BIDS);
     expect(document.querySelector(chip('sro'))?.getAttribute('aria-pressed')).toBe('false');
     expect(document.getElementById('filter-count-building')?.hidden).toBe(true);
-    expect(document.getElementById('filter-count-ownership')?.hidden).toBe(true);
+    expect(document.getElementById('filter-count-landlord')?.hidden).toBe(true);
     expect(h.landlords.isActive()).toBe(false);
   });
 
-  it('Reset and Clear (Ownership) also clear unpicked, typed landlord search text', () => {
+  it('Reset and Clear (Landlord) also clear unpicked, typed landlord search text', () => {
     const h = startHarness();
     const input = document.getElementById('owner-search') as HTMLInputElement;
 
@@ -299,7 +299,7 @@ describe('Clear and Reset', () => {
 
     input.value = 'acm';
     input.dispatchEvent(new Event('input'));
-    h.click('#filter-clear-ownership');
+    h.click('#filter-clear-landlord');
     expect(input.value).toBe('');
   });
 });
