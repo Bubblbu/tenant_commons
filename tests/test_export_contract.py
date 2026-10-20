@@ -139,7 +139,8 @@ def test_network_entities_merge_spellings_and_same_entity_claims():
     clusters = {"Chris Wall": "Chris Wall / WALL, CHRISTOPHER ROBERT",
                 "WALL, CHRISTOPHER ROBERT": "Chris Wall / WALL, CHRISTOPHER ROBERT"}
     classify = EntityClassifier(registry={sanitize_owner("WALL, CHRISTOPHER ROBERT"): "individual",
-                                          sanitize_owner("1030163 B.C. LTD."): "corporation"})
+                                          sanitize_owner("1030163 B.C. LTD."): "corporation"},
+                                filed={"WALL, CHRISTOPHER ROBERT", "1030163 B.C. LTD."})
     ents = build_networks(_wall_rows(), clusters=clusters, classify=classify)["net:wall"].entities
     got = [(e.name, e.also_named, e.kind, e.buildings) for e in ents]
     assert got == [

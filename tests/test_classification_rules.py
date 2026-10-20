@@ -170,6 +170,8 @@ def test_scale_thresholds(n, scale):
     assert scale_for(n, ScaleThresholds()) == scale
 
 
-def test_in_registry_knows_names_filed_with_the_registry():
-    c = EntityClassifier(registry={sanitize_owner("1030163 B.C. LTD."): "corporation"})
-    assert c.in_registry("1030163 B.C. LTD.") and not c.in_registry("Someone Else Ltd")
+def test_in_registry_knows_only_the_spelling_filed_with_the_registry():
+    c = EntityClassifier(registry={sanitize_owner("Siddoo Kashmir Holdings Ltd"): "corporation"},
+                         filed={"Siddoo Kashmir Holdings Ltd"})
+    assert c.in_registry("Siddoo Kashmir Holdings Ltd")
+    assert not c.in_registry("Siddoo Kashmir Holding Limited") and not c.in_registry("Someone Else Ltd")

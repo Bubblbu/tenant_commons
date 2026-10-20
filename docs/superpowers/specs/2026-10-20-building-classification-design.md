@@ -2,6 +2,8 @@
 
 *2026-10-20. Resumes the sector classification paused on 2026-10-06 (CLAUDE.md, Open questions).*
 
+> **Implemented 2026-10-20** (branch `feature/building-classification`). Planning and implementation refined several points; they are listed under "Refinements" at the end and win over the body where the two differ.
+
 ## Goal
 
 Classify every building and every owner entity along a few independent axes, so that:
@@ -103,14 +105,9 @@ Pure functions, no I/O:
 
 Name rules are an ordered table in the module.
 
-### Derived tables
+### Research outputs
 
-Rebuilt on every run, so research can query them:
-
-- `entity_kinds(entity_key, name, kind, institutional, basis, inferred)`
-- `building_classifications(building_id, owner_type, owner_legal_forms, owner_parts, owner_reason, owner_basis, owner_inferred, market, market_basis, market_inferred, scale, operator_type, operator_basis, operator_inferred, portfolio_units, portfolio_value, source_row_ids)`
-
-List-valued columns are JSON text (Postgres-compatible as `jsonb` later).
+`scripts/classification_report.py` reads the exported `building_records.json` and writes `data/derived/classification/buildings.csv` (one row per building: owner type, legal forms, parts, reason, basis, inferred; market; operator; scale; network) and `entities.csv` (name, role, kind, institutional, buildings), plus a printed report for eyeballing. Not public. (Not SQLite tables: `rebuild_data.py --skip-ingest` must never write to the database.)
 
 ### Export and contract (v5)
 
@@ -165,21 +162,14 @@ Targeted, per CLAUDE.md §6.
 
 ## Research queries (examples)
 
-```sql
--- Units by owner type and market status
-SELECT c.owner_type, c.market, COUNT(*) AS buildings, SUM(b.units) AS units
-FROM building_classifications c JOIN buildings b USING (building_id)
-GROUP BY 1, 2 ORDER BY units DESC;
-
--- Share of private rental units held through numbered companies, by local area
-SELECT b.local_area,
-       SUM(CASE WHEN c.owner_legal_forms LIKE '%numbered_company%' THEN b.units END) * 1.0
-         / SUM(b.units) AS numbered_share
-FROM building_classifications c JOIN buildings b USING (building_id)
-WHERE c.owner_type = 'private'
-GROUP BY 1 ORDER BY 2 DESC;
+```bash
+uv run python scripts/classification_report.py
+sqlite3 :memory: \
+  ".import --csv data/derived/classification/buildings.csv b" \
+  "SELECT owner_type, market, COUNT(*), SUM(units) FROM b GROUP BY 1, 2 ORDER BY 4 DESC;" \
+  "SELECT local_area, ROUND(1.0 * SUM(CASE WHEN owner_legal_forms LIKE '%numbered_company%' THEN units END) / SUM(units), 3)
+     FROM b WHERE owner_type = 'private' GROUP BY 1 ORDER BY 2 DESC;"
 ```
-
 
 ## Rollout
 
@@ -188,3 +178,15 @@ Rebuild (`prepare_data.py`, then `rebuild_data.py`), compare snapshots with `scr
 ## Out of scope
 
 Colour-by mode and legend; a totals panel; operator-type filter; a form for entering classification claims (internal tool, CLAUDE.md §4); splitting City-owned land by fund type; per-folio values (`collapse_parcels()`).
+
+## Refinements (planning and implementation, 2026-10-20)
+
+1. **Nothing known is null, never `"unknown"`.** The contract already bans sentinel strings (`test_v2_has_no_sentinels`). `Kind` and `OwnerType` have no `unknown`; `classification.owner` and `classification.market` are null when nothing is known; `NetworkEntity.kind` is nullable; `entity_kind` claims cannot say `unknown`. `metrics/sector.py` keeps `"unknown"` internally.
+2. **The leasehold reason is `public_land_leasehold`** and covers any non-government owner on City land. 9 of the first 11 cases are non-profit or co-op leaseholders; the popup names the leaseholder type ("City land, non-profit leasehold").
+3. **Registry holder type is evidence for `individual`**; a registry corporation is never an individual. "Settlor → trust" is dropped (a settlor created the trust; it is not the trust). `trust` comes from the name or a claim.
+4. **`inferred` on the owner axis** means the owner type came from something other than a registry owner, a claim or the City-owned list. Name rules applied to a registry owner don't make it inferred; the basis still lists `name_rule`.
+5. **Name rules** gained: association/benevolence → non-profit; Metro Vancouver Housing → government; "NNNNNN British Columbia Ltd" → numbered company; plain two-to-four-word names without organisation words ("Chris Wall") → individual, as the old network kind guess had it.
+6. **Portfolio sliders read network totals** (`NetworkTotals.units`, new `assessed_value`). Buildings carry no portfolio fields. The 2,330 buildings with no landlord on record share the sentinel network key `"unknown"` and are excluded from portfolios and scale.
+7. **No facet counts** in `filter_config.json`; the chips are static HTML like the housing chips.
+8. **`Basis`** gained `listing` (operators from manager listings) and lost `network`.
+9. **Coverage.** The licence-holder fallback (B′) only helps buildings that have a licence holder. The 2,330 buildings with neither owner nor licensee stay unclassified unless City land, co-op, SRO or non-market evidence applies. First build: owner type known for 2,489 of 5,588 buildings (private 1,949, government 259, non-profit 187, co-op 83, mixed 11); market status known for 2,542.

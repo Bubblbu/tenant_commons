@@ -98,23 +98,29 @@ class EntityClassifier:
         registry: Mapping[str, str] | None = None,
         kinds: Mapping[str, tuple[str, str]] | None = None,
         institutional: Mapping[str, tuple[str, str]] | None = None,
+        filed: set[str] | None = None,
     ) -> None:
         self._registry = registry or {}
+        self._filed = filed or set()
         self._kinds = kinds or {}
         self._institutional = institutional or {}
         self._cache: dict[str, EntityClass] = {}
 
     @classmethod
     def from_conn(cls, conn: sqlite3.Connection) -> EntityClassifier:
+        filed = {r[0] for r in conn.execute(
+            "SELECT DISTINCT TRIM(holder_name) FROM raw_lotr_ownership WHERE holder_name IS NOT NULL")}
         return cls(
             registry=registry_holder_types(conn),
+            filed=filed,
             kinds=entity_attribute_claims(conn, ENTITY_KIND),
             institutional=entity_attribute_claims(conn, INSTITUTIONAL),
         )
 
     def in_registry(self, name: str) -> bool:
-        """Whether the registry has a holder by this name (any spelling noise)."""
-        return sanitize_owner(name) in self._registry
+        """Whether this exact spelling is a holder name as filed with the
+        registry (networks prefer it as an entity's display name)."""
+        return name in self._filed
 
     def __call__(self, name: str) -> EntityClass:
         if name not in self._cache:
