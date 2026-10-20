@@ -36,6 +36,12 @@ def test_attribute_value_outside_vocabulary_is_rejected():
         record_claim(conn, "0733603 BC Ltd", "numbered company", ENTITY_KIND, "manual_research")
 
 
+def test_unknown_is_not_a_claimable_kind():
+    conn = _conn()
+    with pytest.raises(ValueError, match="entity_kind"):
+        record_claim(conn, "Acme Ltd", "unknown", ENTITY_KIND, "manual_research")
+
+
 def test_attribute_values_are_not_entities():
     conn = _conn()
     record_claim(conn, "Mennonite Senior Citizens Society of BC", "non_profit", ENTITY_KIND,

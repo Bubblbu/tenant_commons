@@ -55,7 +55,7 @@ ENTITY_KIND = "entity_kind"
 INSTITUTIONAL = "institutional"
 ENTITY_KINDS = (
     "government", "non_profit", "coop", "individual", "company",
-    "numbered_company", "trust", "partnership", "unknown",
+    "numbered_company", "trust", "partnership",
 )
 INSTITUTIONAL_KINDS = ("reit", "pension_fund", "insurer", "asset_manager", "other")
 ATTRIBUTE_RELATIONSHIPS = {ENTITY_KIND: ENTITY_KINDS, INSTITUTIONAL: INSTITUTIONAL_KINDS}

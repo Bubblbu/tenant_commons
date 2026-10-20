@@ -189,15 +189,3 @@ def building_pids(conn: sqlite3.Connection, pid_address_map_path: str) -> dict[s
         for addr_key in addr_keys:
             result[addr_key].add(_dashed(pid))
     return {addr_key: sorted(pids) for addr_key, pids in result.items()}
-
-
-def entity_kinds(conn: sqlite3.Connection) -> dict[str, str]:
-    """{name as filed: "person" | "company"} from the registry's own record of
-    whether each holder (reporting bodies included) is an individual."""
-    kinds: dict[str, str] = {}
-    for name, holder_type in conn.execute(
-        "SELECT DISTINCT TRIM(holder_name), holder_type FROM raw_lotr_ownership "
-        "WHERE holder_name IS NOT NULL AND TRIM(holder_name) != '' AND holder_type IS NOT NULL"
-    ):
-        kinds[name] = "person" if holder_type == "INDIVIDUAL" else "company"
-    return kinds

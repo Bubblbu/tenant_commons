@@ -40,6 +40,11 @@ from tc_core.normalize import sanitize_owner
     ("Computershare Trust Company of Canada", "company"),
     ("Moore, Kathleen Frances", "individual"),
     ("George Rener & Alenka Rener", "unknown"),
+    ("Chris Wall", "individual"),
+    ("Paul Y Mansion", "individual"),
+    ("Willow Lane Apartments", "company"),
+    ("Hotel Balmoral", "company"),
+    ("Metcap Living Management", "company"),
     ("", "unknown"),
 ])
 def test_kind_from_name(name, kind):
@@ -118,7 +123,7 @@ def test_non_profit_coop_is_coop_and_non_market():
 
 def test_equity_coop_is_market_inferred():
     c = classify_building([], CLASSIFY, BuildingFacts(coop_model="equity"))
-    assert (c.market.value, c.market.inferred) == ("market", True)
+    assert (c.owner, c.market.value, c.market.inferred) == (None, "market", True)
 
 
 def test_non_market_list_beats_private_owner_for_market():
@@ -145,11 +150,15 @@ def test_operator_from_manager_then_unlinked_licensee():
 
 def test_nothing_known_is_unknown():
     c = classify_building([], CLASSIFY, BuildingFacts())
-    assert (c.owner.value, c.market.value, c.operator, c.scale) == ("unknown", "unknown", None, None)
-    assert c.owner.basis == [] and c.market.basis == []
+    assert (c.owner, c.market, c.operator, c.scale) == (None, None, None, None)
 
 
 @pytest.mark.parametrize("n, scale", [(None, None), (1, "single"), (2, "small_portfolio"),
                                       (9, "small_portfolio"), (10, "large_portfolio")])
 def test_scale_thresholds(n, scale):
     assert scale_for(n, ScaleThresholds()) == scale
+
+
+def test_in_registry_knows_names_filed_with_the_registry():
+    c = EntityClassifier(registry={sanitize_owner("1030163 B.C. LTD."): "corporation"})
+    assert c.in_registry("1030163 B.C. LTD.") and not c.in_registry("Someone Else Ltd")

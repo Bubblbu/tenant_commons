@@ -21,6 +21,9 @@
           "title": "Areas",
           "type": "array"
         },
+        "classification": {
+          "$ref": "#/$defs/Classification"
+        },
         "coop": {
           "anyOf": [
             {
@@ -236,7 +239,8 @@
         "registry_search",
         "coop",
         "sro",
-        "rezoning"
+        "rezoning",
+        "classification"
       ],
       "title": "Building",
       "type": "object"
@@ -252,7 +256,7 @@
           "type": "object"
         },
         "schema_version": {
-          "const": 4,
+          "const": 5,
           "title": "Schema Version",
           "type": "integer"
         }
@@ -262,6 +266,66 @@
         "records"
       ],
       "title": "BuildingRecordsFile",
+      "type": "object"
+    },
+    "Classification": {
+      "additionalProperties": false,
+      "description": "Each axis is null when nothing is known about it.",
+      "properties": {
+        "market": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/MarketAxis"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "operator": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/OperatorAxis"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "owner": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/OwnerAxis"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "scale": {
+          "anyOf": [
+            {
+              "enum": [
+                "single",
+                "small_portfolio",
+                "large_portfolio"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Scale"
+        }
+      },
+      "required": [
+        "owner",
+        "market",
+        "operator",
+        "scale"
+      ],
+      "title": "Classification",
       "type": "object"
     },
     "Coop": {
@@ -373,6 +437,50 @@
       "title": "Issues",
       "type": "object"
     },
+    "MarketAxis": {
+      "additionalProperties": false,
+      "properties": {
+        "basis": {
+          "items": {
+            "enum": [
+              "name_rule",
+              "registry",
+              "licence",
+              "listing",
+              "city_owned",
+              "non_market_list",
+              "chf_bc",
+              "sro_inventory",
+              "claim_registry",
+              "claim_city_records",
+              "vtu_research"
+            ],
+            "type": "string"
+          },
+          "title": "Basis",
+          "type": "array"
+        },
+        "inferred": {
+          "title": "Inferred",
+          "type": "boolean"
+        },
+        "value": {
+          "enum": [
+            "non_market",
+            "market"
+          ],
+          "title": "Value",
+          "type": "string"
+        }
+      },
+      "required": [
+        "value",
+        "basis",
+        "inferred"
+      ],
+      "title": "MarketAxis",
+      "type": "object"
+    },
     "Network": {
       "additionalProperties": false,
       "properties": {
@@ -442,12 +550,25 @@
           "type": "integer"
         },
         "kind": {
-          "enum": [
-            "person",
-            "company"
+          "anyOf": [
+            {
+              "enum": [
+                "government",
+                "non_profit",
+                "coop",
+                "individual",
+                "company",
+                "numbered_company",
+                "trust",
+                "partnership"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
           ],
-          "title": "Kind",
-          "type": "string"
+          "title": "Kind"
         },
         "name": {
           "title": "Name",
@@ -466,6 +587,17 @@
     "NetworkTotals": {
       "additionalProperties": false,
       "properties": {
+        "assessed_value": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Assessed Value"
+        },
         "buildings": {
           "title": "Buildings",
           "type": "integer"
@@ -493,6 +625,7 @@
       "required": [
         "buildings",
         "units",
+        "assessed_value",
         "open_issues",
         "properties_on_title"
       ],
@@ -510,7 +643,7 @@
           "type": "object"
         },
         "schema_version": {
-          "const": 4,
+          "const": 5,
           "title": "Schema Version",
           "type": "integer"
         }
@@ -520,6 +653,147 @@
         "networks"
       ],
       "title": "NetworksFile",
+      "type": "object"
+    },
+    "OperatorAxis": {
+      "additionalProperties": false,
+      "properties": {
+        "basis": {
+          "items": {
+            "enum": [
+              "name_rule",
+              "registry",
+              "licence",
+              "listing",
+              "city_owned",
+              "non_market_list",
+              "chf_bc",
+              "sro_inventory",
+              "claim_registry",
+              "claim_city_records",
+              "vtu_research"
+            ],
+            "type": "string"
+          },
+          "title": "Basis",
+          "type": "array"
+        },
+        "value": {
+          "enum": [
+            "government",
+            "non_profit",
+            "coop",
+            "private",
+            "mixed"
+          ],
+          "title": "Value",
+          "type": "string"
+        }
+      },
+      "required": [
+        "value",
+        "basis"
+      ],
+      "title": "OperatorAxis",
+      "type": "object"
+    },
+    "OwnerAxis": {
+      "additionalProperties": false,
+      "properties": {
+        "basis": {
+          "items": {
+            "enum": [
+              "name_rule",
+              "registry",
+              "licence",
+              "listing",
+              "city_owned",
+              "non_market_list",
+              "chf_bc",
+              "sro_inventory",
+              "claim_registry",
+              "claim_city_records",
+              "vtu_research"
+            ],
+            "type": "string"
+          },
+          "title": "Basis",
+          "type": "array"
+        },
+        "inferred": {
+          "title": "Inferred",
+          "type": "boolean"
+        },
+        "legal_forms": {
+          "default": [],
+          "items": {
+            "enum": [
+              "government",
+              "non_profit",
+              "coop",
+              "individual",
+              "company",
+              "numbered_company",
+              "trust",
+              "partnership"
+            ],
+            "type": "string"
+          },
+          "title": "Legal Forms",
+          "type": "array"
+        },
+        "parts": {
+          "default": [],
+          "items": {
+            "enum": [
+              "government",
+              "non_profit",
+              "coop",
+              "private",
+              "mixed"
+            ],
+            "type": "string"
+          },
+          "title": "Parts",
+          "type": "array"
+        },
+        "reason": {
+          "anyOf": [
+            {
+              "enum": [
+                "owners_differ",
+                "public_land_private_leasehold"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reason"
+        },
+        "value": {
+          "enum": [
+            "government",
+            "non_profit",
+            "coop",
+            "private",
+            "mixed"
+          ],
+          "title": "Value",
+          "type": "string"
+        }
+      },
+      "required": [
+        "value",
+        "legal_forms",
+        "parts",
+        "reason",
+        "basis",
+        "inferred"
+      ],
+      "title": "OwnerAxis",
       "type": "object"
     },
     "Party": {
@@ -571,8 +845,7 @@
                 "company",
                 "numbered_company",
                 "trust",
-                "partnership",
-                "unknown"
+                "partnership"
               ],
               "type": "string"
             },

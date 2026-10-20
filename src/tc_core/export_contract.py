@@ -22,6 +22,7 @@ from .contract import (
     Value,
 )
 from .export_parties import _date, _http, _text, build_parties
+from .metrics.sector import BuildingFacts, EntityClassifier, ScaleThresholds, classify_building
 from .sro_text import sector
 
 _LISTED_IN = {
@@ -140,7 +141,24 @@ def _coord(value: object) -> float | None:
     return None if n is None else round(n, 6)
 
 
-def build_building(row: Mapping[str, object], *, shares: LandShares, clusters: Mapping[str, str]) -> Building:
+def _facts(row: Mapping[str, object], coop: Coop | None, sro: Sro | None, listed_in: list[str]) -> BuildingFacts:
+    return BuildingFacts(
+        city_owned=bool(row.get("city_owned")),
+        coop_model=coop.ownership_model if coop else None,
+        sro_owner_sector=sro.owner_sector if sro else None,
+        sro_operator_sector=sro.operator_sector if sro else None,
+        on_non_market_list="non_market_list" in listed_in,
+        network_buildings=_int(row.get("network_buildings_on_map")),
+    )
+
+
+def build_building(
+    row: Mapping[str, object], *, shares: LandShares, clusters: Mapping[str, str],
+    classify: EntityClassifier | None = None, thresholds: ScaleThresholds = ScaleThresholds(),
+) -> Building:
+    classify = classify or EntityClassifier()
+    parties = build_parties(row, clusters, classify)
+    listed_in, coop, sro = _listed_in(row), _coop(row), _sro(row)
     return Building(
         id=int(row["b_id"]),
         origin=row.get("source") or "building",
@@ -155,24 +173,17 @@ def build_building(row: Mapping[str, object], *, shares: LandShares, clusters: M
         units=_int(row.get("units")),
         units_basis=_units_basis(row),
         year_built=_int(row.get("year_built")),
-        listed_in=_listed_in(row),
+        listed_in=listed_in,
         value=_value(row, shares),
         issues=_issues(row),
-        parties=build_parties(row, clusters),
+        parties=parties,
         network_id=_text(row.get("network_key")),
         registry_search=_registry_search(row),
-        coop=_coop(row),
-        sro=_sro(row),
+        coop=coop,
+        sro=sro,
         rezoning=_rezoning(row),
+        classification=classify_building(parties, classify, _facts(row, coop, sro, listed_in), thresholds),
     )
-
-
-_COMPANY_WORDS = re.compile(
-    r"\b(ltd|limited|inc|incorporated|corp|corporation|co|company|society|association|"
-    r"partnership|holdings?|properties|group|foundation|trust|enterprises|ventures|"
-    r"investments?|realty|developments?|management|hotel|apartments|gp)\b",
-    re.IGNORECASE,
-)
 
 
 def _name_key(name: str) -> str:
@@ -180,10 +191,6 @@ def _name_key(name: str) -> str:
     "1030163 BC Ltd"); stricter than export_parties.match_key, which would
     also join "Development Corp" and "Developments Ltd"."""
     return re.sub(r"[^a-z0-9]", "", name.lower())
-
-
-def _guess_kind(name: str) -> str:
-    return "company" if _COMPANY_WORDS.search(name) or re.search(r"\d{5,}", name) else "person"
 
 
 def _owner_names(row: Mapping[str, object]) -> list[str]:
@@ -198,7 +205,7 @@ def _owner_names(row: Mapping[str, object]) -> list[str]:
 
 def _network_entities(
     names: list[str], members: list[Mapping[str, object]],
-    clusters: Mapping[str, str], kinds: Mapping[str, str],
+    clusters: Mapping[str, str], classify: EntityClassifier,
 ) -> list[NetworkEntity]:
     groups: dict[str, list[str]] = {}
     for name in names:
@@ -212,25 +219,26 @@ def _network_entities(
             owned[key] += 1
     entities = []
     for key, spellings in groups.items():
-        registry = sorted(n for n in spellings if n in kinds)
+        registry = sorted(n for n in spellings if classify.in_registry(n))
         name = registry[0] if registry else sorted(spellings)[0]
-        kind = next((kinds[n] for n in registry), None) or _guess_kind(name)
+        kind = classify(name).kind
+        kind = None if kind == "unknown" else kind
         entities.append(NetworkEntity(
             name=name, also_named=sorted(n for n in spellings if n != name), kind=kind, buildings=owned[key],
         ))
-    return sorted(entities, key=lambda e: (e.kind != "person", -e.buildings, e.name))
+    return sorted(entities, key=lambda e: (e.kind != "individual", -e.buildings, e.name))
 
 
 def build_networks(
     rows: Iterable[Mapping[str, object]],
     clusters: Mapping[str, str] | None = None,
-    kinds: Mapping[str, str] | None = None,
+    classify: EntityClassifier | None = None,
 ) -> dict[str, Network]:
     """One record per network key on the map: claims networks are
     `confirmed`; every other grouping (licence name, SRO owner, an owner on
     its own) is a `name_match`. `clusters` is claims.resolve_entity_clusters()
-    output; `kinds` maps registry names to "person"/"company"."""
-    clusters, kinds = clusters or {}, kinds or {}
+    output; `classify` gives each entity its kind (metrics/sector.py)."""
+    clusters, classify = clusters or {}, classify or EntityClassifier()
     networks: dict[str, Network] = {}
     for key, members in _group_rows(rows).items():
         first = members[0]
@@ -246,16 +254,28 @@ def build_networks(
                               vtu_research=int(evidence.get("vtu_research", 0))),
             entities=_network_entities(
                 [e for e in (_text(v) for v in (first.get("network_entities") or [])) if e],
-                members, clusters, kinds,
+                members, clusters, classify,
             ),
             totals=NetworkTotals(
                 buildings=len(members),
                 units=sum(_int(r.get("units")) or 0 for r in members),
+                assessed_value=_assessed_total(members),
                 open_issues=sum(_int(r.get("n_issues")) or 0 for r in members),
                 properties_on_title=_int(first.get("network_properties_on_title")) if claims else None,
             ),
         )
     return networks
+
+
+def _assessed_total(members: list[Mapping[str, object]]) -> int | None:
+    """Land + building assessed value of the network's buildings on the map;
+    null when none has a value. A lower bound on the landlord's holdings."""
+    values = [
+        (_num(r.get("value_land")) or 0) + (_num(r.get("value_bldg")) or 0)
+        for r in members
+        if _num(r.get("value_land")) is not None or _num(r.get("value_bldg")) is not None
+    ]
+    return int(round(sum(values))) if values else None
 
 
 def _group_rows(rows: Iterable[Mapping[str, object]]) -> dict[str, list[Mapping[str, object]]]:

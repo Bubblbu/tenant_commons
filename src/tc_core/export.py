@@ -52,8 +52,8 @@ from .metrics.registry_owners import (
     build_registry_owners,
     build_registry_searches,
     building_pids,
-    entity_kinds,
 )
+from .metrics.sector import EntityClassifier, ScaleThresholds, city_owned_buildings
 from .normalize import sanitize_owner
 from .overlay_areas import OverlayArea, load_area_features
 from .sro_names import SroName, load_sro_names
@@ -941,6 +941,7 @@ def export_artifacts(
     overlay_areas: list[OverlayArea] = (),
     now: datetime | None = None,
     property_managers_path: str | None = None,
+    classification: ScaleThresholds = ScaleThresholds(),
 ) -> None:
     """Write the complete frontend artifact set.
 
@@ -957,6 +958,11 @@ def export_artifacts(
         conn, now, pid_address_map_path,
         load_property_managers(property_managers_path) | managers_from_claims(conn),
         load_listing_aliases(property_managers_path),
+    )
+    # Buildings on City land (b_id is buildings.building_id for these rows).
+    on_city_land = list(city_owned_buildings(conn))
+    points_df = points_df.with_columns(
+        city_owned=pl.col("b_id").cast(pl.Int64).is_in(on_city_land) & (pl.col("source") == "building")
     )
 
     # Overlay areas (Chinatown, DEOD, Villages Plan) double as filterable
@@ -981,7 +987,7 @@ def export_artifacts(
     )
 
     filter_cfg = reconstruct_filter_config(conn, points_df, blocks_df, now, list(overlay_areas))
-    building_payload, network_payload, median_share = _contract_records(conn, points_df)
+    building_payload, network_payload, median_share = _contract_records(conn, points_df, classification)
     filter_cfg["land_share_median"] = median_share
 
     _write_json(
@@ -1077,7 +1083,7 @@ def _marker_records(points_df: pl.DataFrame) -> list[dict]:
 
 
 def _contract_records(
-    conn: sqlite3.Connection, points_df: pl.DataFrame
+    conn: sqlite3.Connection, points_df: pl.DataFrame, thresholds: ScaleThresholds = ScaleThresholds()
 ) -> tuple[dict, dict, float | None]:
     """building_records.json and networks.json payloads, validated against
     the public contract (tc_core/contract.py — a validation error fails the
@@ -1089,14 +1095,18 @@ def _contract_records(
         [s for s in (land_share(r) for r in rows if r.get("source") == "building") if s is not None]
     )
     clusters = resolve_entity_clusters(conn)
+    classify = EntityClassifier.from_conn(conn)
     buildings = BuildingRecordsFile(
         schema_version=SCHEMA_VERSION,
         records={
-            str(int(r["b_id"])): build_building(r, shares=shares, clusters=clusters) for r in rows
+            str(int(r["b_id"])): build_building(
+                r, shares=shares, clusters=clusters, classify=classify, thresholds=thresholds
+            )
+            for r in rows
         },
     )
     nets = NetworksFile(
         schema_version=SCHEMA_VERSION,
-        networks=build_networks(rows, clusters=clusters, kinds=entity_kinds(conn)),
+        networks=build_networks(rows, clusters=clusters, classify=classify),
     )
     return buildings.model_dump(mode="json"), nets.model_dump(mode="json"), shares.median

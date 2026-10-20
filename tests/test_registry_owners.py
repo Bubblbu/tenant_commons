@@ -194,8 +194,9 @@ def test_building_pids_come_from_every_address_point_and_are_dashed(tmp_path):
     }
 
 
-def test_entity_kinds_come_from_the_registrys_holder_type():
-    from tc_core.metrics.registry_owners import entity_kinds
+def test_holder_types_come_from_the_registry():
+    from tc_core.metrics.sector import registry_holder_types
+    from tc_core.normalize import sanitize_owner
 
     conn = _conn()
     conn.executemany(
@@ -205,4 +206,7 @@ def test_entity_kinds_come_from_the_registrys_holder_type():
          ("A LTD.", "INTEREST_HOLDER", "INDIVIDUAL", "DOE, JANE"),
          ("Wong, Allen", "RB_TRUSTEE_INDIVIDUAL", "INDIVIDUAL", "Wong, Allen")],
     )
-    assert entity_kinds(conn) == {"A LTD.": "company", "DOE, JANE": "person", "Wong, Allen": "person"}
+    assert registry_holder_types(conn) == {
+        sanitize_owner("A LTD."): "corporation", sanitize_owner("DOE, JANE"): "individual",
+        sanitize_owner("Wong, Allen"): "individual",
+    }

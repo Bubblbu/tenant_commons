@@ -8,7 +8,7 @@ from pathlib import Path
 
 from contract_helpers import network, networks, owner, parties, records
 
-from tc_core.claims import NETWORK_LABEL, record_claim
+from tc_core.claims import ENTITY_KIND, INSTITUTIONAL, NETWORK_LABEL, record_claim
 from tc_core.db import init_db
 from tc_core.export import export_artifacts
 
@@ -89,7 +89,7 @@ def test_building_owner_is_its_registry_body_within_a_claims_network(tmp_path):
     assert (net["id"], net["name"], net["tier"], net["name_source"]) == (
         "net:glr-properties-ltd", "GLR PROPERTIES LTD.", "confirmed", "default")
     assert [(e["name"], e["kind"], e["buildings"]) for e in net["entities"]] == [
-        ("RENER, GEORGE", "person", 0),
+        ("RENER, GEORGE", "individual", 0),
         ("GLR PROPERTIES LTD.", "company", 1),
         ("ST. GEORGE ESTATES LTD.", "company", 1),
     ]
@@ -374,3 +374,50 @@ def test_overlay_records_take_their_owner_from_the_registry(tmp_path):
     assert rec["registry_search"]["status"] == "filed"
     assert rec["pids"] == ["009-999-999"]
     assert network(out, rec)["name"] == "OVERLAY OWNER LTD."
+
+
+KIND_CANARY = "CANARY-kind-91c2"
+
+
+def _kind_claims(conn):
+    record_claim(conn, "GLR PROPERTIES LTD.", "trust", ENTITY_KIND, "tenant_report",
+                 confidence="confirmed", source_note=KIND_CANARY, reported_by="organizer-x")
+    record_claim(conn, "GLR PROPERTIES LTD.", "reit", INSTITUTIONAL, "manual_research",
+                 confidence="confirmed", source_note=KIND_CANARY)
+    conn.commit()
+
+
+def test_classification_claim_notes_and_reporters_never_reach_any_artifact(tmp_path):
+    out = _export(tmp_path, extra=_kind_claims)
+    text = _all_artifact_text(out)
+    assert KIND_CANARY not in text and "organizer-x" not in text
+
+
+def test_claimed_kind_reaches_parties_with_a_bucketed_basis(tmp_path):
+    out = _export(tmp_path, extra=_kind_claims)
+    recs = records(out)
+    glr = next(p for r in recs.values() for p in r["parties"] if p["name"] == "GLR PROPERTIES LTD.")
+    assert (glr["kind"], glr["institutional"]) == ("trust", "reit")
+    building = next(r for r in recs.values() if any(p["name"] == "GLR PROPERTIES LTD." for p in r["parties"]))
+    assert "vtu_research" in building["classification"]["owner"]["basis"]
+    assert "tenant_report" not in json.dumps(building)
+
+
+def test_every_building_is_classified_and_networks_use_the_new_kinds(tmp_path):
+    out = _export(tmp_path)
+    owners = {(r["classification"]["owner"] or {}).get("value") for r in records(out).values()}
+    assert "private" in owners and None in owners  # 3 nobody st: nothing known is null, not "unknown"
+    assert owners <= {"government", "non_profit", "coop", "private", "mixed", None}
+    kinds = {e["kind"] for n in networks(out).values() for e in n["entities"]}
+    assert kinds and kinds <= {"government", "non_profit", "coop", "individual", "company",
+                               "numbered_company", "trust", "partnership", None}
+    assert all("assessed_value" in n["totals"] for n in networks(out).values())
+
+
+def test_unknown_basis_fails_the_export():
+    import pytest
+    from pydantic import ValidationError
+
+    from tc_core.contract import MarketAxis
+    with pytest.raises(ValidationError):
+        MarketAxis(value="market", basis=["tenant_report"], inferred=True)

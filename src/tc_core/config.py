@@ -12,6 +12,7 @@ import json
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from .metrics.sector import ScaleThresholds
 from .overlay_areas import OverlayArea
 
 try:
@@ -81,6 +82,8 @@ class IngestConfig:
     # Optional: hand-kept strata lot PID -> strata plan map
     # (ingest/strata_lot_pids.py), so LOTR filings on a lot reach the building.
     strata_lot_pids: str | None = None
+    # [classification]: network-size thresholds for a building's scale.
+    classification: ScaleThresholds = field(default_factory=ScaleThresholds)
     # Where export_artifacts() writes the frontend's input (the artifact
     # directory, spec §3/§6). frontend/ reads it via TC_ARTIFACTS_DIR.
     artifacts: str = DEFAULT_ARTIFACTS_DIR
@@ -159,4 +162,5 @@ def load_ingest_config(path: str) -> IngestConfig:
         ),
         strata_lot_pids=str(flat["strata_lot_pids"]) if flat.get("strata_lot_pids") else None,
         artifacts=str(flat.get("artifacts", DEFAULT_ARTIFACTS_DIR)),
+        classification=ScaleThresholds(**raw.get("classification", {})),
     )

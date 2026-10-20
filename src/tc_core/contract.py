@@ -12,7 +12,7 @@ from typing import Annotated, Literal
 
 from pydantic import AfterValidator, BaseModel, ConfigDict, Field, Strict
 
-SCHEMA_VERSION = 4
+SCHEMA_VERSION = 5
 
 _SENTINELS = {"(unknown)", "unknown"}
 
@@ -34,12 +34,13 @@ SourceType = Literal[
 ]
 Role = Literal["owner", "interest_holder", "manager", "licensee"]
 Sector = Literal["private", "non_profit", "government", "chinese_society"]
+# Not known is null, never "unknown" (no sentinels, see module docstring).
 Kind = Literal[
     "government", "non_profit", "coop", "individual", "company",
-    "numbered_company", "trust", "partnership", "unknown",
+    "numbered_company", "trust", "partnership",
 ]
 Institutional = Literal["reit", "pension_fund", "insurer", "asset_manager", "other"]
-OwnerType = Literal["government", "non_profit", "coop", "private", "mixed", "unknown"]
+OwnerType = Literal["government", "non_profit", "coop", "private", "mixed"]
 # Where a classification came from. Claims show only as their bucket.
 Basis = Literal[
     "name_rule", "registry", "licence", "listing", "city_owned", "non_market_list",
@@ -120,7 +121,7 @@ class OwnerAxis(_Model):
 
 
 class MarketAxis(_Model):
-    value: Literal["non_market", "market", "unknown"]
+    value: Literal["non_market", "market"]
     basis: list[Basis]
     inferred: bool
 
@@ -131,8 +132,10 @@ class OperatorAxis(_Model):
 
 
 class Classification(_Model):
-    owner: OwnerAxis
-    market: MarketAxis
+    """Each axis is null when nothing is known about it."""
+
+    owner: OwnerAxis | None
+    market: MarketAxis | None
     operator: OperatorAxis | None
     scale: Scale | None
 
@@ -162,6 +165,7 @@ class Building(_Model):
     coop: Coop | None
     sro: Sro | None
     rezoning: Rezoning | None
+    classification: Classification
 
 
 class Evidence(_Model):
@@ -177,6 +181,9 @@ class Evidence(_Model):
 class NetworkTotals(_Model):
     buildings: Int
     units: Int
+    # Land + building assessed value of its buildings on the map: a lower
+    # bound on the landlord's holdings. Null when none has a value.
+    assessed_value: Int | None
     open_issues: Int
     properties_on_title: Int | None
 
@@ -187,7 +194,7 @@ class NetworkEntity(_Model):
 
     name: Text  # the registry's spelling where there is one
     also_named: list[Text]
-    kind: Literal["person", "company"]
+    kind: Kind | None
     buildings: Int  # buildings on the map it owns (on title, jointly, or per the SRO inventory)
 
 
@@ -202,12 +209,12 @@ class Network(_Model):
 
 
 class BuildingRecordsFile(_Model):
-    schema_version: Literal[4]
+    schema_version: Literal[5]
     records: dict[str, Building]
 
 
 class NetworksFile(_Model):
-    schema_version: Literal[4]
+    schema_version: Literal[5]
     networks: dict[str, Network]
 
 

@@ -39,10 +39,14 @@ _NAME_RULES: list[tuple[str, re.Pattern[str]]] = [
     ("trust", re.compile(r"\btrust\b", re.I)),
     ("company", re.compile(
         r"\b(ltd|limited|inc|incorporated|corp|corporation|company|holdings?|properties|"
-        r"investments?|enterprises|developments?|realty|assurance|insurance|bank|reit|ulc)\b",
+        r"investments?|enterprises|developments?|realty|assurance|insurance|bank|reit|ulc|"
+        r"group|management|ventures|apartments|hotel|gp)\b",
         re.I)),
     # "Surname, Given Names" as the registry files people.
     ("individual", re.compile(r"^[A-Za-z' -]+, [A-Za-z' .-]+$")),
+    # Two to four plain words and nothing company-like ("Chris Wall"): a
+    # person written given-name first, as the old network kind guess had it.
+    ("individual", re.compile(r"^[A-Za-z'.-]+( [A-Za-z'.-]+){1,3}$")),
 ]
 
 CLAIM_BASIS = {"registry": "claim_registry", "city_records": "claim_city_records", "vtu_research": "vtu_research"}
@@ -103,6 +107,10 @@ class EntityClassifier:
             institutional=entity_attribute_claims(conn, INSTITUTIONAL),
         )
 
+    def in_registry(self, name: str) -> bool:
+        """Whether the registry has a holder by this name (any spelling noise)."""
+        return sanitize_owner(name) in self._registry
+
     def __call__(self, name: str) -> EntityClass:
         if name not in self._cache:
             self._cache[name] = self._classify(name)
@@ -160,7 +168,9 @@ def _unique(items) -> list:
     return list(dict.fromkeys(i for i in items if i))
 
 
-def _owner_axis(parties: Sequence[Party], classify: Callable[[str], EntityClass], facts: BuildingFacts) -> OwnerAxis:
+def _owner_axis(
+    parties: Sequence[Party], classify: Callable[[str], EntityClass], facts: BuildingFacts
+) -> OwnerAxis | None:
     """Precedence: owners on title (claims, then registry, then names decide
     their kind), the City's land list, then the co-op, SRO and non-market
     lists and finally the licence holder, the last four marked inferred."""
@@ -205,23 +215,23 @@ def _owner_axis(parties: Sequence[Party], classify: Callable[[str], EntityClass]
         if value != "unknown":
             forms = [c.kind] if value == "private" else []
             return OwnerAxis(value=value, legal_forms=forms, basis=_unique(["licence", c.basis]), inferred=True)
-    return OwnerAxis(value="unknown", basis=[], inferred=False)
+    return None
 
 
-def _market_axis(owner: OwnerAxis, facts: BuildingFacts) -> MarketAxis:
+def _market_axis(owner: OwnerAxis | None, facts: BuildingFacts) -> MarketAxis | None:
     if facts.on_non_market_list:
         return MarketAxis(value="non_market", basis=["non_market_list"], inferred=False)
     if facts.coop_model == "non_profit":
         return MarketAxis(value="non_market", basis=["chf_bc"], inferred=False)
-    if owner.value == "government" and not owner.inferred:
+    if owner and owner.value == "government" and not owner.inferred:
         return MarketAxis(value="non_market", basis=owner.basis, inferred=False)
     if {facts.sro_owner_sector, facts.sro_operator_sector} & {"non_profit", "government"}:
         return MarketAxis(value="non_market", basis=["sro_inventory"], inferred=True)
     if facts.coop_model == "equity":
         return MarketAxis(value="market", basis=["chf_bc"], inferred=True)
-    if owner.value == "private":
+    if owner and owner.value == "private":
         return MarketAxis(value="market", basis=owner.basis, inferred=True)
-    return MarketAxis(value="unknown", basis=[], inferred=False)
+    return None
 
 
 def _operator_axis(parties: Sequence[Party], classify: Callable[[str], EntityClass]) -> OperatorAxis | None:

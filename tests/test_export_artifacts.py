@@ -58,7 +58,7 @@ def test_marker_metadata_carries_coordinates(tmp_path):
     export_artifacts(conn, tmp_path)
 
     meta = json.loads((tmp_path / "marker_metadata.json").read_text())
-    assert meta["schema_version"] == 4
+    assert meta["schema_version"] == 5
     record = meta["markers"][0]
     assert record["lat"] == 49.28
     assert record["lon"] == -123.1

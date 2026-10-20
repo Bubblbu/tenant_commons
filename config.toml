@@ -22,6 +22,11 @@ property_managers = "data/curated/property_managers.toml"
 manager_listings = "data/raw/property_managers"
 strata_lot_pids = "data/curated/strata_lot_pids.csv"
 
+[classification]
+# A building's scale from its network size in buildings on the map (spec 2026-10-20).
+small_portfolio_min = 2
+large_portfolio_min = 10
+
 # Boundary overlays a building can belong to alongside its neighbourhood:
 # each is a Filters > Neighbourhoods entry (after the separator) and a
 # Show on map toggle. `feature` picks one polygon by its `name`; without it

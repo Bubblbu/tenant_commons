@@ -17,15 +17,15 @@ const collapsed = (label: string, items: string[]) =>
 
 function entityItem(e: NetworkEntity): string {
   const aka = e.also_named.length ? provenanceIcon(`Also named: ${e.also_named.join('; ')}`) : '';
-  const held = e.kind === 'person' ? ''
+  const held = e.kind === 'individual' ? ''
     : ` <span class="popup-muted">${e.buildings ? plural(e.buildings, 'building', 'buildings') : 'not on the map'}</span>`;
   return `${escapeHtml(e.name)}${held}${aka}`;
 }
 
 /** The network's people, then its companies (most buildings on the map first, as exported). */
 function entityLists(entities: NetworkEntity[]): string {
-  const people = entities.filter((e) => e.kind === 'person');
-  const companies = entities.filter((e) => e.kind === 'company');
+  const people = entities.filter((e) => e.kind === 'individual');
+  const companies = entities.filter((e) => e.kind !== 'individual');
   const lists = collapsed(plural(people.length, 'person', 'people'), people.map(entityItem)) +
     collapsed(plural(companies.length, 'company', 'companies'), companies.map(entityItem));
   return lists && `<div class="popup-muted net-entities-intro">Linked in this network:</div>${lists}`;

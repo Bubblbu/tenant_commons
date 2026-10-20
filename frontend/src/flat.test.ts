@@ -6,7 +6,7 @@ const network: Network = {
   id: 'net:cressey', name: 'Cressey Development Group', name_source: 'claim', tier: 'confirmed',
   evidence: { registry: 7, city_records: 0, vtu_research: 9 },
   entities: [{ name: 'A Ltd', also_named: [], kind: 'company', buildings: 1 }],
-  totals: { buildings: 10, units: 609, open_issues: 2, properties_on_title: 10 },
+  totals: { buildings: 10, units: 609, assessed_value: null, open_issues: 2, properties_on_title: 10 },
 };
 
 const york: Building = {
@@ -24,6 +24,7 @@ const york: Building = {
   ],
   network_id: 'net:cressey', registry_search: { status: 'filed', date: null },
   coop: null, sro: { rooms: 10, occupancy: 'open', owner_sector: 'private', operator_sector: null }, rezoning: null,
+  classification: { owner: null, market: null, operator: null, scale: null },
 };
 
 describe('flatten', () => {

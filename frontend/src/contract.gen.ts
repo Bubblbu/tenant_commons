@@ -8,6 +8,56 @@
 export type Address = string;
 export type AlsoKnownAs = string[];
 export type Areas = string[];
+export type Basis = (
+  | "name_rule"
+  | "registry"
+  | "licence"
+  | "listing"
+  | "city_owned"
+  | "non_market_list"
+  | "chf_bc"
+  | "sro_inventory"
+  | "claim_registry"
+  | "claim_city_records"
+  | "vtu_research"
+)[];
+export type Inferred = boolean;
+export type Value = "non_market" | "market";
+export type Basis1 = (
+  | "name_rule"
+  | "registry"
+  | "licence"
+  | "listing"
+  | "city_owned"
+  | "non_market_list"
+  | "chf_bc"
+  | "sro_inventory"
+  | "claim_registry"
+  | "claim_city_records"
+  | "vtu_research"
+)[];
+export type Value1 = "government" | "non_profit" | "coop" | "private" | "mixed";
+export type Basis2 = (
+  | "name_rule"
+  | "registry"
+  | "licence"
+  | "listing"
+  | "city_owned"
+  | "non_market_list"
+  | "chf_bc"
+  | "sro_inventory"
+  | "claim_registry"
+  | "claim_city_records"
+  | "vtu_research"
+)[];
+export type Inferred1 = boolean;
+export type LegalForms = (
+  "government" | "non_profit" | "coop" | "individual" | "company" | "numbered_company" | "trust" | "partnership"
+)[];
+export type Parts = ("government" | "non_profit" | "coop" | "private" | "mixed")[];
+export type Reason = ("owners_differ" | "public_land_private_leasehold") | null;
+export type Value2 = "government" | "non_profit" | "coop" | "private" | "mixed";
+export type Scale = ("single" | "small_portfolio" | "large_portfolio") | null;
 export type OwnershipModel = ("non_profit" | "equity") | null;
 export type Status = ("open_waitlist" | "closed") | null;
 export type Url = string | null;
@@ -36,17 +86,7 @@ export type EntityKey = string;
 export type Institutional = ("reit" | "pension_fund" | "insurer" | "asset_manager" | "other") | null;
 export type Interest = string | null;
 export type Kind =
-  | (
-      | "government"
-      | "non_profit"
-      | "coop"
-      | "individual"
-      | "company"
-      | "numbered_company"
-      | "trust"
-      | "partnership"
-      | "unknown"
-    )
+  | ("government" | "non_profit" | "coop" | "individual" | "company" | "numbered_company" | "trust" | "partnership")
   | null;
 export type Name1 = string;
 export type Pids = string[];
@@ -85,10 +125,12 @@ export type Land = number;
 export type LandShare = number;
 export type LandSharePctl = number;
 export type YearBuilt = number | null;
-export type SchemaVersion = 4;
+export type SchemaVersion = 5;
 export type AlsoNamed = string[];
 export type Buildings = number;
-export type Kind1 = "person" | "company";
+export type Kind1 =
+  | ("government" | "non_profit" | "coop" | "individual" | "company" | "numbered_company" | "trust" | "partnership")
+  | null;
 export type Name2 = string;
 export type Entities = NetworkEntity[];
 export type CityRecords = number;
@@ -98,11 +140,12 @@ export type Id1 = string;
 export type Name3 = string;
 export type NameSource = "claim" | "default";
 export type Tier = "confirmed" | "name_match";
+export type AssessedValue = number | null;
 export type Buildings1 = number;
 export type OpenIssues = number;
 export type PropertiesOnTitle = number | null;
 export type Units1 = number;
-export type SchemaVersion1 = 4;
+export type SchemaVersion1 = 5;
 
 /**
  * Schema root only: one place the frontend's types are generated from.
@@ -130,6 +173,7 @@ export interface Building {
   address: Address;
   also_known_as: AlsoKnownAs;
   areas: Areas;
+  classification: Classification;
   coop: Coop | null;
   id: Id;
   issues: Issues | null;
@@ -147,8 +191,49 @@ export interface Building {
   sro: Sro | null;
   units: Units;
   units_basis: UnitsBasis;
-  value: Value | null;
+  value: Value3 | null;
   year_built: YearBuilt;
+}
+/**
+ * Each axis is null when nothing is known about it.
+ *
+ * This interface was referenced by `Contract`'s JSON-Schema
+ * via the `definition` "Classification".
+ */
+export interface Classification {
+  market: MarketAxis | null;
+  operator: OperatorAxis | null;
+  owner: OwnerAxis | null;
+  scale: Scale;
+}
+/**
+ * This interface was referenced by `Contract`'s JSON-Schema
+ * via the `definition` "MarketAxis".
+ */
+export interface MarketAxis {
+  basis: Basis;
+  inferred: Inferred;
+  value: Value;
+}
+/**
+ * This interface was referenced by `Contract`'s JSON-Schema
+ * via the `definition` "OperatorAxis".
+ */
+export interface OperatorAxis {
+  basis: Basis1;
+  value: Value1;
+}
+/**
+ * This interface was referenced by `Contract`'s JSON-Schema
+ * via the `definition` "OwnerAxis".
+ */
+export interface OwnerAxis {
+  basis: Basis2;
+  inferred: Inferred1;
+  legal_forms: LegalForms;
+  parts: Parts;
+  reason: Reason;
+  value: Value2;
 }
 /**
  * This interface was referenced by `Contract`'s JSON-Schema
@@ -223,7 +308,7 @@ export interface Sro {
  * This interface was referenced by `Contract`'s JSON-Schema
  * via the `definition` "Value".
  */
-export interface Value {
+export interface Value3 {
   building: Building1;
   land: Land;
   land_share: LandShare;
@@ -284,6 +369,7 @@ export interface Evidence {
  * via the `definition` "NetworkTotals".
  */
 export interface NetworkTotals {
+  assessed_value: AssessedValue;
   buildings: Buildings1;
   open_issues: OpenIssues;
   properties_on_title: PropertiesOnTitle;
