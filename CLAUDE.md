@@ -2,18 +2,22 @@
 
 *Living document. Update this as decisions change — it's meant to be edited, not archived.*
 
-Last updated: 2026-10-08
+Last updated: 2026-10-20
 
 ---
 
 ## 1. Purpose & vision
 
-Tenant Commons is being rebuilt from scratch to serve two goals at once:
+Tenant Commons is a **prototype data project**, using Vancouver and VTU (Vancouver Tenants Union) as the case to explore whether — and how — it's worth building out. It has two uses, equally weighted:
 
-1. **An internal organizing-intelligence tool** for VTU (Vancouver Tenants Union), combining public property/rental data with VTU's own membership data and — most importantly — manually-researched ownership intelligence gathered from tenants (e.g. "these two shell companies are secretly the same landlord").
-2. **A proof-of-concept for funding** — the internal tool itself is the core pitch, not the public map. The public map (and possibly other public-facing views) are framed as a *service that could be offered to client organizations* (e.g. Toronto tenant unions currently in conversation), not the primary product.
+1. **A public tool for tenants** — the map at map.tenantcommons.ca: who owns, manages and licenses a building, and which landlord network it belongs to.
+2. **An internal tool for organizers** — combining public property/rental data with VTU's own data and manually-researched ownership knowledge gathered from tenants (e.g. "these two shell companies are secretly the same landlord"). Requirements still open — see Section 4.
 
-The manually-curated ownership knowledge — built from tenant testimony and research — is the project's actual differentiator. Nobody else has it. The architecture below is built to protect and grow that asset first.
+**The long-term interest is data infrastructure.** The aim is political: bridging the power and information gaps between landlords and tenants. That means modeling ownership and control properly (see "Ownership modeling direction" in Section 3), not just drawing it on a map.
+
+The manually-curated ownership knowledge — built from tenant testimony and research — is what nobody else has, and what tools like WhoOwnsWhat or the Anti-Eviction Mapping Project don't do. The architecture below is built to protect and grow that asset first.
+
+**Not current goals** (don't design for them or bring them up as drivers): funding is an open question still being explored, not a design target; Toronto and other collaborators are interesting, but no other municipality or location gets explored without funding.
 
 ---
 
@@ -21,9 +25,9 @@ The manually-curated ownership knowledge — built from tenant testimony and res
 
 | Decision | Answer | Rationale |
 |---|---|---|
-| Public vs. internal | **Both**, but as separate views/products (Q1) | Current site exposes exact VTU membership counts per building — sensitive to a landlord who finds the site. Public map = story/transparency layer; internal tool = organizing utility + funding pitch. |
-| Single-org vs. multi-tenant | **Single-org (Vancouver/VTU) now, architected to generalize later** (Q2) | Toronto unions are already interested, but building real multi-tenancy (accounts, data isolation per org) now is premature infrastructure. Avoid hard-coding Vancouver-only assumptions into the schema (e.g. city/region stays a first-class field) so a second org isn't a rewrite. |
-| Geographic scope for v1 | **No hard-coded geographic restriction in the data layer** — ingest/merge pulls whatever the source data covers, not a West-End-only bbox/neighbourhood filter (Q3, revised 2026-08-06) | The original West End–only restriction conflated two different things: which buildings to *ingest* and which buildings to *research deeply*. Only the second needs to stay narrow to be convincing to funders — see Section 7's milestone gate, which is about depth on a small, well-known case set, not about limiting what data flows into the pipeline. Hard-restricting ingestion added filtering work for no real benefit once the pipeline can just take whatever the source data contains. |
+| Public vs. internal | **Both**, as separate views/products (Q1) | The public map must never expose VTU membership or tenant-identifying details (a landlord can find the site). Public map = transparency layer for tenants; internal tool = organizer utility. |
+| Single-org vs. multi-tenant | **Vancouver/VTU only** (Q2, revised 2026-10-20) | No other locations without funding. Keep city/region a first-class field and avoid Vancouver-only assumptions where it costs nothing, but don't build for generalization. |
+| Geographic scope | **No hard-coded geographic restriction in the data layer** — ingest/merge pulls whatever the source data covers (Q3, revised 2026-08-06) | Which buildings to *ingest* and which to *research deeply* are different questions. Only research depth needs to stay narrow; restricting ingestion adds filtering work for no benefit. |
 
 ---
 
@@ -61,7 +65,7 @@ The manually-curated layer (starting with **ownership claims**) is modeled as it
 | `confidence` | e.g. `unconfirmed` / `confirmed` |
 | `status` | `active` / `retracted` — claims are never deleted, only retracted, preserving history |
 
-Built with an eye toward generalizing to a broader `claims` pattern later (building condition reports, renoviction incidents, organizing-campaign stage, rent-increase reports, tenant willingness-to-organize signals, corrections to public data) — **not built now**, but the schema shape (entity + relationship/attribute + value + source + confidence + status + timestamp) should stay compatible with that future.
+Built with an eye toward generalizing to a broader `claims` pattern later (see "Ownership modeling direction" below) (building condition reports, renoviction incidents, organizing-campaign stage, rent-increase reports, tenant willingness-to-organize signals, corrections to public data) — **not built now**, but the schema shape (entity + relationship/attribute + value + source + confidence + status + timestamp) should stay compatible with that future.
 
 ### Claims ingestion & entity resolution
 
@@ -77,6 +81,14 @@ Built with an eye toward generalizing to a broader `claims` pattern later (build
 - `claims.py::find_similar_entity()` gives a soft nudge (not a hard merge) when a new entity's normalized key matches an existing one under a different display spelling — used by the bulk importer as a warning, and intended for future form autocomplete.
 - `claims.py::resolve_entity_clusters()` computes, at read time (no persisted table — see the design discussion this came from), a joined display name for every entity in a `same_entity` cluster (transitive — A~B, B~C joins all three), e.g. `"0733603 BC Ltd" -> "0733603 BC Ltd / Phil Kim"`. `display_name_for()` looks up a single entity against that result, falling back to the raw name. `claims.py::resolve_owner_groups()` does the equivalent for `common_owner`, but returns each entity's *group* (the other entities sharing its real owner) rather than joining names — these are legally distinct entities, so callers should present them as a portfolio/group (this is the `resolve_owner_groups()` behind CLAUDE.md's planned public-map "claims-derived landlord clustering," Section 5 Phase 1), not rename them. Both default to `confirmed`-only claims (`include_unconfirmed=True` opts into the softer behavior), matching the confidence gate above.
 - `network_label` claims name a landlord network: `entity_a` is any entity in a `common_owner` cluster, `entity_b` the display label — free text, stored verbatim, and excluded from `list_known_entities()`/`find_similar_entity()`. The most recently updated confirmed, active label on any entity in the cluster wins; without one the network is named after the entity holding the most PIDs. Relabelling never changes a network's key.
+
+### Ownership modeling direction (2026-10-20)
+
+The direction is a **BODS-like model** ([Beneficial Ownership Data Standard](https://standard.openownership.org/)): statements about entities, persons, and the ownership/control relationships between them, each with its own source and date. BODS hasn't worked out land and real estate as an asset; exploring that gap is the project's long-term interest — see Open Ownership's [Bridging the gap for effective asset transparency](https://www.openownership.org/en/publications/bridging-the-gap-for-effective-asset-transparency/). Vancouver has the ingredients: land title / LOTR interest holders, the City's SRO inventory naming who's behind a company, managers and licensees, and VTU research linking shell companies.
+
+The current `ownership_claims` model and the export contract's parties-in-roles are working sketches toward this, not the final shape. Not a commitment to adopt BODS wholesale or now — a direction to keep new modeling compatible with.
+
+**RTB decisions** are being ingested in a separate project. It stays separate for now (different demands and legal frameworks); the data models should converge eventually, but nothing here depends on it.
 
 ### Ingest run tracking
 
@@ -97,7 +109,7 @@ Raw source tables (Open Data extract, FOI list, NationBuilder export, ownership_
 
 ### Export mechanism (Q12)
 Two paths, sharing the same underlying "filter to public fields" logic in `tc_core`:
-1. **Ad hoc export button** (in the internal app) — download a filtered CSV/JSON of whatever's currently in view, for sharing with e.g. a Toronto union or a funder.
+1. **Ad hoc export button** (in the internal app, not yet built) — download a filtered CSV/JSON of whatever's currently in view, for sharing with collaborators.
 2. **Automated public feed** — the same filter logic feeds the public map's build step directly (`tc_core` → filter to public fields → JSON → public site build reads it). Keeps the public map in sync with real data without manual copy-paste.
 
 The public contract is `tc_core/contract.py` (Pydantic models, `extra="forbid"`, no sentinel strings — missing is null): it is the allowlist of public fields for `building_records.json` and `networks.json`, and a record that doesn't validate fails the export. Buildings carry their parties in roles (owner on title, interest holder, manager, licensee) with source types and dates — see docs/superpowers/specs/2026-10-08-building-popup-and-contract-v2-design.md. `scripts/write_contract_schema.py` writes `frontend/src/contract.schema.json`; `npm run gen:types` generates the frontend's types from it.
@@ -106,12 +118,22 @@ The public contract is `tc_core/contract.py` (Pydantic models, `extra="forbid"`,
 
 ## 4. Internal tool
 
+**Status (2026-10-20): still a wish; requirements and vision are open, and so is the tech (Streamlit was the earlier pick, not a commitment).** Nothing is built. Rather than a generic browse/edit app, the plan is to pick **one concrete use case** and explore it in depth first. Candidates (none chosen):
+
+- **Doorknocking tool** for VTU chapters
+- **Research dashboard** — advanced queries and visualizations over the data in detail
+- **Power-mapping tool** — understanding ownership patterns and landlord networks
+- **Derived landlord index**
+
+Whichever comes first, a single-record claim form (via `record_claim()`) is likely needed — today claims only enter through CSV/script imports.
+
+Constraints that still hold regardless of use case:
+
 | Decision | Answer |
 |---|---|
-| Access scope | **Single-user (you) for now** (Q7) — read + write via forms, not raw SQL editing. Multi-user accounts deferred until there's an actual second organizer who needs it. |
-| Tech | **Streamlit** (Q8) — fastest path to a working browse/edit tool in pure Python, fits existing skillset, no separate frontend to build. Not built for eventual multi-user use — that's a rewrite either way, deferred deliberately. |
-| Data exploration | Raw source tables + merged/entity tables both browsable in-app (Q8b) — see "Data transparency" above. |
-| Hosting | **Local only**, but config (file paths, secrets) not hardcoded to this machine, so deploying later is a config change, not a redesign (Q10). Given the data includes tenant-reported and membership information, "reachable over the internet" is a real risk not worth taking on before there's an actual second user and a real auth plan. |
+| Access scope | **Single-user for now** (Q7) — read + write via forms, not raw SQL editing. Multi-user accounts deferred until there's an actual second organizer who needs it. |
+| Data exploration | Raw source tables + merged/entity tables both browsable (Q8b) — see "Data transparency" above. |
+| Hosting | **Local only**, but config (file paths, secrets) not hardcoded to this machine, so deploying later is a config change, not a redesign (Q10). Given the data includes tenant-reported and membership information, "reachable over the internet" is a real risk not worth taking on before there's a second user and a real auth plan. |
 
 ---
 
@@ -130,78 +152,51 @@ The public contract is `tc_core/contract.py` (Pydantic models, `extra="forbid"`,
 
 | Decision | Answer |
 |---|---|
-| Deployment/CI | **Deferred entirely** for now (Q17). Existing `.github/workflows/` pattern (push → build → GitHub Pages) can be revived later; not needed while nothing is meant to be shown externally yet. |
+| Deployment/CI | **Manual deploy, no CI** (Q17, revised 2026-10-20). `uv run deploy` builds the frontend and publishes it to the `production` build-output branch (GitHub Pages, map.tenantcommons.ca). CI and scheduled rebuilds are deferred. |
 | Testing | **Targeted, not broad** (Q18). Automated tests specifically on: (1) the public/sensitive field-filtering logic, and (2) claims-merge logic — because silent regressions there are actively dangerous (data leak risk / corrupting the core IP asset). Everything else (address matching, block aggregation, rendering) gets sanity-checked by eyeballing output on the current (still-small) dataset, not formal tests. |
 
 ---
 
-## 7. MVP definition & milestone gate
+## 7. Where it stands & what's next to share
 
-**The Phase 0 "thin slice" (below) is an internal-only checkpoint — not to be shown to anyone external.**
+**Current state (2026-10-20):** the public map is live at map.tenantcommons.ca and circulating among a small group — VTU organizers and tenant organizers across Canada and North America. It does a decent job of showing the potential, but on its own it isn't clearly different from tools like WhoOwnsWhat or the Anti-Eviction Mapping Project.
 
-The actual gate for showing this to anyone (Toronto union, funder, etc.) is:
+**Next shareable version:** one that demonstrates the other uses of the data — **collaboration, claims, curation and community knowledge**. "Here's a building, here's who really owns it, here's how we know, and here's how organizers add to it." Shape not yet decided; likely tied to the internal-tool use case chosen in Section 4.
 
-> **A small, deep subset of buildings/landlords is fully populated and richly claimed** — not broad-but-thin coverage of whatever the pipeline happens to ingest. Pick cases you already know well (existing VTU organizing activity, already-pieced-together shell-company ownership) — wherever in Vancouver they are — and make those airtight: accurate data, real ownership_claims, clear provenance. This is what proves the differentiator — "here's a building, here's who really owns it, here's how we know" — not raw coverage numbers.
+**Depth over breadth still holds for research:** a small set of well-known cases (existing VTU organizing, already-pieced-together shell-company ownership) made airtight — accurate data, real ownership_claims, clear provenance — shows the claims layer better than coverage numbers. While researching a known case, capture threads into other buildings as `ownership_claims` even if those buildings aren't researched yet; this seeds breadth cheaply.
 
-**Secondary, opportunistic scope:** while researching a known case, if a thread leads to a landlord's holdings in buildings you aren't deeply researching yet, capture that as an `ownership_claim` even if the linked building itself isn't fully researched/populated yet. This seeds future breadth cheaply, without competing for time against case-depth work.
-
-**Explicit risk to guard against:** the thin slice (Section 8 below) is easy to mistake for "done" once it's technically working. It isn't. The claims-layer milestone above is the real bar — don't let a working map-with-dots substitute for it, and don't let convenience-driven shortcuts (e.g. skipping the sensitivity-flag logic "for now") quietly become permanent.
+**Risk to guard against:** convenience shortcuts (especially around sensitivity filtering) quietly becoming permanent. Re-check the public-export gate before every deploy.
 
 ---
 
 ## 8. Build sequencing
 
-**Approach: thin vertical slice across all three layers first (internal checkpoint only), then deepen.**
-
-Rationale: with real external interest already in motion (Toronto), having something end-to-end working soon is worth more than a perfectly sequenced build with nothing demoable for weeks. It also surfaces integration problems (e.g. "does the SQLite schema actually export cleanly into what the map needs?") early, rather than after each piece is built in isolation.
-
-Risks to actively manage (see Section 7): the "good enough" trap, premature demoing before the claims layer exists, shortcuts becoming permanent, cross-stack context-switching cost, and showing rough/thin data before it's cleaned.
+The thin vertical slice (SQLite → export → Vite/Leaflet map) is done and live. Work now deepens layer by layer: the ownership model (Section 3), the public map, and an internal-tool use case (Section 4).
 
 ---
 
 ## 9. Task breakdown
 
-### Phase 0 — Thin slice (internal checkpoint, not for external eyes)
+### Phase 0 — Thin slice (done)
 
-**`tc_core` (data layer)**
-- [ ] Set up SQLite schema: `landlords`, `buildings`, `units`, `vtu_membership` (basic fields only, no claims yet)
-- [ ] Write ingest scripts for Open Data (addresses, shapefiles, business licences)
-- [ ] Write ingest script for FOI purpose-built rental list
-- [ ] Write ingest script for anonymized NationBuilder export
-- [ ] Basic merge/dedup logic (landlord ↔ building ↔ address matching)
-- [ ] Add `source_row_ids` field to merged output rows (the lineage hook — do this now, while writing the merge logic anyway)
-- [ ] Basic public/sensitive field flags on known-sensitive fields (VTU membership counts/IDs)
-- [ ] Basic export function: filter to public fields → JSON
+SQLite schema, ingest for Open Data / FOI / NationBuilder (plus LOTR, SRO, co-ops, rezoning, listings), merge/dedup with `source_row_ids`, the public-field allowlist (`contract.py`, membership never exported), and the Vite + TypeScript Leaflet map with sidebar tables — all built and live. The Streamlit app from the original Phase 0 was never built; it's superseded by Section 4.
 
-**Internal app (Streamlit)**
-- [ ] Local Streamlit app, reads SQLite directly
-- [ ] Browse view: landlords, buildings, raw source tables (separate tabs)
-- [ ] Basic filter/search
-- [ ] Config (file paths etc.) externalized, not hardcoded — so future hosting is a config change
-
-**Public map**
-- [ ] Vite + TypeScript project scaffold
-- [ ] Hand-written Leaflet map, loads from the JSON export
-- [ ] Basic markers for buildings in the pipeline, no clustering needed yet at this scale
-- [ ] Minimal table view alongside map (can mirror old sidebar table for now)
-
-**Checkpoint:** confirm the full pipe works end to end — SQLite → export → map renders real data. This is *not* shown to anyone outside yourself.
-
-### Phase 1 — Deepen toward the milestone gate
+### Phase 1 — Deepen
 
 **`tc_core`**
 - [x] Build `ownership_claims` table per schema in Section 3 (incl. `claim_key`)
 - [x] Bulk-CSV import for `ownership_claims` (`ingest/ownership_claims.py`), upserting by `claim_key` so a research spreadsheet can be re-imported safely — see "Claims ingestion" above
 - [x] Shared `record_claim()` write path + entity-resolution convention (`same_entity`/`common_owner`) — see "Claims ingestion" above
 - [x] Per-source `ingest_runs` tracking (success/failure history for every ingest run, not just claims) — see "Ingest run tracking" above
+- [x] Targeted tests: sensitivity-filter logic, claims-merge logic (`tests/test_export_*.py`, `tests/test_claims_*.py`)
+- [x] Public export excludes sensitive fields, test-covered (canaries in `tests/test_export_ownership.py`, `tests/test_export_artifacts.py`)
 - [ ] Populate claims for the small, deep case set you already know well
 - [ ] Opportunistically capture city-wide ownership claims surfaced during that research (unpolished, seed data only)
-- [ ] Write targeted tests: sensitivity-filter logic, claims-merge logic
-- [ ] Confirm public export correctly excludes sensitive fields (test-covered, not just eyeballed)
+- [ ] Explore what a BODS-like ownership model looks like against the current claims + parties-in-roles data — see "Ownership modeling direction" in Section 3
 
-**Internal app**
-- [ ] Add/edit form for `ownership_claims` (entity_a, entity_b, relationship, source_note, confidence, etc.) — writes via the `record_claim()` path already built, per "Claims ingestion" above
-- [ ] Retract (not delete) UI for claims
+**Internal tool**
+- [ ] Pick one use case from Section 4 and work out its requirements and vision
+- [ ] Single-record add/edit form and retract (not delete) UI for `ownership_claims`, via `record_claim()`
 - [ ] Ad hoc export button (filtered CSV/JSON for sharing)
 
 **Public map**
@@ -211,13 +206,15 @@ Risks to actively manage (see Section 7): the "good enough" trap, premature demo
 - [ ] Polish filters/sidebar to match or exceed current site's functionality (neighbourhood, assessed value, unit sliders)
 - [ ] Marker clustering/canvas rendering if point count warrants it
 
-**Milestone check:** does a small set of buildings/landlords tell a complete, accurate, well-sourced ownership story? If yes — this is the "ready to show externally" gate.
+**Next shareable version:** shows collaboration, claims, curation and community — see Section 7.
 
 ### Phase 2 — Not yet scoped (deliberately deferred)
 - Deployment/CI automation (GitHub Actions → Pages, or scheduled rebuilds)
 - Multi-user accounts for the internal app
 - Vector tiles (MapLibre GL) — only if/when data volume makes Leaflet performance a real problem
 - Broader `claims` model generalization (building condition, renoviction, campaign stage, etc.)
+- Converging the data model with the separate RTB-decisions project
+- Other municipalities/collaborators — only with funding
 
 ---
 
