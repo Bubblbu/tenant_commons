@@ -93,6 +93,8 @@ export interface Harness {
   map: FakeMap;
   markers: Record<string, FakeLayer>;
   blocks: Record<string, FakeLayer>;
+  /** The blocks GeoJSON layer itself (on the map only while Show on map > Blocks is ticked). */
+  blocksLayer: FakeLayer;
   paint: FakeLayer[];
   landlords: LandlordFilter;
   /** Overlay area layers by key, as bootstrap.ts hands them to wiring. */
@@ -199,7 +201,7 @@ export function startHarness(opts: { initialFilter?: Partial<FilterState> } = {}
   };
 
   return {
-    map, markers, blocks, paint, landlords, overlays,
+    map, markers, blocks, blocksLayer, paint, landlords, overlays,
     visible: () => [...(seen.visible ?? [])].sort((a, b) => Number(a) - Number(b)),
     markerHidden: (bid) => markers[String(bid)].options.radius === 0,
     markerHighlighted: (bid) => markers[String(bid)].options.color === HIGHLIGHT,

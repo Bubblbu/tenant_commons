@@ -305,6 +305,15 @@ describe('Clear and Reset', () => {
 });
 
 describe('blocks', () => {
+  it('starts with the block layer off, and reset turns it off again', () => {
+    const h = startHarness();
+    expect(h.map.hasLayer(h.blocksLayer)).toBe(false);
+    h.setChecked('#viz-show-blocks', true);
+    expect(h.map.hasLayer(h.blocksLayer)).toBe(true);
+    h.click('#filter-reset');
+    expect(h.map.hasLayer(h.blocksLayer)).toBe(false);
+  });
+
   it('shows empty blocks only on request, and matches a block by its own area', () => {
     const h = startHarness();
     h.setChecked('#viz-show-empty-blocks', true);

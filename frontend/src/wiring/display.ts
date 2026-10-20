@@ -238,10 +238,10 @@ export function initDisplay(
       restack.now();
     }
     if (vizBlocksChk) {
-      vizBlocksChk.checked = true;
-      toggleLayerVisibility(layerBlocks, true);
-      restack.sendBlocksToBack();
-      restack.now();
+      // Back to the start-up state (off by default; index.html).
+      vizBlocksChk.checked = vizBlocksChk.defaultChecked;
+      toggleLayerVisibility(layerBlocks, vizBlocksChk.checked);
+      if (vizBlocksChk.checked) { restack.sendBlocksToBack(); restack.now(); }
     }
     if (vizNeighbourhoodsChk) vizNeighbourhoodsChk.checked = true;
     // Back to each area's start-up state (overlays.ts's `shown`).
