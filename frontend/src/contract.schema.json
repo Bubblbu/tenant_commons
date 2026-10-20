@@ -762,7 +762,7 @@
             {
               "enum": [
                 "owners_differ",
-                "public_land_private_leasehold"
+                "public_land_leasehold"
               ],
               "type": "string"
             },

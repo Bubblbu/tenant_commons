@@ -113,7 +113,8 @@ class OwnerAxis(_Model):
     value: OwnerType
     legal_forms: list[Kind] = []  # the private owners' kinds
     parts: list[OwnerType] = []  # when mixed
-    reason: Literal["owners_differ", "public_land_private_leasehold"] | None = None
+    # public_land_leasehold: City land, someone else on title (a leasehold).
+    reason: Literal["owners_differ", "public_land_leasehold"] | None = None
     basis: list[Basis]
     # True when the owner is not confirmed on title, a claim or the City's
     # own land list (licence holder, SRO inventory, co-op or non-market list).

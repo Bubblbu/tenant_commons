@@ -26,14 +26,16 @@ _NAME_RULES: list[tuple[str, re.Pattern[str]]] = [
     ("government", re.compile(
         r"^(the )?city of vancouver\b|\bbc housing\b|british columbia housing management commission|"
         r"provincial rental housing corp|vancouver public housing corp|vancouver affordable housing agency|"
+        r"metro vancouver housing|"
         r"\b(his|her) majesty\b|government of canada|canada mortgage and housing|"
         r"^province of british columbia$|board of parks and recreation|^school district",
         re.I)),
     ("coop", re.compile(r"\bco-?op(erative)?\b", re.I)),
     ("non_profit", re.compile(
-        r"\b(society|foundation|church|parish|diocese|synod|ywca|ymca|benevolent|legion|"
+        r"\b(society|foundation|association|church|parish|diocese|synod|ywca|ymca|benevolen(t|ce)|legion|"
         r"young (wo)?men'?s christian association)\b", re.I)),
-    ("numbered_company", re.compile(r"^\d{6,}\s*b\.?\s*c\.?\s*(ltd|limited|inc|corp)", re.I)),
+    ("numbered_company", re.compile(
+        r"^\d{6,}\s*(b\.?\s*c\.?|british columbia)\s*(ltd|limited|inc|corp)", re.I)),
     ("partnership", re.compile(r"\b(limited partnership|partnership|l\.?p\.?)\s*$", re.I)),
     ("company", re.compile(r"\btrust company\b", re.I)),
     ("trust", re.compile(r"\btrust\b", re.I)),
@@ -46,7 +48,10 @@ _NAME_RULES: list[tuple[str, re.Pattern[str]]] = [
     ("individual", re.compile(r"^[A-Za-z' -]+, [A-Za-z' .-]+$")),
     # Two to four plain words and nothing company-like ("Chris Wall"): a
     # person written given-name first, as the old network kind guess had it.
-    ("individual", re.compile(r"^[A-Za-z'.-]+( [A-Za-z'.-]+){1,3}$")),
+    ("individual", re.compile(
+        r"^(?!.*\b(housing|community|services?|centre|center|council|club|fund|residences?|estates?|"
+        r"place|court|manor|towers?|villa|alley|lodge|house|homes)\b)[A-Za-z'.-]+( [A-Za-z'.-]+){1,3}$",
+        re.I)),
 ]
 
 CLAIM_BASIS = {"registry": "claim_registry", "city_records": "claim_city_records", "vtu_research": "vtu_research"}
@@ -183,7 +188,7 @@ def _owner_axis(
         basis = _unique(["registry", *(c.basis for c in classes)])
         if facts.city_owned and set(known) - {"government"}:
             return OwnerAxis(value="mixed", legal_forms=forms, parts=sorted({"government", *known}),
-                             reason="public_land_private_leasehold",
+                             reason="public_land_leasehold",
                              basis=_unique([*basis, "city_owned"]), inferred=False)
         if len(known) > 1:
             return OwnerAxis(value="mixed", legal_forms=forms, parts=sorted(known),

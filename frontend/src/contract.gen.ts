@@ -55,7 +55,7 @@ export type LegalForms = (
   "government" | "non_profit" | "coop" | "individual" | "company" | "numbered_company" | "trust" | "partnership"
 )[];
 export type Parts = ("government" | "non_profit" | "coop" | "private" | "mixed")[];
-export type Reason = ("owners_differ" | "public_land_private_leasehold") | null;
+export type Reason = ("owners_differ" | "public_land_leasehold") | null;
 export type Value2 = "government" | "non_profit" | "coop" | "private" | "mixed";
 export type Scale = ("single" | "small_portfolio" | "large_portfolio") | null;
 export type OwnershipModel = ("non_profit" | "equity") | null;

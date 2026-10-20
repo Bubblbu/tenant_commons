@@ -45,6 +45,12 @@ from tc_core.normalize import sanitize_owner
     ("Willow Lane Apartments", "company"),
     ("Hotel Balmoral", "company"),
     ("Metcap Living Management", "company"),
+    ("Affordable Housing Advisory Association", "non_profit"),
+    ("Affordable Housing Charitable Association", "non_profit"),
+    ("Community Builders Benevolence Group", "non_profit"),
+    ("Metro Vancouver Housing Corporation", "government"),
+    ("544792 British Columbia Ltd", "numbered_company"),
+    ("Hogan's Alley Housing", "unknown"),
     ("", "unknown"),
 ])
 def test_kind_from_name(name, kind):
@@ -98,8 +104,13 @@ def test_owners_of_different_types_are_mixed():
 
 def test_city_land_under_private_leasehold_is_mixed():
     c = classify_building([_p("owner", "VLC Leaseholds Ltd", "registry")], CLASSIFY, BuildingFacts(city_owned=True))
-    assert (c.owner.value, c.owner.reason) == ("mixed", "public_land_private_leasehold")
+    assert (c.owner.value, c.owner.reason) == ("mixed", "public_land_leasehold")
     assert c.owner.parts == ["government", "private"] and "city_owned" in c.owner.basis
+
+
+def test_city_land_under_a_society_leasehold_is_mixed_too():
+    c = classify_building([_p("owner", "New Chelsea Society", "registry")], CLASSIFY, BuildingFacts(city_owned=True))
+    assert (c.owner.value, c.owner.reason, c.owner.parts) == ("mixed", "public_land_leasehold", ["government", "non_profit"])
 
 
 def test_city_owned_without_registry_owner_is_government_non_market():
