@@ -24,7 +24,7 @@ import sqlite3
 
 import polars as pl
 
-from ..claims import NETWORK_LABEL, find_similar_entity, record_claim
+from ..claims import ATTRIBUTE_RELATIONSHIPS, NETWORK_LABEL, find_similar_entity, record_claim
 from ..io import normalize_cols, read_any_csv
 
 logger = logging.getLogger("tc_core.ingest")
@@ -85,8 +85,9 @@ def ingest_ownership_claims(conn: sqlite3.Connection, path: str) -> int:
         # requires a same_entity/common_owner claim — see claims.py's module
         # docstring.
         relationship = _cell(row, "relationship")
-        # A network_label's entity_b is display text, not an entity.
-        entities = (entity_a,) if relationship == NETWORK_LABEL else (entity_a, entity_b)
+        # A network_label's or attribute claim's entity_b is a value, not an entity.
+        value_b = relationship == NETWORK_LABEL or relationship in ATTRIBUTE_RELATIONSHIPS
+        entities = (entity_a,) if value_b else (entity_a, entity_b)
         for entity in entities:
             if entity is None:
                 continue
