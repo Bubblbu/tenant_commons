@@ -63,7 +63,7 @@ uv run python scripts/rebuild_data.py                           # derived/artifa
 cd frontend && npm ci && npm run build                          # frontend/dist
 ```
 
-For development, `cd frontend && npm run dev` serves the map with hot reload. See
+For development, `uv run dev` (or `cd frontend && npm run dev`) serves the map with hot reload. See
 [`frontend/README.md`](frontend/README.md) for configuration.
 
 ## Development Workflow
@@ -94,7 +94,7 @@ Two branches, two different kinds of thing:
 release overwrites it wholesale.
 
 1. If the data changed, rebuild it: `uv run python scripts/rebuild_data.py`.
-2. From `frontend/`: `npm run deploy`. This runs `vite build` against your real local artifacts, then
+2. `uv run deploy` (or `npm run deploy` from `frontend/`). This runs `vite build` against your real local artifacts, then
    force-pushes `dist/`'s contents as the entirety of the `production` branch via
    [`gh-pages`](https://www.npmjs.com/package/gh-pages) — nothing to review, nothing to merge.
 3. GitHub Pages picks it up automatically (Settings → Pages → "Deploy from a branch" → `production` / `(root)`).

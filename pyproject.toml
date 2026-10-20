@@ -18,6 +18,10 @@ dependencies = [
     "pydantic>=2.14.0",
 ]
 
+[project.scripts]
+dev = "tc_core.cli:dev"
+deploy = "tc_core.cli:deploy"
+
 [build-system]
 requires = ["uv_build>=0.9.3,<0.10.0"]
 build-backend = "uv_build"
