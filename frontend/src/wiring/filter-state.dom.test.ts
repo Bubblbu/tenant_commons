@@ -11,7 +11,13 @@ function setup() {
     <button class="housing-chip" data-housing="sro" aria-pressed="false"></button>
     <button class="housing-chip" data-housing="co-op" aria-pressed="false"></button>
     <input type="checkbox" id="filter-only-issues"><input type="checkbox" id="filter-only-owned">
-    <input type="checkbox" id="filter-only-units">`;
+    <input type="checkbox" id="filter-only-units">
+    <button class="owner-type-chip" data-owner-type="private" aria-pressed="false"></button>
+    <button class="owner-type-chip" data-owner-type="non_profit" aria-pressed="false"></button>
+    <button class="legal-form-chip" data-legal-form="numbered_company" aria-pressed="false"></button>
+    <button class="legal-form-chip" data-legal-form="company" aria-pressed="false"></button>
+    <button class="market-chip" data-market="market" aria-pressed="false"></button>
+    <input type="checkbox" id="filter-include-inferred" checked>`;
   const units = { summary: { min: 0, max: 100, step: 1, attr: 'units' }, currentMin: 0, currentMax: 100 };
   const metrics = {
     keys: ['units'],
@@ -42,5 +48,31 @@ describe('readFilterState / writeFilterState', () => {
     writeFilterState(c, { ...readFilterState(c), hoods: ['west end'] });
     expect(c.hoodInputs[0].checked).toBe(true);
     expect(readFilterState(c).hoods).toEqual(['west end']);
+  });
+});
+
+describe('classification controls', () => {
+  it('round-trips the classification filters', () => {
+    const c = setup();
+    const state: FilterState = {
+      hoods: [], housing: [], landlords: [], onlyIssues: false, onlyOwned: false, onlyUnits: false,
+      ownerTypes: ['private'], legalForms: ['numbered_company'], market: ['market'], includeInferred: false,
+      thresholds: { units: { min: null, max: null } },
+    };
+    writeFilterState(c, state);
+    expect(readFilterState(c)).toEqual(state);
+  });
+
+  it('legal form chips are disabled, and dropped, until Private is chosen', () => {
+    const c = setup();
+    const base: FilterState = {
+      hoods: [], housing: [], landlords: [], onlyIssues: false, onlyOwned: false, onlyUnits: false,
+      ownerTypes: [], legalForms: ['company'], market: [], includeInferred: true, thresholds: {},
+    };
+    writeFilterState(c, base);
+    expect(c.legalFormChips.every((chip) => chip.hasAttribute('disabled'))).toBe(true);
+    expect(readFilterState(c).legalForms).toEqual([]);
+    writeFilterState(c, { ...base, ownerTypes: ['private'] });
+    expect(c.legalFormChips.some((chip) => chip.hasAttribute('disabled'))).toBe(false);
   });
 });

@@ -93,7 +93,7 @@ export function initFilterPass(deps: FilterPassDeps, doc: Document): FilterPass 
     };
   });
 
-  const sectionEls = (['area', 'ownership', 'building', 'value'] as const).reduce(
+  const sectionEls = (['area', 'ownership', 'building', 'value', 'portfolio'] as const).reduce(
     (acc, sec) => {
       acc[sec] = {
         count: doc.getElementById('filter-count-' + sec),
@@ -184,12 +184,21 @@ export function initFilterPass(deps: FilterPassDeps, doc: Document): FilterPass 
   if (controls.onlyUnits) controls.onlyUnits.addEventListener('change', apply);
   controls.hoodInputs.forEach((inp) => inp.addEventListener('change', apply));
 
-  controls.housingChips.forEach((chip) => {
+  [...controls.housingChips, ...controls.legalFormChips, ...controls.marketChips].forEach((chip) => {
     chip.addEventListener('click', () => {
       chip.setAttribute('aria-pressed', chip.getAttribute('aria-pressed') === 'true' ? 'false' : 'true');
       apply();
     });
   });
+  // Owner type also gates the legal form chips (only for private owners).
+  controls.ownerTypeChips.forEach((chip) => {
+    chip.addEventListener('click', () => {
+      chip.setAttribute('aria-pressed', chip.getAttribute('aria-pressed') === 'true' ? 'false' : 'true');
+      writeFilterState(controls, readFilterState(controls));
+      apply();
+    });
+  });
+  if (controls.includeInferred) controls.includeInferred.addEventListener('change', apply);
 
   function clearSection(section: FilterSection): void {
     // writeFilterState(landlords.set([])) only replaces the tiles; clear()

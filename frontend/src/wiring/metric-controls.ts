@@ -33,6 +33,8 @@ export interface MetricControls {
 
 // Under the Assessed value heading, "Land"/"Building" say enough.
 const VALUE_METRIC_LABELS: Record<string, string> = { value_land: 'Land', value_bldg: 'Building' };
+// Under the Landlord portfolio heading (spec 2026-10-20).
+const PORTFOLIO_METRIC_LABELS: Record<string, string> = { portfolio_units: 'Units', portfolio_value: 'Assessed value' };
 
 export function buildMetricControls(filterConfig: FilterConfig, doc: Document, onChange: () => void): MetricControls {
   const controls: Record<string, MetricControl> = {};
@@ -274,17 +276,22 @@ export function buildMetricControls(filterConfig: FilterConfig, doc: Document, o
   const buildingMetrics = filterConfig.building_metrics as Record<string, MetricSummary> | undefined;
   const buildingContainer = doc.getElementById('filter-building-section');
   const valueContainer = doc.getElementById('filter-value-section');
+  const portfolioContainer = doc.getElementById('filter-portfolio-section');
   if (buildingContainer && buildingMetrics) {
     buildingContainer.innerHTML = '';
     if (valueContainer) valueContainer.innerHTML = '';
+    if (portfolioContainer) portfolioContainer.innerHTML = '';
     const order = (filterConfig.building_metric_order as string[] | undefined) || Object.keys(buildingMetrics);
     order.forEach((metric) => {
       const summary = buildingMetrics[metric];
       if (!summary) return;
-      const section: MetricSection = VALUE_METRIC_LABELS[metric] && valueContainer ? 'value' : 'building';
-      // Under the Assessed value heading, "Land"/"Building" say enough.
-      const shown = section === 'value' ? { ...summary, label: VALUE_METRIC_LABELS[metric] } : summary;
-      const container = section === 'value' ? valueContainer : buildingContainer;
+      const section: MetricSection = PORTFOLIO_METRIC_LABELS[metric] && portfolioContainer ? 'portfolio'
+        : VALUE_METRIC_LABELS[metric] && valueContainer ? 'value' : 'building';
+      // Under the Assessed value and Landlord portfolio headings, short labels say enough.
+      const label = section === 'portfolio' ? PORTFOLIO_METRIC_LABELS[metric]
+        : section === 'value' ? VALUE_METRIC_LABELS[metric] : undefined;
+      const shown = label ? { ...summary, label } : summary;
+      const container = section === 'portfolio' ? portfolioContainer : section === 'value' ? valueContainer : buildingContainer;
       if (!container) return;
       controls[metric] = renderMetricControl(container, metric, shown, section);
     });

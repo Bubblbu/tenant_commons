@@ -1348,6 +1348,15 @@
     color: #fff;
   }
 
+  #filters-panel .filter-chip:disabled {
+    opacity: 0.45;
+    cursor: default;
+  }
+
+  #filters-panel .filter-chip:disabled:hover {
+    background: #fff;
+  }
+
   #filters-panel .filter-collapsible > summary {
     list-style: none;
     cursor: pointer;
@@ -1640,6 +1649,30 @@
         <div class="filter-visual filter-after-picker">
           <label><input type="checkbox" id="filter-only-owned"> Landlord on record</label>
         </div>
+        <div class="filter-chips filter-after-picker" role="group" aria-label="Owner type">
+          <span class="filter-chips-label">Owner type</span>
+          <button type="button" class="filter-chip owner-type-chip" data-owner-type="private" aria-pressed="false">Private</button>
+          <button type="button" class="filter-chip owner-type-chip" data-owner-type="non_profit" aria-pressed="false">Non-profit</button>
+          <button type="button" class="filter-chip owner-type-chip" data-owner-type="coop" aria-pressed="false">Co-op</button>
+          <button type="button" class="filter-chip owner-type-chip" data-owner-type="government" aria-pressed="false">Public</button>
+        </div>
+        <div class="filter-chips" role="group" aria-label="Private owner's legal form">
+          <span class="filter-chips-label">Legal form</span>
+          <button type="button" class="filter-chip legal-form-chip" data-legal-form="individual" aria-pressed="false" disabled>Individual</button>
+          <button type="button" class="filter-chip legal-form-chip" data-legal-form="company" aria-pressed="false" disabled>Company</button>
+          <button type="button" class="filter-chip legal-form-chip" data-legal-form="numbered_company" aria-pressed="false" disabled>Numbered company</button>
+          <button type="button" class="filter-chip legal-form-chip" data-legal-form="trust" aria-pressed="false" disabled>Trust</button>
+          <button type="button" class="filter-chip legal-form-chip" data-legal-form="partnership" aria-pressed="false" disabled>Partnership</button>
+        </div>
+        <div class="filter-chips" role="group" aria-label="Rents">
+          <span class="filter-chips-label">Rents</span>
+          <button type="button" class="filter-chip market-chip" data-market="market" aria-pressed="false">Market</button>
+          <button type="button" class="filter-chip market-chip" data-market="non_market" aria-pressed="false">Non-market</button>
+        </div>
+        <div class="filter-visual">
+          <label><input type="checkbox" id="filter-include-inferred" checked> Include inferred</label>
+        </div>
+        <p class="filter-hint">Legal form applies to private owners. Inferred: from the rental licence holder or a City housing list, not the land title.</p>
       </div>
       <div class="filter-section">
         <h4 class="filter-heading">Building <span class="filter-count" id="filter-count-building" hidden></span><button type="button" class="filter-section-clear" id="filter-clear-building" hidden>Clear</button></h4>
@@ -1657,6 +1690,11 @@
       <details class="filter-section filter-collapsible" id="filter-value-details">
         <summary><h4 class="filter-heading">Assessed value <span class="filter-count" id="filter-count-value" hidden></span><button type="button" class="filter-section-clear" id="filter-clear-value" hidden>Clear</button></h4></summary>
         <div id="filter-value-section" class="filter-building"></div>
+      </details>
+      <details class="filter-section filter-collapsible" id="filter-portfolio-details">
+        <summary><h4 class="filter-heading">Landlord portfolio <span class="filter-count" id="filter-count-portfolio" hidden></span><button type="button" class="filter-section-clear" id="filter-clear-portfolio" hidden>Clear</button></h4></summary>
+        <p class="filter-hint">The landlord's rental buildings on this map only, so a lower bound on what they hold.</p>
+        <div id="filter-portfolio-section" class="filter-building"></div>
       </details>
     </section>
   </div>

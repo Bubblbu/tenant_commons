@@ -29,6 +29,10 @@ export interface FilterControls {
   onlyIssues: HTMLInputElement | null;
   onlyOwned: HTMLInputElement | null;
   onlyUnits: HTMLInputElement | null;
+  ownerTypeChips: HTMLElement[];
+  legalFormChips: HTMLElement[];
+  marketChips: HTMLElement[];
+  includeInferred: HTMLInputElement | null;
   landlords?: LandlordFilter;
   metrics: MetricControls;
 }
@@ -84,6 +88,15 @@ export function sectionCounts(state: FilterState, metricSection: Record<string, 
 
 const areaKey = (v: string): string => (v || '').toLowerCase().trim();
 
+const pressed = (chips: HTMLElement[], attr: string): string[] =>
+  chips.filter((chip) => chip.getAttribute('aria-pressed') === 'true').map((chip) => chip.getAttribute(attr) ?? '');
+
+function press(chips: HTMLElement[], attr: string, values: string[]): void {
+  chips.forEach((chip) => {
+    chip.setAttribute('aria-pressed', values.includes(chip.getAttribute(attr) ?? '') ? 'true' : 'false');
+  });
+}
+
 export function findFilterControls(doc: Document, landlords: LandlordFilter | undefined, metrics: MetricControls): FilterControls {
   const checkbox = (id: string) => doc.getElementById(id) as HTMLInputElement | null;
   return {
@@ -92,6 +105,10 @@ export function findFilterControls(doc: Document, landlords: LandlordFilter | un
     onlyIssues: checkbox('filter-only-issues'),
     onlyOwned: checkbox('filter-only-owned'),
     onlyUnits: checkbox('filter-only-units'),
+    ownerTypeChips: Array.from(doc.querySelectorAll<HTMLElement>('.owner-type-chip')),
+    legalFormChips: Array.from(doc.querySelectorAll<HTMLElement>('.legal-form-chip')),
+    marketChips: Array.from(doc.querySelectorAll<HTMLElement>('.market-chip')),
+    includeInferred: checkbox('filter-include-inferred'),
     landlords,
     metrics,
   };
@@ -113,10 +130,10 @@ export function readFilterState(c: FilterControls): FilterState {
     onlyIssues: !!c.onlyIssues?.checked,
     onlyOwned: !!c.onlyOwned?.checked,
     onlyUnits: !!c.onlyUnits?.checked,
-    ownerTypes: [],
-    legalForms: [],
-    market: [],
-    includeInferred: true,
+    ownerTypes: pressed(c.ownerTypeChips, 'data-owner-type'),
+    legalForms: pressed(c.legalFormChips, 'data-legal-form'),
+    market: pressed(c.marketChips, 'data-market'),
+    includeInferred: c.includeInferred ? c.includeInferred.checked : true,
     thresholds,
   };
 }
@@ -130,6 +147,13 @@ export function writeFilterState(c: FilterControls, state: FilterState): void {
   if (c.onlyIssues) c.onlyIssues.checked = state.onlyIssues;
   if (c.onlyOwned) c.onlyOwned.checked = state.onlyOwned;
   if (c.onlyUnits) c.onlyUnits.checked = state.onlyUnits;
+  press(c.ownerTypeChips, 'data-owner-type', state.ownerTypes);
+  // Legal form narrows private owners, so it only applies once Private is chosen.
+  const privateChosen = state.ownerTypes.includes('private');
+  press(c.legalFormChips, 'data-legal-form', privateChosen ? state.legalForms : []);
+  c.legalFormChips.forEach((chip) => chip.toggleAttribute('disabled', !privateChosen));
+  press(c.marketChips, 'data-market', state.market);
+  if (c.includeInferred) c.includeInferred.checked = state.includeInferred;
   c.landlords?.set(state.landlords);
   for (const key of c.metrics.keys) {
     const t = state.thresholds[key];
