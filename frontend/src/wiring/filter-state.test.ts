@@ -102,6 +102,11 @@ describe('clearSection', () => {
     const classified = { ...busy, ownerTypes: ['private'], legalForms: ['trust'], includeInferred: false };
     expect(sectionCounts(classified, sections).type).toBe(3);
     expect(clearSection(classified, 'type', sections)).toEqual(busy);
+    // Rents sit in Building.
+    const rents = { ...defaultFilterState(), market: ['non_market'] };
+    expect(sectionCounts(rents, sections)).toMatchObject({ type: 0, building: 1 });
+    expect(clearSection(rents, 'type', sections).market).toEqual(['non_market']);
+    expect(clearSection(rents, 'building', sections).market).toEqual([]);
   });
 });
 

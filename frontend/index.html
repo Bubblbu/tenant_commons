@@ -1370,16 +1370,27 @@
     margin-top: 0;
   }
 
-  #filters-panel .filter-subgroup {
-    display: block;
-    margin-top: 14px;
+  #filters-panel .filter-subsection {
+    margin-top: 12px;
+  }
+
+  #filters-panel .filter-subsection h5 {
+    margin: 0;
+    font-size: 12px;
+    font-weight: 600;
+    color: #27354a;
+  }
+
+  #filters-panel .filter-chips-hint {
+    margin: -8px 0 12px;
   }
 
   #filters-panel .filter-collapsible > summary::-webkit-details-marker {
     display: none;
   }
 
-  #filters-panel .filter-collapsible > summary h4::before {
+  #filters-panel .filter-collapsible > summary h4::before,
+  #filters-panel .filter-collapsible > summary h5::before {
     content: "▸";
     display: inline-block;
     width: 10px;
@@ -1387,7 +1398,8 @@
     transition: transform 0.15s;
   }
 
-  #filters-panel .filter-collapsible[open] > summary h4::before {
+  #filters-panel .filter-collapsible[open] > summary h4::before,
+  #filters-panel .filter-collapsible[open] > summary h5::before {
     transform: rotate(90deg);
   }
 
@@ -1655,14 +1667,15 @@
         <div class="filter-visual filter-after-picker">
           <label><input type="checkbox" id="filter-only-owned"> Landlord on record</label>
         </div>
-        <div class="filter-chips-label filter-subgroup">Portfolio on the map</div>
-        <p class="filter-hint">The landlord's rental buildings on this map only, so a lower bound on what they hold.</p>
-        <div id="filter-portfolio-section" class="filter-building"></div>
+        <details class="filter-subsection filter-collapsible" id="filter-portfolio-details">
+          <summary><h5 class="filter-heading">Portfolio size</h5></summary>
+          <p class="filter-hint">The landlord's rental buildings on this map only, so a lower bound on what they hold.</p>
+          <div id="filter-portfolio-section" class="filter-building"></div>
+        </details>
       </details>
       <details class="filter-section filter-collapsible" id="filter-type-details">
-        <summary><h4 class="filter-heading">Owner type <span class="filter-count" id="filter-count-type" hidden></span><button type="button" class="filter-section-clear" id="filter-clear-type" hidden>Clear</button></h4></summary>
-        <div class="filter-chips" role="group" aria-label="Owner type">
-          <span class="filter-chips-label">Type</span>
+        <summary><h4 class="filter-heading">Ownership type <span class="filter-count" id="filter-count-type" hidden></span><button type="button" class="filter-section-clear" id="filter-clear-type" hidden>Clear</button></h4></summary>
+        <div class="filter-chips" role="group" aria-label="Ownership type">
           <button type="button" class="filter-chip owner-type-chip" data-owner-type="private" aria-pressed="false">Private</button>
           <button type="button" class="filter-chip owner-type-chip" data-owner-type="non_profit" aria-pressed="false">Non-profit</button>
           <button type="button" class="filter-chip owner-type-chip" data-owner-type="coop" aria-pressed="false">Co-op</button>
@@ -1676,11 +1689,6 @@
           <button type="button" class="filter-chip legal-form-chip" data-legal-form="trust" aria-pressed="false" disabled>Trust</button>
           <button type="button" class="filter-chip legal-form-chip" data-legal-form="partnership" aria-pressed="false" disabled>Partnership</button>
         </div>
-        <div class="filter-chips" role="group" aria-label="Rents">
-          <span class="filter-chips-label">Rents</span>
-          <button type="button" class="filter-chip market-chip" data-market="market" aria-pressed="false">Market</button>
-          <button type="button" class="filter-chip market-chip" data-market="non_market" aria-pressed="false">Non-market</button>
-        </div>
         <div class="filter-visual">
           <label><input type="checkbox" id="filter-include-inferred" checked> Include inferred</label>
         </div>
@@ -1693,6 +1701,12 @@
           <button type="button" class="filter-chip housing-chip" data-housing="sro" aria-pressed="false">SRO</button>
           <button type="button" class="filter-chip housing-chip" data-housing="co-op" aria-pressed="false">Co-op</button>
         </div>
+        <div class="filter-chips" role="group" aria-label="Rents">
+          <span class="filter-chips-label">Rents</span>
+          <button type="button" class="filter-chip market-chip" data-market="market" aria-pressed="false">Market</button>
+          <button type="button" class="filter-chip market-chip" data-market="non_market" aria-pressed="false">Non-market</button>
+        </div>
+        <p class="filter-hint filter-chips-hint">Market is mostly inferred: privately owned and not on the City's non-market list.</p>
         <div class="filter-visual">
           <label><input type="checkbox" id="filter-only-issues"> Has open rental issues</label>
           <label><input type="checkbox" id="filter-only-units"> Unit count on record</label>

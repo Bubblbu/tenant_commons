@@ -11,7 +11,7 @@ const none: FilterState = {
 const f = (bid: string, o: Partial<FilterFields> = {}): FilterFields => ({
   bid, area: 'west end', areas: [], owner: '', network: '', manager: '',
   housingTypes: [], nIssues: null, hasOwner: false, metrics: { units: 10 },
-  ownerTypes: [], legalForms: [], ownerInferred: false, market: '', marketInferred: false, ...o,
+  ownerTypes: [], legalForms: [], ownerInferred: false, market: '', ...o,
 });
 const unitsSpec: MetricSpec = { key: 'units', attr: 'units', bins: [{ start: 0, end: 10 }, { start: 10, end: 20 }] };
 const ids = (s: Set<string>) => [...s].sort();
@@ -124,9 +124,9 @@ describe('classification filters', () => {
     expect(pass({ ownerTypes: ['non_profit', 'private'], legalForms: ['numbered_company'] }, state)).toBe(true);
   });
 
-  it('include inferred off drops inferred owner types and market values', () => {
+  it('include inferred off drops inferred owner types, but rents always count inferred values', () => {
     expect(pass({ ownerTypes: ['private'], ownerInferred: true }, { ownerTypes: ['private'], includeInferred: false })).toBe(false);
-    expect(pass({ market: 'market', marketInferred: true }, { market: ['market'], includeInferred: false })).toBe(false);
-    expect(pass({ market: 'non_market', marketInferred: false }, { market: ['non_market'], includeInferred: false })).toBe(true);
+    expect(pass({ market: 'market' }, { market: ['market'], includeInferred: false })).toBe(true);
+    expect(pass({ market: 'non_market' }, { market: ['non_market'], includeInferred: false })).toBe(true);
   });
 });

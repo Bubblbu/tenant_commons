@@ -31,7 +31,6 @@ export interface FilterFields {
   ownerInferred: boolean;
   /** 'market' | 'non_market' | '' when not known. */
   market: string;
-  marketInferred: boolean;
   /** Keyed by a metric summary's attr: 'units', 'year-built', 'value-land', 'value-bldg', 'value-ratio'. */
   metrics: Record<string, number | null>;
 }
@@ -103,7 +102,6 @@ export function filterFields(r: BuildingRecord): FilterFields {
     legalForms: areaList(r.owner_legal_forms),
     ownerInferred: r.owner_inferred === true,
     market: text(r.market),
-    marketInferred: r.market_inferred === true,
     metrics: {
       units: truncOrNull(r.units),
       'year-built': truncOrNull(r.year_built),

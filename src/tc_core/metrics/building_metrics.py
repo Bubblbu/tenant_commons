@@ -37,7 +37,7 @@ BUILDING_METRICS = {
         "log_floor": 10000,
     },
     "units": {
-        "label": "Units",
+        "label": "Units in building",
         "format": "number",
         "type": "int",
         "step": 1,

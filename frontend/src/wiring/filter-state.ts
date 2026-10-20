@@ -15,14 +15,14 @@ export interface FilterState {
   ownerTypes: string[];
   legalForms: string[];
   market: string[];
-  /** Off: only owner types and market values from evidence, not inference. */
+  /** Off: only owner types from evidence, not inference (rents always count inferred values). */
   includeInferred: boolean;
   /** Missing key or null bound = unbounded. */
   thresholds: Record<string, Threshold>;
 }
 
 /** The sidebar's Filter by sections. The portfolio sliders sit in Landlord; classification in Owner type. */
-export type FilterSection = 'area' | 'landlord' | 'type' | 'building' | 'value';
+export type FilterSection = 'area' | 'landlord' | 'type' | 'building' | 'value';  // 'type' = Ownership type
 
 export interface FilterControls {
   hoodInputs: HTMLInputElement[];
@@ -63,9 +63,12 @@ export function clearSection(state: FilterState, section: FilterSection, metricS
     case 'area': return { ...state, hoods: [] };
     case 'landlord':
       return { ...state, landlords: [], onlyOwned: false, thresholds: withoutSection(state.thresholds, 'portfolio', metricSection) };
-    case 'type': return { ...state, ownerTypes: [], legalForms: [], market: [], includeInferred: true };
+    case 'type': return { ...state, ownerTypes: [], legalForms: [], includeInferred: true };
     case 'building':
-      return { ...state, housing: [], onlyIssues: false, onlyUnits: false, thresholds: withoutSection(state.thresholds, 'building', metricSection) };
+      return {
+        ...state, housing: [], market: [], onlyIssues: false, onlyUnits: false,
+        thresholds: withoutSection(state.thresholds, 'building', metricSection),
+      };
     case 'value': return { ...state, thresholds: withoutSection(state.thresholds, 'value', metricSection) };
   }
 }
@@ -80,8 +83,9 @@ export function sectionCounts(state: FilterState, metricSection: Record<string, 
   return {
     area: state.hoods.length,
     landlord: state.landlords.length + (state.onlyOwned ? 1 : 0) + active.portfolio,
-    type: state.ownerTypes.length + state.legalForms.length + state.market.length + (state.includeInferred ? 0 : 1),
-    building: state.housing.length + (state.onlyIssues ? 1 : 0) + (state.onlyUnits ? 1 : 0) + active.building,
+    type: state.ownerTypes.length + state.legalForms.length + (state.includeInferred ? 0 : 1),
+    building: state.housing.length + state.market.length + (state.onlyIssues ? 1 : 0) + (state.onlyUnits ? 1 : 0) +
+      active.building,
     value: active.value,
   };
 }

@@ -37,10 +37,8 @@ function baseMatches(f: FilterFields, s: FilterState): boolean {
     const formMatches = s.legalForms.length === 0 || s.legalForms.some((t) => f.legalForms.includes(t));
     if (!s.ownerTypes.some((t) => f.ownerTypes.includes(t) && (t !== 'private' || formMatches))) return false;
   }
-  if (s.market.length > 0) {
-    if (!s.includeInferred && f.marketInferred) return false;
-    if (!s.market.includes(f.market)) return false;
-  }
+  // Rents always count inferred values: almost every "market" one is inferred.
+  if (s.market.length > 0 && !s.market.includes(f.market)) return false;
   return true;
 }
 
