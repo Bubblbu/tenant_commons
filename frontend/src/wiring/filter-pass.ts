@@ -93,7 +93,7 @@ export function initFilterPass(deps: FilterPassDeps, doc: Document): FilterPass 
     };
   });
 
-  const sectionEls = (['area', 'landlord', 'type', 'building', 'value'] as const).reduce(
+  const sectionEls = (['area', 'landlord', 'type', 'building'] as const).reduce(
     (acc, sec) => {
       acc[sec] = {
         count: doc.getElementById('filter-count-' + sec),

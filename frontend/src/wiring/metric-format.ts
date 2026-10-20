@@ -1,5 +1,5 @@
 /**
- * Pure numeric helpers for the Filter by > Building/Assessed value sliders:
+ * Pure numeric helpers for the Filter by > Building and Landlord sliders:
  * the log-scale slider<->value mapping (with a floor bin) and value/tick
  * formatting. No DOM — metric-controls.ts renders with these.
  */

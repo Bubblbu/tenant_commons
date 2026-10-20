@@ -22,7 +22,8 @@ export interface FilterState {
 }
 
 /** The sidebar's Filter by sections. The portfolio sliders sit in Landlord; classification in Owner type. */
-export type FilterSection = 'area' | 'landlord' | 'type' | 'building' | 'value';  // 'type' = Ownership type
+/** 'type' is Ownership type; Building holds the Property value sliders ('value' metrics). */
+export type FilterSection = 'area' | 'landlord' | 'type' | 'building';
 
 export interface FilterControls {
   hoodInputs: HTMLInputElement[];
@@ -67,9 +68,8 @@ export function clearSection(state: FilterState, section: FilterSection, metricS
     case 'building':
       return {
         ...state, housing: [], market: [], onlyIssues: false, onlyUnits: false,
-        thresholds: withoutSection(state.thresholds, 'building', metricSection),
+        thresholds: withoutSection(withoutSection(state.thresholds, 'building', metricSection), 'value', metricSection),
       };
-    case 'value': return { ...state, thresholds: withoutSection(state.thresholds, 'value', metricSection) };
   }
 }
 
@@ -85,8 +85,7 @@ export function sectionCounts(state: FilterState, metricSection: Record<string, 
     landlord: state.landlords.length + (state.onlyOwned ? 1 : 0) + active.portfolio,
     type: state.ownerTypes.length + state.legalForms.length + (state.includeInferred ? 0 : 1),
     building: state.housing.length + state.market.length + (state.onlyIssues ? 1 : 0) + (state.onlyUnits ? 1 : 0) +
-      active.building,
-    value: active.value,
+      active.building + active.value,
   };
 }
 

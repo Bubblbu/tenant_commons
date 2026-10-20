@@ -31,11 +31,11 @@ export interface MetricControls {
   setBarCounts(metric: string, counts: number[]): void;
 }
 
-// Under the Assessed value heading, "Land"/"Building" say enough.
-const VALUE_METRIC_LABELS: Record<string, string> = { value_land: 'Land', value_bldg: 'Building' };
+// Under Building > Property value.
+const VALUE_METRIC_LABELS: Record<string, string> = { value_land: 'Land value', value_bldg: 'Building value' };
 // Under Landlord > Portfolio size (spec 2026-10-20): say whose units and value, beside the building's own.
 const PORTFOLIO_METRIC_LABELS: Record<string, string> = {
-  portfolio_units: "Landlord's units on the map", portfolio_value: "Landlord's total assessed value",
+  portfolio_units: "Landlord's units on the map", portfolio_value: "Landlord's total property value",
 };
 
 export function buildMetricControls(filterConfig: FilterConfig, doc: Document, onChange: () => void): MetricControls {
@@ -289,7 +289,7 @@ export function buildMetricControls(filterConfig: FilterConfig, doc: Document, o
       if (!summary) return;
       const section: MetricSection = PORTFOLIO_METRIC_LABELS[metric] && portfolioContainer ? 'portfolio'
         : VALUE_METRIC_LABELS[metric] && valueContainer ? 'value' : 'building';
-      // Under the Assessed value heading, "Land"/"Building" say enough.
+      // Labels that say whose value, under their subsection headings.
       const label = section === 'portfolio' ? PORTFOLIO_METRIC_LABELS[metric]
         : section === 'value' ? VALUE_METRIC_LABELS[metric] : undefined;
       const shown = label ? { ...summary, label } : summary;

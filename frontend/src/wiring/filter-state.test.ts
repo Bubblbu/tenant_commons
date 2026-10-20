@@ -87,18 +87,16 @@ describe('clearSection', () => {
       ...busy, landlords: [], onlyOwned: false,
       thresholds: { units: { min: 5, max: null }, value_land: { min: null, max: 9 } },
     });
+    // Building includes its Property value sliders.
     expect(clearSection(busy, 'building', sections)).toEqual({
       ...busy, housing: [], onlyIssues: false, onlyUnits: false,
-      thresholds: { value_land: { min: null, max: 9 }, portfolio_units: { min: 50, max: null } },
-    });
-    expect(clearSection(busy, 'value', sections)).toEqual({
-      ...busy, thresholds: { units: { min: 5, max: null }, portfolio_units: { min: 50, max: null } },
+      thresholds: { portfolio_units: { min: 50, max: null } },
     });
   });
 
   it('counts active filters per section', () => {
-    expect(sectionCounts(busy, sections)).toEqual({ area: 1, landlord: 3, type: 0, building: 4, value: 1 });
-    expect(sectionCounts(defaultFilterState(), sections)).toEqual({ area: 0, landlord: 0, type: 0, building: 0, value: 0 });
+    expect(sectionCounts(busy, sections)).toEqual({ area: 1, landlord: 3, type: 0, building: 5 });
+    expect(sectionCounts(defaultFilterState(), sections)).toEqual({ area: 0, landlord: 0, type: 0, building: 0 });
     const classified = { ...busy, ownerTypes: ['private'], legalForms: ['trust'], includeInferred: false };
     expect(sectionCounts(classified, sections).type).toBe(3);
     expect(clearSection(classified, 'type', sections)).toEqual(busy);
