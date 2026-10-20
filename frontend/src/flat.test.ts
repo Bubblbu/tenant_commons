@@ -16,10 +16,10 @@ const york: Building = {
   value: { land: 8721000, building: 11437000, land_share: 0.43, land_share_pctl: 20 },
   issues: { count: 1, url: 'http://app.vancouver.ca/x' },
   parties: [
-    { role: 'owner', name: 'Yorkshire Place Apts. Ltd.', entity_key: 'yorkshire-place-apts-ltd', kind: null,
+    { role: 'owner', name: 'Yorkshire Place Apts. Ltd.', entity_key: 'yorkshire-place-apts-ltd', kind: null, institutional: null,
       interest: null, pids: ['007-273-924'], same_as: null,
       sources: [{ type: 'registry', as_of: '2024-05-03', url: null }, { type: 'licence', as_of: null, url: null }] },
-    { role: 'manager', name: 'Cascadia Apartment Rentals', entity_key: 'cascadia-apartment-rentals', kind: null,
+    { role: 'manager', name: 'Cascadia Apartment Rentals', entity_key: 'cascadia-apartment-rentals', kind: null, institutional: null,
       interest: null, pids: [], same_as: null, sources: [{ type: 'listing', as_of: '2026-09-30', url: 'https://c.example' }] },
   ],
   network_id: 'net:cressey', registry_search: { status: 'filed', date: null },

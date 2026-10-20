@@ -12,10 +12,11 @@ from __future__ import annotations
 
 import re
 import sqlite3
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 
 from ..claims import ENTITY_KIND, INSTITUTIONAL, entity_attribute_claims
+from ..contract import Classification, MarketAxis, OperatorAxis, OwnerAxis, Party
 from ..normalize import sanitize_owner
 from .portfolios import EVIDENCE_BUCKET
 
@@ -120,3 +121,131 @@ class EntityClassifier:
         if holder == "corporation" and by_name in ("individual", "unknown"):
             return EntityClass("company", "registry", False, institutional)
         return EntityClass(by_name, "name_rule", True, institutional)
+
+
+OWNER_TYPE_OF_KIND = {
+    "government": "government", "non_profit": "non_profit", "coop": "coop",
+    "individual": "private", "company": "private", "numbered_company": "private",
+    "trust": "private", "partnership": "private", "unknown": "unknown",
+}
+_SECTOR_OWNER_TYPE = {"private": "private", "non_profit": "non_profit",
+                      "government": "government", "chinese_society": "non_profit"}
+
+
+@dataclass(frozen=True)
+class BuildingFacts:
+    city_owned: bool = False
+    coop_model: str | None = None  # Coop.ownership_model
+    sro_owner_sector: str | None = None
+    sro_operator_sector: str | None = None
+    on_non_market_list: bool = False
+    network_buildings: int | None = None
+
+
+@dataclass(frozen=True)
+class ScaleThresholds:
+    small_portfolio_min: int = 2
+    large_portfolio_min: int = 10
+
+
+def scale_for(n: int | None, t: ScaleThresholds) -> str | None:
+    if not n:
+        return None
+    if n >= t.large_portfolio_min:
+        return "large_portfolio"
+    return "small_portfolio" if n >= t.small_portfolio_min else "single"
+
+
+def _unique(items) -> list:
+    return list(dict.fromkeys(i for i in items if i))
+
+
+def _owner_axis(parties: Sequence[Party], classify: Callable[[str], EntityClass], facts: BuildingFacts) -> OwnerAxis:
+    """Precedence: owners on title (claims, then registry, then names decide
+    their kind), the City's land list, then the co-op, SRO and non-market
+    lists and finally the licence holder, the last four marked inferred."""
+    owners = [p for p in parties if p.role == "owner"]
+    on_title = [p for p in owners if p.sources[0].type == "registry"]
+    if on_title:
+        classes = [classify(p.name) for p in on_title]
+        known = [t for t in _unique(OWNER_TYPE_OF_KIND[c.kind] for c in classes) if t != "unknown"]
+        forms = sorted({c.kind for c in classes if OWNER_TYPE_OF_KIND[c.kind] == "private"})
+        basis = _unique(["registry", *(c.basis for c in classes)])
+        if facts.city_owned and set(known) - {"government"}:
+            return OwnerAxis(value="mixed", legal_forms=forms, parts=sorted({"government", *known}),
+                             reason="public_land_private_leasehold",
+                             basis=_unique([*basis, "city_owned"]), inferred=False)
+        if len(known) > 1:
+            return OwnerAxis(value="mixed", legal_forms=forms, parts=sorted(known),
+                             reason="owners_differ", basis=basis, inferred=False)
+        if known:
+            return OwnerAxis(value=known[0], legal_forms=forms, basis=basis, inferred=False)
+    if facts.city_owned:
+        return OwnerAxis(value="government", basis=["city_owned"], inferred=False)
+    if facts.coop_model == "non_profit":
+        return OwnerAxis(value="coop", basis=["chf_bc"], inferred=True)
+    sro_owner = next((p for p in owners if p.sources[0].type == "sro_inventory"), None)
+    if sro_owner or facts.sro_owner_sector:
+        kind = classify(sro_owner.name).kind if sro_owner else "unknown"
+        value = (OWNER_TYPE_OF_KIND[kind] if kind != "unknown"
+                 else _SECTOR_OWNER_TYPE.get(facts.sro_owner_sector or "", "unknown"))
+        if value != "unknown":
+            forms = [kind] if value == "private" and kind != "unknown" else []
+            return OwnerAxis(value=value, legal_forms=forms, basis=["sro_inventory"], inferred=True)
+    if facts.on_non_market_list:
+        operator = next((p for p in parties if p.role in ("manager", "licensee")), None)
+        value = OWNER_TYPE_OF_KIND[classify(operator.name).kind] if operator else "unknown"
+        if value in ("non_profit", "coop", "government"):
+            return OwnerAxis(value=value, basis=["non_market_list"], inferred=True)
+    licensed = next((p for p in owners if p.sources[0].type == "licence"), None) or next(
+        (p for p in parties if p.role == "licensee"), None)
+    if licensed:
+        c = classify(licensed.name)
+        value = OWNER_TYPE_OF_KIND[c.kind]
+        if value != "unknown":
+            forms = [c.kind] if value == "private" else []
+            return OwnerAxis(value=value, legal_forms=forms, basis=_unique(["licence", c.basis]), inferred=True)
+    return OwnerAxis(value="unknown", basis=[], inferred=False)
+
+
+def _market_axis(owner: OwnerAxis, facts: BuildingFacts) -> MarketAxis:
+    if facts.on_non_market_list:
+        return MarketAxis(value="non_market", basis=["non_market_list"], inferred=False)
+    if facts.coop_model == "non_profit":
+        return MarketAxis(value="non_market", basis=["chf_bc"], inferred=False)
+    if owner.value == "government" and not owner.inferred:
+        return MarketAxis(value="non_market", basis=owner.basis, inferred=False)
+    if {facts.sro_owner_sector, facts.sro_operator_sector} & {"non_profit", "government"}:
+        return MarketAxis(value="non_market", basis=["sro_inventory"], inferred=True)
+    if facts.coop_model == "equity":
+        return MarketAxis(value="market", basis=["chf_bc"], inferred=True)
+    if owner.value == "private":
+        return MarketAxis(value="market", basis=owner.basis, inferred=True)
+    return MarketAxis(value="unknown", basis=[], inferred=False)
+
+
+def _operator_axis(parties: Sequence[Party], classify: Callable[[str], EntityClass]) -> OperatorAxis | None:
+    """The manager, else a licence holder who is neither owner nor manager."""
+    operator = next((p for p in parties if p.role == "manager"), None) or next(
+        (p for p in parties if p.role == "licensee" and p.same_as is None), None)
+    if operator is None:
+        return None
+    value = OWNER_TYPE_OF_KIND[classify(operator.name).kind]
+    if value == "unknown":
+        return None
+    return OperatorAxis(value=value, basis=_unique(s.type for s in operator.sources))
+
+
+def classify_building(
+    parties: Sequence[Party],
+    classify: Callable[[str], EntityClass],
+    facts: BuildingFacts,
+    thresholds: ScaleThresholds = ScaleThresholds(),
+) -> Classification:
+    owner = _owner_axis(parties, classify, facts)
+    return Classification(
+        owner=owner,
+        market=_market_axis(owner, facts),
+        operator=_operator_axis(parties, classify),
+        scale=scale_for(facts.network_buildings, thresholds),
+    )

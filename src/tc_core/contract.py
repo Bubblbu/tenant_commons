@@ -34,6 +34,18 @@ SourceType = Literal[
 ]
 Role = Literal["owner", "interest_holder", "manager", "licensee"]
 Sector = Literal["private", "non_profit", "government", "chinese_society"]
+Kind = Literal[
+    "government", "non_profit", "coop", "individual", "company",
+    "numbered_company", "trust", "partnership", "unknown",
+]
+Institutional = Literal["reit", "pension_fund", "insurer", "asset_manager", "other"]
+OwnerType = Literal["government", "non_profit", "coop", "private", "mixed", "unknown"]
+# Where a classification came from. Claims show only as their bucket.
+Basis = Literal[
+    "name_rule", "registry", "licence", "listing", "city_owned", "non_market_list",
+    "chf_bc", "sro_inventory", "claim_registry", "claim_city_records", "vtu_research",
+]
+Scale = Literal["single", "small_portfolio", "large_portfolio"]
 
 
 class _Model(BaseModel):
@@ -50,7 +62,8 @@ class Party(_Model):
     role: Role
     name: Text
     entity_key: Text
-    kind: None = None  # reserved for the sector project
+    kind: Kind | None = None
+    institutional: Institutional | None = None
     interest: Text | None = None
     pids: list[Text] = []
     same_as: Literal["owner", "manager"] | None = None
@@ -93,6 +106,35 @@ class Rezoning(_Model):
     detail: Text | None = None
     url: Text | None = None
 
+
+
+class OwnerAxis(_Model):
+    value: OwnerType
+    legal_forms: list[Kind] = []  # the private owners' kinds
+    parts: list[OwnerType] = []  # when mixed
+    reason: Literal["owners_differ", "public_land_private_leasehold"] | None = None
+    basis: list[Basis]
+    # True when the owner is not confirmed on title, a claim or the City's
+    # own land list (licence holder, SRO inventory, co-op or non-market list).
+    inferred: bool
+
+
+class MarketAxis(_Model):
+    value: Literal["non_market", "market", "unknown"]
+    basis: list[Basis]
+    inferred: bool
+
+
+class OperatorAxis(_Model):
+    value: OwnerType
+    basis: list[Basis]
+
+
+class Classification(_Model):
+    owner: OwnerAxis
+    market: MarketAxis
+    operator: OperatorAxis | None
+    scale: Scale | None
 
 class Building(_Model):
     id: Int

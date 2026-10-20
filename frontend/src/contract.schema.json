@@ -529,6 +529,25 @@
           "title": "Entity Key",
           "type": "string"
         },
+        "institutional": {
+          "anyOf": [
+            {
+              "enum": [
+                "reit",
+                "pension_fund",
+                "insurer",
+                "asset_manager",
+                "other"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Institutional"
+        },
         "interest": {
           "anyOf": [
             {
@@ -542,9 +561,27 @@
           "title": "Interest"
         },
         "kind": {
+          "anyOf": [
+            {
+              "enum": [
+                "government",
+                "non_profit",
+                "coop",
+                "individual",
+                "company",
+                "numbered_company",
+                "trust",
+                "partnership",
+                "unknown"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
           "default": null,
-          "title": "Kind",
-          "type": "null"
+          "title": "Kind"
         },
         "name": {
           "title": "Name",
@@ -597,6 +634,7 @@
         "name",
         "entity_key",
         "kind",
+        "institutional",
         "interest",
         "pids",
         "same_as",

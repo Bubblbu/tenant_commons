@@ -83,7 +83,7 @@ describe('renderOwnership', () => {
   });
 
   it('distinguishes joint owners of one parcel from owners of separate parcels', () => {
-    const owner = (name: string, pids: string[]) => ({ role: 'owner' as const, name, entity_key: name, kind: null,
+    const owner = (name: string, pids: string[]) => ({ role: 'owner' as const, name, entity_key: name, kind: null, institutional: null,
       interest: null, pids, same_as: null, sources: [{ type: 'registry' as const, as_of: '2026-01-01', url: null }] });
     const joint: Building = { ...BIDWELL, network_id: null, parties: [owner('RENER, ALENKA', ['1']), owner('RENER, GEORGE', ['1'])] };
     const split: Building = { ...BIDWELL, network_id: null, parties: [owner('A LTD.', ['1']), owner('B LTD.', ['2'])] };

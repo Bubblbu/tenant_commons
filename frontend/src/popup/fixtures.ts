@@ -3,7 +3,7 @@ import type { Building, Network, Party } from '../contract.gen';
 import type { PopupContext } from './index';
 
 const party = (p: Partial<Party> & Pick<Party, 'role' | 'name'>): Party => ({
-  entity_key: p.name.toLowerCase(), kind: null, interest: null, pids: [], same_as: null, sources: [], ...p,
+  entity_key: p.name.toLowerCase(), kind: null, institutional: null, interest: null, pids: [], same_as: null, sources: [], ...p,
 });
 const base = (b: Partial<Building> & Pick<Building, 'id' | 'address'>): Building => ({
   origin: 'building', name: null, also_known_as: [], pids: [], local_area: null, lat: 49.2, lon: -123.1,

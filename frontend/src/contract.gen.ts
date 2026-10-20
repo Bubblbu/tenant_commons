@@ -33,8 +33,21 @@ export type Name = string | null;
 export type NetworkId = string | null;
 export type Origin = "building" | "overlay_sro" | "overlay_coop";
 export type EntityKey = string;
+export type Institutional = ("reit" | "pension_fund" | "insurer" | "asset_manager" | "other") | null;
 export type Interest = string | null;
-export type Kind = null;
+export type Kind =
+  | (
+      | "government"
+      | "non_profit"
+      | "coop"
+      | "individual"
+      | "company"
+      | "numbered_company"
+      | "trust"
+      | "partnership"
+      | "unknown"
+    )
+  | null;
 export type Name1 = string;
 export type Pids = string[];
 export type Role = "owner" | "interest_holder" | "manager" | "licensee";
@@ -160,6 +173,7 @@ export interface Issues {
  */
 export interface Party {
   entity_key: EntityKey;
+  institutional: Institutional;
   interest: Interest;
   kind: Kind;
   name: Name1;
