@@ -26,9 +26,9 @@ describe('sidebar', () => {
     expect(page).toContain('<div id="pane-neighbourhoods" class="pane">');
   });
 
-  it('keeps the blocks table without a tab: the map block filter reads its rows', () => {
-    expect(page).toContain('id="blocks-table"');
-    expect(page).not.toContain('id="tab-blocks"');
+  it('has no blocks table: the map block filter reads the blocks GeoJSON', () => {
+    expect(page).not.toContain('id="blocks-table"');
+    expect(page).not.toContain('id="pane-blocks"');
   });
 
   it('shows the selection hint above the table search, as a note', () => {

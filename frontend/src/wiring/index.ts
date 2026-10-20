@@ -24,7 +24,7 @@ export type { WiringContext } from './types';
 export function startWiring(ctx: WiringContext, doc: Document = document): void {
   const index = buildMapIndex(ctx);
   const restack = createRestack(index);
-  const blocks = createBlockStyler(index, doc, restack.schedule);
+  const blocks = createBlockStyler(index, doc);
   blocks.recomputeScale();
   restack.sendBlocksToBack();
   const markers = createMarkerStyler(index, restack.schedule);
@@ -35,7 +35,7 @@ export function startWiring(ctx: WiringContext, doc: Document = document): void 
   const status = createStatus(index, ctx.map, ctx.filterConfig, doc);
   watchMap(ctx.map, status, () => markers.applyZoom(ctx.map.getZoom()));
   const tables = initLiveTables(index, doc);
-  const selection = initSelection(index, markers, blocks, tables, doc);
+  const selection = initSelection(index, markers, tables, doc);
   // Sliders are built before the filter pass they trigger exists.
   let filterPass: FilterPass | undefined;
   const metrics = buildMetricControls(ctx.filterConfig, doc, () => filterPass?.schedule());

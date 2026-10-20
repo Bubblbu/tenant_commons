@@ -26,10 +26,7 @@ export interface BlockLayer extends L.Path {
   feature: { properties: Record<string, unknown> };
   _blockUnits: number;
   _blockBuildings: number;
-  _baseStyle: L.PathOptions;
   _isFiltered: boolean;
-  _selectionRefs: number;
-  _highlighted: boolean;
 }
 
 /** Lookup tables built once at start-up (formerly window.* globals). */
@@ -49,7 +46,7 @@ export interface MapIndex {
 export interface CachedRow extends HTMLTableRowElement {
   __checkbox: HTMLInputElement | null;
   __cells?: Record<string, Element | null>;
-  __lastMetrics?: { bldgs: number; units: number; avg: number; medianYear: number | null };
+  __lastMetrics?: { bldgs: number; units: number; avg: number };
 }
 
 export interface WiringContext {

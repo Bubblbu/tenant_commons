@@ -9,7 +9,7 @@ import type { BuildingRecord } from './types';
 const OWNER_SOURCE: Record<string, string> = { registry: 'registry', licence: 'licence', sro_inventory: 'sro_list' };
 
 export const FLAT_COLUMNS = [
-  'b_id', 'source', 'address', 'building_name', 'local_area', 'block_id', 'units', 'year_built',
+  'b_id', 'source', 'address', 'building_name', 'local_area', 'units', 'year_built',
   'owner_name', 'owner_key', 'owner_source', 'licence_holder', 'managed_by',
   'network_key', 'network_name', 'network_source', 'network_buildings_on_map',
   'network_evidence_registry', 'network_evidence_city', 'network_evidence_research',
@@ -31,7 +31,6 @@ export function flatten(b: Building, networks: Record<string, Network>): Buildin
     building_name: b.name,
     other_names: b.also_known_as,
     local_area: b.local_area,
-    block_id: b.block_id,
     units: b.units,
     year_built: b.year_built,
     owner_name: owner?.name ?? null,

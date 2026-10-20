@@ -1,8 +1,7 @@
 """Ingest orchestration: CSVs -> tc_core SQLite tables.
 
 Order matters for FK dependencies: raw tables first, then the merge step
-(which needs both raw_buildings and raw_addresses, and needs blocks for
-point-in-polygon assignment), then overlays (matches raw_sro/raw_coops/
+(which needs both raw_buildings and raw_addresses), then overlays (matches raw_sro/raw_coops/
 raw_rezoning against the merged buildings: flags matched buildings, writes
 the rest to overlay_housing; needs the local-area boundary GeoJSON), then
 membership (needs buildings.addr_key to resolve building_id), then
@@ -42,7 +41,7 @@ from typing import Any, Callable
 from ..config import IngestConfig, load_ingest_config
 from ..db import get_connection, init_db
 from .block_numbers import ingest_raw_block_numbers
-from .blocks import ingest_blocks
+from .blocks import ingest_raw_blocks
 from .building_names import derive_building_names
 from .manager_listings import ingest_manager_listings
 from .membership import ingest_membership
@@ -94,8 +93,8 @@ def run_ingest(conn: sqlite3.Connection, config: IngestConfig) -> dict[str, int]
     counts["raw_addresses"] = run_source(
         conn, run_id, "raw_addresses", ingest_raw_addresses, conn, config.addresses
     )
-    counts["blocks"] = run_source(
-        conn, run_id, "blocks", ingest_blocks, conn, config.blocks, config.bbox
+    counts["raw_blocks"] = run_source(
+        conn, run_id, "raw_blocks", ingest_raw_blocks, conn, config.blocks
     )
     counts["raw_block_numbers"] = run_source(
         conn, run_id, "raw_block_numbers", ingest_raw_block_numbers, conn, config.block_numbers

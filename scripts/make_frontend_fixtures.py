@@ -85,7 +85,7 @@ def _seed(conn: sqlite3.Connection) -> None:
          (2, "Sample Rentals Inc", "sample-rentals-inc", TS, TS)],
     )
     conn.executemany(
-        "INSERT INTO blocks (block_id, geom, ingested_at) VALUES (?, ?, ?)",
+        "INSERT INTO raw_blocks (raw_block_id, geom, ingested_at) VALUES (?, ?, ?)",
         [(1, json.dumps(_square(-123.130, 49.280)), TS),
          (2, json.dumps(_square(-123.120, 49.270)), TS),
          (3, json.dumps(_square(-123.110, 49.260)), TS)],  # empty block
@@ -95,13 +95,13 @@ def _seed(conn: sqlite3.Connection) -> None:
         conn.execute(
             "INSERT INTO buildings (building_id, addr_key, address, local_area, lat, lon, units, "
             "year_built, value_land, value_bldg, bldg_land_ratio, n_issues, issues_details, "
-            "landlord_id, block_id, "
+            "landlord_id, "
             "is_coop, is_sro, coop_status, coop_ownership_model, coop_url, housing_name, sro_owner, "
             "sro_operator, sro_ownership_group, sro_operator_group, sro_occupancy_status, "
             "sro_registered_rooms, created_at, updated_at) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (bid, key, addr, area, lat, lon, units, year, land, bldg, ratio, issues, issues_url,
-             landlord, block, coop, sro, cstatus, cmodel, curl, hname,
+             landlord, coop, sro, cstatus, cmodel, curl, hname,
              # The SRO inventory's abbreviation, expanded on export ("BCH" -> BC Housing);
              # the licence (Sample Rentals Inc) stays a separate licensee.
              "BCH" if sro else None, "Example Housing Society" if sro else None,

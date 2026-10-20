@@ -21,17 +21,6 @@
           "title": "Areas",
           "type": "array"
         },
-        "block_id": {
-          "anyOf": [
-            {
-              "type": "integer"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "title": "Block Id"
-        },
         "coop": {
           "anyOf": [
             {
@@ -233,7 +222,6 @@
         "also_known_as",
         "pids",
         "local_area",
-        "block_id",
         "lat",
         "lon",
         "areas",
@@ -264,7 +252,7 @@
           "type": "object"
         },
         "schema_version": {
-          "const": 3,
+          "const": 4,
           "title": "Schema Version",
           "type": "integer"
         }
@@ -522,7 +510,7 @@
           "type": "object"
         },
         "schema_version": {
-          "const": 3,
+          "const": 4,
           "title": "Schema Version",
           "type": "integer"
         }

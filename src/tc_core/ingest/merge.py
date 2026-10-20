@@ -12,9 +12,8 @@ against data already sitting in SQLite, with two deliberate deviations from v1:
    scope-narrowing is deferred to query/export time, matching the fact that
    buildings.csv is already city-wide, not West-End-scoped.
 
-Also assigns `block_id` (point-in-polygon against `blocks`, forked from
-`point_in_block_ids`'s STRtree logic) and upserts `landlords` — neither of
-which have a home anywhere else in the ingest sequence.
+Also upserts `landlords`, which has no home anywhere else in the ingest
+sequence.
 """
 
 from __future__ import annotations
@@ -24,13 +23,9 @@ import math
 import sqlite3
 from datetime import datetime, timezone
 
-import numpy as np
 import polars as pl
-from shapely.geometry import Point
-from shapely.strtree import STRtree
 
 from ..db import query_frame
-from ..geometry import parse_geom
 from ..normalize import (
     addr_key_from_freeform,
     clean_owner_label,
@@ -313,35 +308,6 @@ def merge_and_dedupe_buildings(
     return buildings
 
 
-def assign_blocks(buildings_df: pl.DataFrame, blocks_df: pl.DataFrame) -> list[int | None]:
-    """Fork of point_in_block_ids (STRtree). block_id per row, None if unmatched."""
-    geoms = []
-    block_ids = []
-    for raw_geom, block_id in zip(blocks_df["geom"], blocks_df["block_id"]):
-        geom = parse_geom(raw_geom)
-        if geom is None:
-            continue
-        geoms.append(geom)
-        block_ids.append(int(block_id))
-
-    if not geoms:
-        return [None] * buildings_df.height
-
-    tree = STRtree(geoms)
-
-    def locate(lon: float, lat: float) -> int | None:
-        if _missing(lat) or _missing(lon):
-            return None
-        point = Point(lon, lat)
-        for idx in np.atleast_1d(tree.query(point)):
-            geom = geoms[int(idx)]
-            if geom.contains(point) or geom.touches(point):
-                return block_ids[int(idx)]
-        return None
-
-    return [locate(lo, la) for la, lo in zip(buildings_df["lat"], buildings_df["lon"])]
-
-
 def upsert_landlords(conn: sqlite3.Connection, buildings_df: pl.DataFrame) -> dict[str, int]:
     """One row per distinct owner_key, excluding 'unknown'. Returns owner_key -> landlord_id."""
     now = datetime.now(timezone.utc).isoformat()
@@ -366,11 +332,10 @@ def write_buildings(
     conn: sqlite3.Connection,
     buildings_df: pl.DataFrame,
     landlord_id_by_owner_key: dict[str, int],
-    block_ids: list[int | None],
 ) -> int:
     now = datetime.now(timezone.utc).isoformat()
     rows = []
-    for row, block_id in zip(buildings_df.iter_rows(named=True), block_ids):
+    for row in buildings_df.iter_rows(named=True):
         rows.append(
             (
                 row["addr_key"],
@@ -387,7 +352,6 @@ def write_buildings(
                 row["n_issues"],
                 row["issues_details"],
                 landlord_id_by_owner_key.get(row["owner_key"]),
-                block_id,
                 row["source_row_ids"],
                 now,
                 now,
@@ -399,8 +363,8 @@ def write_buildings(
             INSERT INTO buildings (
                 addr_key, address, local_area, lat, lon, units, building_source, year_built,
                 value_land, value_bldg, bldg_land_ratio, n_issues, issues_details,
-                landlord_id, block_id, source_row_ids, created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                landlord_id, source_row_ids, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             rows,
         )
@@ -412,9 +376,5 @@ def run_merge(conn: sqlite3.Connection) -> int:
     listings = usable_listings(conn)
     secondary = load_secondary_address_index(conn) if listings else {}
     buildings_df = merge_and_dedupe_buildings(raw_buildings, raw_addresses, listings, secondary)
-
-    blocks_df = query_frame(conn, "SELECT block_id, geom FROM blocks")
-    block_ids = assign_blocks(buildings_df, blocks_df)
-
     landlord_id_by_owner_key = upsert_landlords(conn, buildings_df)
-    return write_buildings(conn, buildings_df, landlord_id_by_owner_key, block_ids)
+    return write_buildings(conn, buildings_df, landlord_id_by_owner_key)

@@ -37,14 +37,13 @@ export function createRestack(index: MapIndex): Restack {
   // Same shared-canvas insertion-order issue sendBlocksToBack() handles, for
   // everything above the blocks: toggling a layer re-inserts it at the end of
   // the draw order, and hovering/selecting changes what must sit on top. One
-  // pass restores the full stack — unhighlighted blocks (left at the back),
-  // highlighted blocks, building markers, housing-type rings (above every
-  // marker, as createBuildingLayers() orders them), then highlighted markers.
+  // pass restores the full stack — blocks (left at the back), building
+  // markers, housing-type rings (above every marker, as createBuildingLayers()
+  // orders them), then highlighted markers.
   // Boundary outlines are on their own canvas above all of this (see
   // createBoundaryRenderer), so they never need restacking.
   function now(): void {
     const markers = Object.keys(index.buildings).map((key) => index.buildings[key]);
-    index.blockLayers.forEach((layer) => { if (layer._highlighted) bringLayerToFront(layer); });
     markers.forEach((marker) => { if (!marker._highlighted) bringLayerToFront(marker); });
     markers.forEach((marker) => {
       (marker._extraRings || []).forEach((ring) => bringLayerToFront(ring.marker));

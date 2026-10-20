@@ -50,7 +50,6 @@ function record(b: B): BuildingRecord {
     registry_no_filing: b.searched ?? null,
     housing_type: b.housing,
     n_issues: b.issues,
-    block_id: b.block,
     areas: b.areas?.join('; ') ?? null,
     value_land: null,
     value_bldg: null,
@@ -70,7 +69,6 @@ const FIXTURE_MARKER_RECORDS: MarkerRecord[] = BUILDINGS.map((b) => ({
   lon: -123.12,
   owner_key: b.owner,
   network_key: b.owner && OWNERS[b.owner] ? OWNERS[b.owner].network : null,
-  block_id: b.block,
   units: b.units,
   year_built: b.year,
   local_area: b.area,
@@ -89,6 +87,7 @@ function block(id: number, area: string, buildings: number, units: number) {
     properties: {
       block_id: id, block_label: `Block ${id}`, local_area: area, buildings, total_units: units,
       median_year_built: null, areas: [],
+      building_ids: BUILDINGS.filter((b) => b.block === id).map((b) => b.id),
     },
   };
 }

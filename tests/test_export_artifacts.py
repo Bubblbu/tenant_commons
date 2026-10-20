@@ -12,7 +12,7 @@ def _seed(conn):
         "49.28, -123.1, 'Downtown', 50, 1970, 'now', 'now')"
     )
     conn.execute(
-        "INSERT INTO blocks (block_id, geom, ingested_at) VALUES (1, "
+        "INSERT INTO raw_blocks (raw_block_id, geom, ingested_at) VALUES (1, "
         "'{\"type\":\"Polygon\",\"coordinates\":[[[-123.2,49.2],[-123.2,49.4],"
         "[-123.0,49.4],[-123.0,49.2],[-123.2,49.2]]]}', 'now')"
     )
@@ -58,7 +58,7 @@ def test_marker_metadata_carries_coordinates(tmp_path):
     export_artifacts(conn, tmp_path)
 
     meta = json.loads((tmp_path / "marker_metadata.json").read_text())
-    assert meta["schema_version"] == 3
+    assert meta["schema_version"] == 4
     record = meta["markers"][0]
     assert record["lat"] == 49.28
     assert record["lon"] == -123.1
@@ -76,6 +76,12 @@ def test_blocks_geojson_is_a_feature_collection(tmp_path):
     feature = gj["features"][0]
     assert feature["geometry"]["type"] == "Polygon"
     assert "block_label" in feature["properties"]
+    # Buildings join blocks at export only; the block lists them, the building carries no block.
+    [building_id] = json.loads((tmp_path / "building_records.json").read_text())["records"]
+    assert feature["properties"]["building_ids"] == [int(building_id)]
+    assert feature["properties"]["buildings"] == 1
+    marker = json.loads((tmp_path / "marker_metadata.json").read_text())["markers"][0]
+    assert "block_id" not in marker
 
 
 def test_matched_building_carries_overlay_data(tmp_path):
@@ -210,7 +216,7 @@ def _seed_precise(conn):
         [-123.06230338496285, 49.243279193752706],
     ]]}
     conn.execute(
-        "INSERT INTO blocks (block_id, geom, ingested_at) VALUES (1, ?, 'now')",
+        "INSERT INTO raw_blocks (raw_block_id, geom, ingested_at) VALUES (1, ?, 'now')",
         (json.dumps(geom),),
     )
     conn.commit()
@@ -235,7 +241,7 @@ def test_block_geometry_drops_vertices_on_straight_edges(tmp_path):
     square = [[-123.1, 49.2], [-123.1, 49.201], [-123.0995, 49.201], [-123.099, 49.201],
               [-123.099, 49.2], [-123.1, 49.2]]
     conn.execute(
-        "INSERT INTO blocks (block_id, geom, ingested_at) VALUES (1, ?, 'now')",
+        "INSERT INTO raw_blocks (raw_block_id, geom, ingested_at) VALUES (1, ?, 'now')",
         (json.dumps({"type": "Polygon", "coordinates": [square]}),),
     )
     conn.commit()

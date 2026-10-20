@@ -82,13 +82,13 @@ export function initFilterPass(deps: FilterPassDeps, doc: Document): FilterPass 
     key, attr: metrics.controls[key].summary.attr, bins: metrics.controls[key].summary.bins ?? [],
   }));
   const metricSection = Object.fromEntries(metrics.keys.map((k) => [k, metrics.controls[k].section]));
-  // Block areas come from the block's own row (never its buildings): see blockVisibility().
+  // Block areas come from the block's own properties (never its buildings): see blockVisibility().
   const blockFields: BlockFields[] = Object.keys(index.blocks).map((id) => {
-    const row = tables.blockRowById[id];
+    const props = index.blocks[id].feature.properties;
     return {
       id,
-      area: row ? (row.getAttribute('data-area') || '').toLowerCase().trim() : '',
-      areas: row ? (row.getAttribute('data-areas') || '').split(' ').filter(Boolean) : [],
+      area: String(props.local_area ?? '').toLowerCase().trim(),
+      areas: Array.isArray(props.areas) ? props.areas.map(String) : [],
       buildingIds: index.blockBuildings[id] || [],
     };
   });
@@ -143,21 +143,7 @@ export function initFilterPass(deps: FilterPassDeps, doc: Document): FilterPass 
     metrics.keys.forEach((k) => metrics.setBarCounts(k, binCounts[k]));
 
     const hiddenBlocks = blockVisibility(blockFields, visible, state.hoods, showEmptyChk ? showEmptyChk.checked : false);
-    blockFields.forEach(({ id }) => {
-      const hide = hiddenBlocks.has(id);
-      const row = tables.blockRowById[id];
-      if (row) {
-        row.classList.toggle('hidden', hide);
-        const checkbox = row.__checkbox;
-        if (hide && checkbox && checkbox.checked) {
-          checkbox.checked = false;
-          const layer = index.blocks[id];
-          if (layer) layer._selectionRefs = 0;
-          selection.blockMarkers(id, false);
-        }
-      }
-      blocks.setFiltered(id, hide);
-    });
+    blockFields.forEach(({ id }) => blocks.setFiltered(id, hiddenBlocks.has(id)));
     // Re-stretch the block colour scale to the blocks visible now.
     blocks.recomputeScale();
 

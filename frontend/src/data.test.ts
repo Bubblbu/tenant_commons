@@ -5,7 +5,7 @@ import { FLAT_COLUMNS } from './flat';
 
 describe('checkSchemaVersion', () => {
   it('accepts the expected version', () => {
-    expect(() => checkSchemaVersion('marker_metadata.json', { schema_version: 3, markers: [] })).not.toThrow();
+    expect(() => checkSchemaVersion('marker_metadata.json', { schema_version: 4, markers: [] })).not.toThrow();
   });
 
   it('rejects a different version, naming the file', () => {
@@ -23,7 +23,7 @@ describe('buildingViews', () => {
   it('keeps the nested buildings for the popup and a flat view for the tables', () => {
     const b: Building = {
       id: 7, origin: 'building', address: '1 main st', name: null, also_known_as: [], pids: [], local_area: 'X',
-      block_id: null, lat: 49.2, lon: -123.1, areas: [], units: 5,
+      lat: 49.2, lon: -123.1, areas: [], units: 5,
       units_basis: 'inventory', year_built: 1950, listed_in: [], value: null, issues: null, parties: [],
       network_id: 'n1', registry_search: { status: 'not_searched', date: null }, coop: null, sro: null, rezoning: null,
     };
@@ -31,8 +31,8 @@ describe('buildingViews', () => {
       evidence: { registry: 0, city_records: 0, vtu_research: 0 }, entities: [],
       totals: { buildings: 1, units: 5, open_issues: 0, properties_on_title: null } };
     const views = buildingViews(
-      { schema_version: 3, records: { '7': b } },
-      { schema_version: 3, networks: { n1 } },
+      { schema_version: 4, records: { '7': b } },
+      { schema_version: 4, networks: { n1 } },
     );
     expect(views.buildings['7']).toBe(b);
     expect(views.networks.n1).toBe(n1);

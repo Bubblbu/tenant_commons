@@ -8,7 +8,7 @@ from tc_core.export_contract import LandShares, build_building, build_networks, 
 def row(**kw):
     base = dict(
         b_id=7, source="building", address="396 e 2nd ave", building_name=None, other_names=[],
-        local_area="Mount Pleasant", block_id=12, lat=49.27, lon=-123.09,
+        local_area="Mount Pleasant", lat=49.27, lon=-123.09,
         areas=[], units=53, building_source="rental inventory",
         year_built=1978.0, value_land=18949000.0, value_bldg=534000.0, n_issues=None,
         issues_details=None, network_key="unknown", network_source=None,

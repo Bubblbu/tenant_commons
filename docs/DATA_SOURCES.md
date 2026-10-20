@@ -198,13 +198,14 @@ for the full rebuild order.
 
 ### `block-outlines.csv`
 
-- **What it is:** polygon geometry for city blocks, used for block-level
-  choropleth aggregation (unit totals, VTU saturation, median year built).
+- **What it is:** polygon geometry for city blocks, stored as the raw
+  `raw_blocks` table. The export joins buildings to it by point-in-polygon
+  for the public map's block choropleth (unit totals, median year built);
+  blocks are not an entity and nothing else references them.
 - **Origin:** TODO — exact dataset URL/name.
 - **License/attribution:** TODO.
 - **Geographic scope:** citywide; `tc_core/ingest/blocks.py` keeps every
-  row and records a `in_west_end_bbox` flag rather than dropping rows
-  outside the pilot bbox, so the table stays fully browsable.
+  row with parseable geometry.
 - **Access method:** scripted, `scripts/fetch_cov_open_data.py` (dataset `block-outlines`).
 - **Format/known quirks:** polygon geometry lives in a `geom` column,
   parsed via `tc_core/geometry.py::parse_geom`.

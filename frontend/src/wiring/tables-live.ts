@@ -6,8 +6,6 @@ export interface LiveTables {
   ownerRows: CachedRow[];
   networkRows: CachedRow[];
   neighbourhoodRows: CachedRow[];
-  blockRows: CachedRow[];
-  blockRowById: Record<string, CachedRow>;
   updateSummaryBar(): void;
   updateGroupTableSummaries(): void;
   /** refreshGroupRowsAfterFilter: recount the visible tab, mark the rest stale. */
@@ -18,31 +16,26 @@ interface GroupMetrics {
   bldgs: number;
   units: number;
   avg: number;
-  medianYear: number | null;
 }
 
 /** Caches rows, wires tabs, header sorting, and the 'tablesearch' footer refresh. */
 export function initLiveTables(index: MapIndex, doc: Document): LiveTables {
   const tabB = doc.getElementById('tab-buildings');
-  const tabK = doc.getElementById('tab-blocks');
   const tabL = doc.getElementById('tab-landlords');
   const tabN = doc.getElementById('tab-neighbourhoods');
   const paneB = doc.getElementById('pane-buildings');
-  const paneK = doc.getElementById('pane-blocks');
   const paneL = doc.getElementById('pane-landlords');
   const paneN = doc.getElementById('pane-neighbourhoods');
 
   function activate(which: string): void {
-    [tabB, tabK, tabL, tabN].forEach((btn) => btn && btn.classList.remove('active'));
-    [paneB, paneK, paneL, paneN].forEach((pane) => pane && pane.classList.remove('active'));
+    [tabB, tabL, tabN].forEach((btn) => btn && btn.classList.remove('active'));
+    [paneB, paneL, paneN].forEach((pane) => pane && pane.classList.remove('active'));
     if (which === 'buildings') { if (tabB) tabB.classList.add('active'); if (paneB) paneB.classList.add('active'); }
-    else if (which === 'blocks') { if (tabK) tabK.classList.add('active'); if (paneK) paneK.classList.add('active'); }
     else if (which === 'neighbourhoods') { if (tabN) tabN.classList.add('active'); if (paneN) paneN.classList.add('active'); }
     else { if (tabL) tabL.classList.add('active'); if (paneL) paneL.classList.add('active'); }
     refreshStaleGroupRows();
   }
   if (tabB) tabB.addEventListener('click', () => activate('buildings'));
-  if (tabK) tabK.addEventListener('click', () => activate('blocks'));
   if (tabL) tabL.addEventListener('click', () => activate('landlords'));
   if (tabN) tabN.addEventListener('click', () => activate('neighbourhoods'));
 
@@ -139,52 +132,21 @@ export function initLiveTables(index: MapIndex, doc: Document): LiveTables {
   neighbourhoodRows.forEach((row) => { row.__checkbox = row.querySelector('.row-select'); });
   cacheRowCells(neighbourhoodRows, { bldgs: 2, units: 3, avg: 4 });
 
-  const blockRowById: Record<string, CachedRow> = {};
-  const blockRows = Array.from(doc.querySelectorAll<CachedRow>('#blocks-table tbody tr'));
-  cacheRowCells(blockRows, { bldgs: 2, units: 3, avg: 4, year: 5 });
-  blockRows.forEach((row) => {
-    row.__checkbox = row.querySelector('.row-select');
-    blockRowById[String(row.getAttribute('data-block'))] = row;
-  });
-
-  // Recomputes one Blocks/Landlords/Neighbourhoods row's Bldgs/Units/Avg
-  // (and, for blocks, Median year) cells from only the buildings currently
-  // passing the active filters — the row's own columns were previously baked
-  // in at build time from the full dataset and never changed when a filter
-  // (e.g. the unit-size slider) hid some of its buildings.
-  // `items` is either an array of markers (landlords/neighbourhoods, via
-  // index.owners/index.hoods) or an array of building-id strings (blocks, via
-  // index.blockBuildings) — `resolveMarker` resolves the latter without
-  // allocating an intermediate array on every call.
-  // `includeYear` skips the years array/sort entirely for landlord and
-  // neighbourhood rows, which never display a median-year column — with
-  // ~1,500 landlord rows re-evaluated per slider-drag frame, that sort was
-  // pure waste for a value nothing ever reads.
-  function computeLiveGroupMetrics(
-    items: unknown[],
-    resolveMarker: ((item: unknown) => BuildingMarker | undefined) | undefined,
-    includeYear: boolean,
-  ): GroupMetrics {
+  // Recomputes one Landlords/Neighbourhoods row's Bldgs/Units/Avg cells from
+  // only the buildings currently passing the active filters — the row's own
+  // columns were previously baked in at build time from the full dataset and
+  // never changed when a filter (e.g. the unit-size slider) hid some of its
+  // buildings.
+  function computeLiveGroupMetrics(markers: BuildingMarker[]): GroupMetrics {
     let bldgs = 0;
     let units = 0;
-    const years: number[] | null = includeYear ? [] : null;
-    items.forEach((item) => {
-      const marker = resolveMarker ? resolveMarker(item) : (item as BuildingMarker);
+    markers.forEach((marker) => {
       if (!marker || marker._isFiltered) return;
       bldgs += 1;
       const u = Number(marker._units);
       if (Number.isFinite(u)) units += u;
-      if (includeYear && marker._yearBuilt !== null && marker._yearBuilt !== undefined) {
-        (years as number[]).push(marker._yearBuilt);
-      }
     });
-    let medianYear: number | null = null;
-    if (includeYear && years && years.length) {
-      years.sort((a, b) => a - b);
-      const mid = Math.floor(years.length / 2);
-      medianYear = years.length % 2 ? years[mid] : Math.round((years[mid - 1] + years[mid]) / 2);
-    }
-    return { bldgs, units, avg: bldgs > 0 ? units / bldgs : 0, medianYear };
+    return { bldgs, units, avg: bldgs > 0 ? units / bldgs : 0 };
   }
 
   function setCellValue(cell: Element | null | undefined, sortValue: unknown, text: string): void {
@@ -194,48 +156,35 @@ export function initLiveTables(index: MapIndex, doc: Document): LiveTables {
   }
 
   // Skips all DOM writes when nothing actually changed since the last call —
-  // during a slider drag, most blocks/landlords/neighbourhoods are unaffected
+  // during a slider drag, most landlords/neighbourhoods are unaffected
   // by a given threshold nudge, and writing textContent/attributes on ~6,000
   // rows every animation frame (whether or not the numbers moved) was the
   // main cause of the drag feeling sluggish.
-  function updateGroupRowValues(
-    row: CachedRow | undefined,
-    items: unknown[],
-    resolveMarker?: (item: unknown) => BuildingMarker | undefined,
-  ): void {
+  function updateGroupRowValues(row: CachedRow | undefined, markers: BuildingMarker[]): void {
     if (!row || !row.__cells) return;
-    const includeYear = !!row.__cells.year;
-    const m = computeLiveGroupMetrics(items, resolveMarker, includeYear);
+    const m = computeLiveGroupMetrics(markers);
     const prev = row.__lastMetrics;
-    if (prev && prev.bldgs === m.bldgs && prev.units === m.units && prev.medianYear === m.medianYear) {
+    if (prev && prev.bldgs === m.bldgs && prev.units === m.units) {
       return;
     }
     row.__lastMetrics = m;
     setCellValue(row.__cells.bldgs, m.bldgs, m.bldgs.toLocaleString());
     setCellValue(row.__cells.units, m.units, m.units.toLocaleString());
     setCellValue(row.__cells.avg, m.avg, m.avg.toFixed(1));
-    if (includeYear) {
-      setCellValue(row.__cells.year, m.medianYear === null ? '' : m.medianYear, m.medianYear === null ? '' : String(m.medianYear));
-    }
     // Keep the row's own data attributes in sync too, since
     // updateGroupTableSummary()'s footer totals sum from these.
     row.setAttribute('data-bldgs', String(m.bldgs));
     row.setAttribute('data-units', String(m.units));
   }
 
-  // Recounting every Blocks/Landlords/Neighbourhoods row was most of a filter
+  // Recounting every Landlords/Neighbourhoods row was most of a filter
   // pass's cost, but only one sidebar tab is on screen at a time. A pass
   // recounts the visible tab's rows and marks the others stale;
   // activate() recounts a stale tab when it's opened.
-  const staleGroupRows: Record<string, boolean> = { blocks: false, landlords: false, neighbourhoods: false };
-  const groupPanes: Record<string, HTMLElement | null> = { blocks: paneK, landlords: paneL, neighbourhoods: paneN };
-  function blockBuilding(id: unknown): BuildingMarker | undefined { return index.buildings[String(id)]; }
+  const staleGroupRows: Record<string, boolean> = { landlords: false, neighbourhoods: false };
+  const groupPanes: Record<string, HTMLElement | null> = { landlords: paneL, neighbourhoods: paneN };
   function refreshGroupRows(which: string): void {
-    if (which === 'blocks') {
-      blockRows.forEach((row) => {
-        updateGroupRowValues(row, index.blockBuildings[String(row.getAttribute('data-block'))] || [], blockBuilding);
-      });
-    } else if (which === 'landlords') {
+    if (which === 'landlords') {
       ownerRows.forEach((row) => { updateGroupRowValues(row, index.owners[String(row.getAttribute('data-owner'))] || []); });
       networkRows.forEach((row) => { updateGroupRowValues(row, index.networks[String(row.getAttribute('data-network'))] || []); });
     } else if (which === 'neighbourhoods') {
@@ -268,7 +217,7 @@ export function initLiveTables(index: MapIndex, doc: Document): LiveTables {
     if (any) updateGroupTableSummaries();
   }
 
-  // Shared footer-summary logic for the Blocks/Landlords/Neighbourhoods tabs,
+  // Shared footer-summary logic for the Landlords/Neighbourhoods tabs,
   // which all use the same Bldgs/Units/Avg Units per Bldg column shape
   // (unlike Buildings, whose footer tracks Units for the building row
   // rather than a per-group aggregate).
@@ -298,10 +247,6 @@ export function initLiveTables(index: MapIndex, doc: Document): LiveTables {
   }
 
   function updateGroupTableSummaries(): void {
-    updateGroupTableSummary(blockRows, {
-      label: 'summary-blocks-label', bldgs: 'summary-blocks-bldgs',
-      units: 'summary-blocks-units', avg: 'summary-blocks-avg',
-    });
     updateGroupTableSummary(ownerRows, {
       label: 'summary-owners-label', bldgs: 'summary-owners-bldgs',
       units: 'summary-owners-units', avg: 'summary-owners-avg',
@@ -343,7 +288,7 @@ export function initLiveTables(index: MapIndex, doc: Document): LiveTables {
   });
 
   return {
-    buildingRows, ownerRows, networkRows, neighbourhoodRows, blockRows, blockRowById,
+    buildingRows, ownerRows, networkRows, neighbourhoodRows,
     updateSummaryBar, updateGroupTableSummaries,
     refreshAfterFilter: refreshGroupRowsAfterFilter,
   };

@@ -315,7 +315,6 @@ describe('blocks', () => {
     expect(h.visible()).toEqual(['4', '5', '6', '10']);
     expect(h.blockHidden(201)).toBe(false);
     expect(h.blockHidden(301)).toBe(true); // holds Downtown building 10, but is a Strathcona block
-    expect(h.rowHidden('#blocks-table tr[data-block="301"]')).toBe(true);
   });
 });
 

@@ -314,13 +314,6 @@
     background: #e6ecf7;
   }
 
-  /* Disabled for now, not removed — wiring.js's block-row selection/hover
-     logic is left as-is underneath. */
-  #tab-blocks,
-  #pane-blocks {
-    display: none;
-  }
-
   #table-search-bar {
     padding: 8px 12px;
     background: #fff;
@@ -532,35 +525,6 @@
               <td id="summary-neighbourhoods-bldgs">0</td>
               <td id="summary-neighbourhoods-units">0</td>
               <td id="summary-neighbourhoods-avg">0.0</td>
-            </tr>
-          </tfoot>
-        </table>
-      </div>
-    </div>
-    <!-- No tab: the blocks table stays as the filter model wiring.js reads
-         (each block's neighbourhood and boundary flags, for the map). -->
-    <div id="pane-blocks" class="pane">
-      <div class="table-wrap">
-        <table class="data" id="blocks-table">
-          <thead>
-            <tr>
-              <th class="select-head" data-sort="none"><input type="checkbox" class="select-all" aria-label="Select all rows shown" title="Select all rows shown"></th>
-              <th data-sort="text">Block</th>
-              <th data-sort="number">Bldgs</th>
-              <th data-sort="number">Units</th>
-              <th data-sort="number">Avg Units/Bldg</th>
-              <th data-sort="number">Med Yr</th>
-            </tr>
-          </thead>
-          <tbody></tbody>
-          <tfoot>
-            <tr class="summary-row">
-              <td></td>
-              <td id="summary-blocks-label">Totals (visible)</td>
-              <td id="summary-blocks-bldgs">0</td>
-              <td id="summary-blocks-units">0</td>
-              <td id="summary-blocks-avg">0.0</td>
-              <td></td>
             </tr>
           </tfoot>
         </table>

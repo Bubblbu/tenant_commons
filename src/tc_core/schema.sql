@@ -8,7 +8,8 @@ DROP TABLE IF EXISTS building_listings;  -- references buildings: drop first
 DROP TABLE IF EXISTS vtu_membership;
 DROP TABLE IF EXISTS buildings;
 DROP TABLE IF EXISTS landlords;
-DROP TABLE IF EXISTS blocks;
+DROP TABLE IF EXISTS blocks;  -- pre-2026-10-20 name of raw_blocks
+DROP TABLE IF EXISTS raw_blocks;
 DROP TABLE IF EXISTS raw_addresses;
 DROP TABLE IF EXISTS raw_buildings;
 DROP TABLE IF EXISTS raw_block_numbers;
@@ -17,7 +18,7 @@ DROP TABLE IF EXISTS raw_coops;
 DROP TABLE IF EXISTS raw_rezoning;
 DROP TABLE IF EXISTS overlay_housing;
 DROP TABLE IF EXISTS strata_lot_pids;
-DROP VIEW IF EXISTS block_stats;
+DROP VIEW IF EXISTS block_stats;  -- retired 2026-10-20; dropped for older databases
 
 -- Hand-kept strata lot PID -> strata plan map (ingest/strata_lot_pids.py,
 -- data/curated/strata_lot_pids.csv). Lets a LOTR filing on one lot reach the
@@ -86,8 +87,8 @@ CREATE INDEX idx_raw_addresses_civic ON raw_addresses(civic_number);
 
 -- Vancouver Open Data's "block-numbers" dataset: one point per city block,
 -- carrying the City's own authoritative geo_local_area — used only to
--- resolve local_area for blocks with zero buildings (see export.py /
--- spatial.py's resolve_local_area_from_block_numbers).
+-- resolve local_area for blocks with zero buildings (see export.py's
+-- resolve_local_area_from_block_numbers).
 CREATE TABLE raw_block_numbers (
     raw_block_number_id INTEGER PRIMARY KEY,
     label TEXT,
@@ -193,11 +194,13 @@ CREATE TABLE overlay_housing (
 );
 CREATE INDEX idx_overlay_housing_addr_key ON overlay_housing(addr_key);
 
-CREATE TABLE blocks (
-    block_id INTEGER PRIMARY KEY,
+-- Vancouver Open Data's "block-outlines" dataset, raw storage only. Blocks
+-- are not an entity: nothing references them, and the export joins buildings
+-- to them by point-in-polygon for the map's block layer (export.py's
+-- reconstruct_blocks).
+CREATE TABLE raw_blocks (
+    raw_block_id INTEGER PRIMARY KEY,
     geom TEXT NOT NULL,               -- GeoJSON polygon, verbatim
-    in_west_end_bbox INTEGER NOT NULL DEFAULT 0,
-    source_row_ids TEXT,
     ingested_at TEXT NOT NULL
 );
 
@@ -227,7 +230,6 @@ CREATE TABLE buildings (
     n_issues INTEGER,
     issues_details TEXT,
     landlord_id INTEGER REFERENCES landlords(landlord_id),
-    block_id INTEGER REFERENCES blocks(block_id),
     source_row_ids TEXT,
     is_coop INTEGER NOT NULL DEFAULT 0,
     coop_status TEXT,
@@ -251,7 +253,6 @@ CREATE TABLE buildings (
     updated_at TEXT NOT NULL
 );
 CREATE INDEX idx_buildings_landlord ON buildings(landlord_id);
-CREATE INDEX idx_buildings_block ON buildings(block_id);
 CREATE INDEX idx_buildings_local_area ON buildings(local_area);
 
 -- Allow-listed columns only — see ingest/membership.py's ALLOWED_MEMBERSHIP_COLUMNS
@@ -270,20 +271,6 @@ CREATE TABLE vtu_membership (
 );
 CREATE INDEX idx_vtu_membership_addr_key ON vtu_membership(addr_key);
 CREATE INDEX idx_vtu_membership_building ON vtu_membership(building_id);
-
--- Illustrative aggregate view — mirrors today's aggregate_blocks() shape.
--- Computed on read, never stored, so it can't go stale when a building changes.
-CREATE VIEW block_stats AS
-SELECT
-    bl.block_id,
-    COUNT(DISTINCT bd.building_id) AS buildings,
-    COALESCE(SUM(bd.units), 0) AS total_units,
-    COUNT(DISTINCT CASE WHEN vm.membership_row_id IS NOT NULL THEN bd.building_id END) AS member_buildings,
-    COUNT(vm.membership_row_id) AS total_members
-FROM blocks bl
-LEFT JOIN buildings bd ON bd.block_id = bl.block_id
-LEFT JOIN vtu_membership vm ON vm.building_id = bd.building_id
-GROUP BY bl.block_id;
 
 -- Every name a source gives a building, with its source (see
 -- ingest/building_names.py). The map shows one, picked at export.

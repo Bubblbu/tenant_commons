@@ -15,9 +15,9 @@ internally (member_count, has_vtu_member, etc. stay on the DataFrame) since
 other internal-only consumers may need it, but none of that reaches
 `export_artifacts()`'s output files. See CLAUDE.md's sensitivity-model notes.
 
-Known, deliberate simplification (not a bug): `reconstruct_blocks` emits
-every block, citywide, rather than v1's dynamic buffered bbox, so block counts
-aren't byte-identical to v1.
+Blocks are not an entity: `reconstruct_blocks` joins buildings to the raw
+City block outlines by point-in-polygon here, at export, and blocks.geojson
+lists each block's buildings. Nothing else carries a block id.
 """
 
 from __future__ import annotations
@@ -101,7 +101,7 @@ def reconstruct_points(
     # Counts are integers; values and years (medians, so possibly fractional)
     # are floats whatever this build's data happens to hold.
     buildings = query_frame(conn, "SELECT * FROM buildings").with_columns(
-        pl.col("building_id", "landlord_id", "block_id", "units", "n_issues").cast(pl.Int64),
+        pl.col("building_id", "landlord_id", "units", "n_issues").cast(pl.Int64),
         pl.col("year_built", "value_land", "value_bldg", "bldg_land_ratio", "lat", "lon").cast(pl.Float64),
     )
     landlords = query_frame(
@@ -171,7 +171,7 @@ def reconstruct_points(
             "network_source", "network_name_source", "network_entities",
             "network_properties_on_title", "network_evidence",
             "member_count_all", "members_payload", "value_land",
-            "value_bldg", "bldg_land_ratio", "local_area", "b_id", "block_id",
+            "value_bldg", "bldg_land_ratio", "local_area", "b_id",
             "latest_membership_year", "source",
             *BUILDING_OVERLAY_COLUMNS,
         ]
@@ -697,11 +697,9 @@ def flag_geoms_intersecting_polygons(geoms: pl.Series, polygons: list) -> pl.Ser
     """True where a block's own polygon overlaps any of `polygons` at all.
 
     Deliberately derived from the block's own geometry, not from whether any
-    of its member buildings are flagged — resolve_local_area_from_block_numbers's
-    docstring notes the block<->building join itself has a known accuracy
-    bug for a handful of blocks, so inferring a boundary flag from building
-    membership would inherit that; testing the block polygon directly avoids
-    it and keeps the block layer consistent with the buildings drawn on it.
+    of its member buildings are flagged, so a block spanning a boundary is in
+    every area it touches and the block layer stays consistent with the
+    buildings drawn on it.
     """
     flags = [False] * len(geoms)
     if polygons:
@@ -739,37 +737,61 @@ def assign_block_labels(blocks_merged: pl.DataFrame) -> pl.Series:
     return pl.Series("block_label", labels, dtype=pl.String)
 
 
+def assign_blocks(points_df: pl.DataFrame, block_geoms: list, block_ids: list[int]) -> list[int | None]:
+    """The block each point falls in (STRtree point-in-polygon), None if none."""
+    tree = STRtree(block_geoms)
+
+    def locate(lon, lat) -> int | None:
+        if _missing(lat) or _missing(lon):
+            return None
+        point = Point(lon, lat)
+        for idx in np.atleast_1d(tree.query(point)):
+            geom = block_geoms[int(idx)]
+            if geom.contains(point) or geom.touches(point):
+                return block_ids[int(idx)]
+        return None
+
+    return [locate(lo, la) for la, lo in zip(points_df["lat"], points_df["lon"])]
+
+
 def reconstruct_blocks(conn: sqlite3.Connection, points_df: pl.DataFrame) -> pl.DataFrame:
-    # Not bbox-filtered: buildings.csv is already city-wide (not West-End-scoped —
-    # see merge.py's notes), so restricting blocks to the static config bbox left
-    # most of the actual data — the whole eastside and south of the city — with no
-    # block polygons at all.
-    blocks_raw = query_frame(conn, "SELECT block_id, geom FROM blocks").with_columns(
+    """Every City block, citywide, with the buildings that fall in it.
+
+    Overlay housing records aren't buildings and join no block. Membership
+    is deliberately never aggregated here: this frame only feeds the public
+    blocks.geojson.
+    """
+    blocks_raw = query_frame(conn, "SELECT raw_block_id AS block_id, geom FROM raw_blocks").with_columns(
         pl.col("block_id").cast(pl.Int64), pl.col("geom").cast(pl.String)
     )
+    blocks_raw = blocks_raw.with_columns(geom_parsed=_objects(parse_geom(g) for g in blocks_raw["geom"]))
+
+    buildings = points_df.filter(pl.col("source") == "building") if "source" in points_df.columns else points_df
+    if blocks_raw.is_empty():
+        joined = buildings.clear().with_columns(block_id=pl.lit(None, dtype=pl.Int64))
+    else:
+        joined = buildings.with_columns(
+            block_id=pl.Series(
+                assign_blocks(buildings, blocks_raw["geom_parsed"].to_list(), blocks_raw["block_id"].to_list()),
+                dtype=pl.Int64,
+            )
+        )
     agg = (
-        points_df.filter(pl.col("block_id").is_not_null())
+        joined.filter(pl.col("block_id").is_not_null())
         .group_by("block_id")
         .agg(
-            buildings=pl.col("address").count(),
+            buildings=pl.len(),
             total_units=pl.col("units").sum(),
             median_year_built=pl.col("year_built").median(),
-            member_buildings=pl.col("has_vtu_member").sum(),
-            total_members=pl.col("member_count").sum(),
+            building_ids=pl.col("b_id").cast(pl.Int64).sort(),
             # Most common; ties to the alphabetically first (pandas' mode().iloc[0]).
             local_area=pl.col("local_area").drop_nulls().mode().min(),
         )
-        .with_columns(pl.col("block_id").cast(pl.Int64))
     )
     merged = blocks_raw.join(agg, on="block_id", how="left", maintain_order="left").with_columns(
-        pl.col("buildings", "total_units", "member_buildings", "total_members").fill_null(0),
+        pl.col("buildings", "total_units").fill_null(0),
+        pl.col("building_ids").fill_null(pl.lit([], dtype=pl.List(pl.Int64))),
         pl.col("local_area").fill_null("(Unknown)"),
-    )
-    merged = merged.with_columns(
-        member_share=pl.when(pl.col("buildings") > 0)
-        .then(pl.col("member_buildings") / pl.col("buildings"))
-        .otherwise(0.0),
-        geom_parsed=_objects(parse_geom(g) for g in merged["geom"]),
     )
     block_numbers_df = query_frame(conn, "SELECT geom, geo_local_area FROM raw_block_numbers")
     merged = merged.with_columns(
@@ -999,6 +1021,7 @@ def _blocks_feature_collection(blocks_df: pl.DataFrame) -> dict:
         "local_area",
         "block_label",
         "areas",
+        "building_ids",
     ]
     property_cols = [col for col in property_cols if col in blocks_df.columns]
     features = []
@@ -1042,7 +1065,6 @@ def _marker_records(points_df: pl.DataFrame) -> list[dict]:
                 "lon": _round_coord(r["lon"]),
                 "owner_key": key(r.get("owner_key")),
                 "network_key": key(r.get("network_key")),
-                "block_id": as_int(r.get("block_id")),
                 "units": as_int(r.get("units")),
                 "year_built": as_int(r.get("year_built")),
                 "local_area": text(r.get("local_area")),

@@ -16,7 +16,7 @@ SCHEMA_FILE = Path(__file__).resolve().parent.parent / "frontend" / "src" / "con
 def _building(**overrides) -> dict:
     base = dict(
         id=1, origin="building", address="1 Main St", name=None, also_known_as=[], pids=[],
-        local_area="Kitsilano", block_id=None, lat=49.2, lon=-123.1,
+        local_area="Kitsilano", lat=49.2, lon=-123.1,
         areas=[], units=10, units_basis="inventory",
         year_built=1970, listed_in=["rental_inventory"], value=None, issues=None,
         parties=[], network_id=None,

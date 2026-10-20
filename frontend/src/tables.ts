@@ -11,7 +11,7 @@ import { formatAddress } from './address';
 import { escapeHtml, isMissing, roundHalfEven, sameName } from './html';
 import { managerKey } from './landlord-picker';
 import { EXPLAINERS, networkProvenance, ownerRowProvenance, provenanceIcon, tipPlacement } from './provenance';
-import type { BlocksCollection, BuildingData, BuildingRecord } from './types';
+import type { BuildingData, BuildingRecord } from './types';
 
 export interface FilterFields {
   bid: string;
@@ -30,11 +30,6 @@ export interface FilterFields {
 }
 
 const num = (v: unknown): number | null => (typeof v === 'number' && Number.isFinite(v) ? v : null);
-/** Python int() of a present number, else "". */
-const intStr = (v: unknown): string => {
-  const n = num(v);
-  return n === null ? '' : String(Math.trunc(n));
-};
 const text = (v: unknown): string => (isMissing(v) ? '' : String(v));
 
 /** A map pin (the locate button's icon); decorative, the button carries the label. */
@@ -81,7 +76,7 @@ const roundOrNull = (v: unknown, digits = 0): number | null => {
   return n === null ? null : roundHalfEven(n, digits);
 };
 const attr = (v: number | null): string => (v === null ? '' : String(v));
-/** Overlay area keys: the flat view's '; '-joined string, or a block's array. */
+/** Overlay area keys: a '; '-joined string or an array. */
 const areaList = (v: unknown): string[] =>
   Array.isArray(v) ? v.map(String) : text(v).split(';').map((k) => k.trim()).filter((k) => k !== '');
 
@@ -125,7 +120,6 @@ function byCodePoint(a: string, b: string): number {
 export function buildingRow(r: BuildingRecord): string {
   const f = filterFields(r);
   const bid = f.bid;
-  const block = intStr(r.block_id);
   const units = attr(f.metrics.units);
   const year = attr(f.metrics['year-built']);
   const nIssues = attr(f.nIssues);
@@ -157,7 +151,6 @@ export function buildingRow(r: BuildingRecord): string {
   return (
     `<tr data-bid="${bid}" data-owner="${escapeHtml(f.owner)}" ` +
     `data-network="${escapeHtml(f.network)}" data-manager="${escapeHtml(f.manager)}" ` +
-    `data-block="${block}" ` +
     `data-area="${a}" data-areas="${escapeHtml(f.areas.join(' '))}" ` +
     `data-value-land="${valLand}" data-value-bldg="${valBldg}" ` +
     `data-value-ratio="${ratioVal}" data-units="${units}" ` +
@@ -186,41 +179,6 @@ export function buildingRowsHtml(records: BuildingRecord[]): string {
 }
 
 const avgUnits = (total: number, bldgs: number): number => (bldgs > 0 ? roundHalfEven(total / bldgs, 1) : 0);
-
-export function blockRowsHtml(fc: BlocksCollection): string {
-  const rows = fc.features.map((f) => f.properties ?? ({} as BlocksCollection['features'][number]['properties']));
-  return rows
-    .map((p) => ({ p, label: text(p.block_label) }))
-    .sort((x, y) => {
-      const ux = x.label.startsWith('(Unknown)') ? 1 : 0;
-      const uy = y.label.startsWith('(Unknown)') ? 1 : 0;
-      return ux - uy || byCodePoint(x.label, y.label);
-    })
-    .map(({ p, label }) => {
-      const id = Math.trunc(Number(p.block_id));
-      const bldgs = Math.trunc(num(p.buildings) ?? 0);
-      const totalRaw = num(p.total_units) ?? 0;
-      const total = Math.trunc(totalRaw);
-      const avg = avgUnits(totalRaw, bldgs);
-      const median = num(p.median_year_built);
-      const year = median === null ? '' : String(roundHalfEven(median));
-      const l = escapeHtml(label);
-      return (
-        `<tr data-block="${id}" data-area="${escapeHtml(text(p.local_area))}" ` +
-        `data-areas="${escapeHtml(areaList(p.areas).join(' '))}" ` +
-        `data-bldgs="${bldgs}" data-units="${total}">` +
-        `<td class="select-cell"><input type="checkbox" class="row-select" ` +
-        `data-type="block" data-target="${id}"></td>` +
-        `<td data-sort-value="${l}">${l}</td>` +
-        `<td data-sort-value="${bldgs}">${bldgs}</td>` +
-        `<td data-sort-value="${total}">${total}</td>` +
-        `<td data-sort-value="${avg}">${avg.toFixed(1)}</td>` +
-        `<td data-sort-value="${year}">${year}</td>` +
-        `</tr>`
-      );
-    })
-    .join('\n');
-}
 
 interface Group {
   label: string;
@@ -367,7 +325,7 @@ export function addHeaderExplainers(doc: Document = document): void {
 }
 
 export function renderTables(
-  data: BuildingData, blocks: BlocksCollection, doc: Document = document, licenceYear: number | null = null,
+  data: BuildingData, doc: Document = document, licenceYear: number | null = null,
 ): void {
   const records = Object.values(data.records);
   const fill = (tableId: string, html: string) => {
@@ -375,7 +333,6 @@ export function renderTables(
     if (tbody) tbody.innerHTML = html;
   };
   fill('buildings-table', buildingRowsHtml(records));
-  fill('blocks-table', blockRowsHtml(blocks));
   fill('owners-table', ownerRowsHtml(records, licenceYear));
   fill('networks-table', networkRowsHtml(records));
   fill('neighbourhoods-table', neighbourhoodRowsHtml(records));

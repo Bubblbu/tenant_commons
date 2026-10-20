@@ -20,7 +20,6 @@ except ModuleNotFoundError:  # pragma: no cover - only for <3.11
     tomllib = None
 
 DEFAULT_DB_PATH = "data/derived/tc_core.db"
-DEFAULT_BBOX = "-123.18,49.265,-123.10,49.295"
 DEFAULT_BOUNDARY_GEOJSON = "data/raw/cov_open_data/local-area-boundary.geojson"
 DEFAULT_ARTIFACTS_DIR = "data/derived/artifacts"
 # "vtu_raw" is the raw NationBuilder export (data/raw/nationbuilder/), allow-
@@ -36,7 +35,6 @@ class IngestConfig:
     block_numbers: str
     vtu_raw: str
     db_path: str = DEFAULT_DB_PATH
-    bbox: tuple[float, float, float, float] = (-123.18, 49.265, -123.10, 49.295)
     # Optional: manually-curated ownership research CSV (see
     # ingest/ownership_claims.py). Not in _REQUIRED_PATHS — unlike the other
     # sources, there may genuinely be no claims yet to import.
@@ -115,9 +113,6 @@ def load_ingest_config(path: str) -> IngestConfig:
     if missing:
         raise ValueError(f"config missing required paths: {', '.join(missing)}")
 
-    bbox_str = str(flat.get("bbox", DEFAULT_BBOX))
-    bbox = tuple(float(v) for v in bbox_str.split(","))
-
     return IngestConfig(
         buildings=str(flat["buildings"]),
         addresses=str(flat["addresses"]),
@@ -125,7 +120,6 @@ def load_ingest_config(path: str) -> IngestConfig:
         block_numbers=str(flat["block_numbers"]),
         vtu_raw=str(flat["vtu_raw"]),
         db_path=str(flat.get("tc_core_db", DEFAULT_DB_PATH)),
-        bbox=bbox,
         ownership_claims=(
             str(flat["ownership_claims"]) if flat.get("ownership_claims") else None
         ),

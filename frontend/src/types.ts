@@ -8,7 +8,6 @@ export interface MarkerRecord {
   lon: number | null;
   owner_key: string | null;
   network_key: string | null;
-  block_id: number | null;
   units: number | null;
   year_built: number | null;
   local_area: string | null;
@@ -71,6 +70,8 @@ export interface BlockProperties {
   median_year_built: number | null;
   /** Overlay area keys the block's outline overlaps. */
   areas?: string[] | null;
+  /** b_ids of the buildings inside the block (the export's point-in-polygon join). */
+  building_ids?: number[] | null;
 }
 
 export type BlocksCollection = FeatureCollection<Geometry, BlockProperties> & { schema_version: number };

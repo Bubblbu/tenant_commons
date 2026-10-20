@@ -1,4 +1,3 @@
-import type { BlockStyler } from './block-style';
 import type { MarkerStyler } from './marker-style';
 import type { LiveTables } from './tables-live';
 import type { MapIndex } from './types';
@@ -7,15 +6,14 @@ export interface Selection {
   owner(key: string, on: boolean): void;
   network(key: string, on: boolean): void;
   hood(key: string, on: boolean): void;
-  blockMarkers(blockId: string, on: boolean): void;
   /** Reset's "untick every row" loop (dispatches change so counts follow). */
   clearAll(): void;
   /** Brings every table's select-all box in line with its shown rows (after a filter pass). */
   syncSelectAll(): void;
 }
 
-/** Wires row checkboxes and row hover for all five tables. */
-export function initSelection(index: MapIndex, markers: MarkerStyler, blocks: BlockStyler, tables: LiveTables, doc: Document): Selection {
+/** Wires row checkboxes and row hover for all four tables. */
+export function initSelection(index: MapIndex, markers: MarkerStyler, tables: LiveTables, doc: Document): Selection {
   function owner(ownerKey: string, selected: boolean): void {
     const arr = index.owners[ownerKey] || [];
     arr.forEach((marker) => { markers.adjustSelection(marker, selected ? 1 : -1); });
@@ -31,15 +29,6 @@ export function initSelection(index: MapIndex, markers: MarkerStyler, blocks: Bl
     arr.forEach((marker) => { markers.adjustSelection(marker, selected ? 1 : -1); });
   }
 
-  function blockMarkers(blockId: string, selected: boolean): void {
-    const ids = index.blockBuildings[String(blockId)] || [];
-    ids.forEach((bid) => {
-      const marker = index.buildings[String(bid)];
-      if (!marker) return;
-      markers.adjustSelection(marker, selected ? 1 : -1);
-    });
-  }
-
   /** Applies one row checkbox's state to its row and the map (no summaries). */
   function applyRow(cb: HTMLInputElement): void {
     const row = cb.closest('tr');
@@ -48,9 +37,6 @@ export function initSelection(index: MapIndex, markers: MarkerStyler, blocks: Bl
     const key = String(cb.dataset.target);
     if (typ === 'building') {
       markers.adjustSelection(index.buildings[key], cb.checked ? 1 : -1);
-    } else if (typ === 'block') {
-      blocks.adjustSelection(index.blocks[key], cb.checked ? 1 : -1);
-      blockMarkers(key, cb.checked);
     } else if (typ === 'owner') {
       owner(key, cb.checked);
     } else if (typ === 'network') {
@@ -114,12 +100,6 @@ export function initSelection(index: MapIndex, markers: MarkerStyler, blocks: Bl
   // Search hides rows without a change event; keep the header boxes honest.
   doc.addEventListener('tablesearch', syncAllHeaders);
 
-  doc.querySelectorAll('#blocks-table tbody tr').forEach((row) => {
-    const id = String(row.getAttribute('data-block'));
-    row.addEventListener('mouseenter', () => blocks.hover(id, true));
-    row.addEventListener('mouseleave', () => blocks.hover(id, false));
-  });
-
   doc.querySelectorAll('#buildings-table tbody tr').forEach((row) => {
     const bid = String(row.getAttribute('data-bid'));
     row.addEventListener('mouseenter', () => markers.hover([index.buildings[bid]], true));
@@ -154,5 +134,5 @@ export function initSelection(index: MapIndex, markers: MarkerStyler, blocks: Bl
     });
   }
 
-  return { owner, network, hood, blockMarkers, clearAll, syncSelectAll: syncAllHeaders };
+  return { owner, network, hood, clearAll, syncSelectAll: syncAllHeaders };
 }

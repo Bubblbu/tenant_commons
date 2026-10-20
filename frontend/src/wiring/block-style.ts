@@ -8,11 +8,9 @@ export interface BlockStyler {
   setColorScaling(enabled: boolean): void;
   colorScalingEnabled(): boolean;
   setFiltered(blockId: string, filtered: boolean): void;
-  adjustSelection(layer: BlockLayer | undefined, delta: number): void;
-  hover(blockId: string, on: boolean): void;
 }
 
-export function createBlockStyler(index: MapIndex, doc: Document, scheduleRestack: () => void): BlockStyler {
+export function createBlockStyler(index: MapIndex, doc: Document): BlockStyler {
   let blockColorScalingEnabled = true;
   let blockColorMin = 0;
   let blockColorMax = 0;
@@ -44,7 +42,6 @@ export function createBlockStyler(index: MapIndex, doc: Document, scheduleRestac
                    (ratio <  1.00) ? MAP_THEME.block.scale[4] : MAP_THEME.block.scale[5];
       base = { weight: 1, color: MAP_THEME.block.stroke, fillOpacity: 0.7, fillColor: fill };
     }
-    layer._baseStyle = base;
     layer.setStyle(base);
   }
 
@@ -107,50 +104,12 @@ export function createBlockStyler(index: MapIndex, doc: Document, scheduleRestac
     if (layer._isFiltered === filtered) return;
     layer._isFiltered = filtered;
     if (filtered) {
-      layer._highlighted = false;
-      layer._selectionRefs = 0;
       // Fully hidden, matching setVisible()'s treatment of filtered
       // buildings (weight:0/fillOpacity:0) rather than just dimming to a
       // faint grey outline.
       layer.setStyle({ weight: 0, color: undefined, fillOpacity: 0, fillColor: MAP_THEME.block.filteredFill });
     } else {
       resetBlockStyle(layer);
-    }
-  }
-
-  function highlightBlock(layer: BlockLayer | undefined, on: boolean): void {
-    if (!layer || layer._isFiltered) return;
-    layer._highlighted = on;
-    scheduleRestack();
-    if (on) {
-      const base = layer._baseStyle || {};
-      layer.setStyle({
-        weight: MAP_THEME.highlight.blockWeight,
-        color: MAP_THEME.highlight.color,
-        fillOpacity: Math.min(0.9, (base.fillOpacity || 0.35) + 0.1),
-        fillColor: base.fillColor || (layer.options && layer.options.fillColor) || MAP_THEME.block.scale[0],
-      });
-    } else {
-      resetBlockStyle(layer);
-    }
-  }
-
-  function adjustSelection(layer: BlockLayer | undefined, delta: number): void {
-    if (!layer) return;
-    layer._selectionRefs = (layer._selectionRefs || 0) + delta;
-    if (layer._selectionRefs < 0) layer._selectionRefs = 0;
-    if (!layer._isFiltered) {
-      highlightBlock(layer, layer._selectionRefs > 0);
-    }
-  }
-
-  function hover(blockId: string, on: boolean): void {
-    const layer = index.blocks[blockId];
-    if (!layer || layer._isFiltered) return;
-    if (on) {
-      highlightBlock(layer, true);
-    } else if ((layer._selectionRefs || 0) === 0) {
-      highlightBlock(layer, false);
     }
   }
 
@@ -169,5 +128,5 @@ export function createBlockStyler(index: MapIndex, doc: Document, scheduleRestac
     return blockColorScalingEnabled;
   }
 
-  return { recomputeScale, setColorScaling, colorScalingEnabled, setFiltered, adjustSelection, hover };
+  return { recomputeScale, setColorScaling, colorScalingEnabled, setFiltered };
 }

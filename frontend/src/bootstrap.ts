@@ -120,7 +120,7 @@ async function main(): Promise<void> {
   initPopupTabs(document);
   // The flat view: the landlord picker and coverage panel read it too.
   const records = loaded.buildingData.records;
-  renderTables(loaded.buildingData, artifacts.blocks, document, artifacts.filterConfig.licence_year ?? null);
+  renderTables(loaded.buildingData, document, artifacts.filterConfig.licence_year ?? null);
   initTipDismiss();
 
   const ownerSearch = document.getElementById('owner-search');

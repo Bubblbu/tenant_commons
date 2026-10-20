@@ -129,7 +129,7 @@ export function startHarness(opts: { initialFilter?: Partial<FilterState> } = {}
 
   document.body.innerHTML = new DOMParser().parseFromString(INDEX_HTML, 'text/html').body.innerHTML;
   renderLegend(FIXTURE_FILTER_CONFIG);
-  renderTables(FIXTURE_BUILDING_DATA, FIXTURE_BLOCKS, document, null);
+  renderTables(FIXTURE_BUILDING_DATA, document, null);
   const landlords = initLandlordPicker(buildOptions(Object.values(FIXTURE_BUILDING_DATA.records)), {
     input: $<HTMLInputElement>('#owner-search'),
     tiles: $('#owner-tiles'),

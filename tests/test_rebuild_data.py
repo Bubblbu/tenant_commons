@@ -39,7 +39,7 @@ def test_skip_ingest_exports_the_existing_database_untouched(tmp_path):
         "-123.1, 'Downtown', 50, 'now', 'now')"
     )
     conn.execute(
-        "INSERT INTO blocks (block_id, geom, ingested_at) VALUES (1, ?, 'now')",
+        "INSERT INTO raw_blocks (raw_block_id, geom, ingested_at) VALUES (1, ?, 'now')",
         (BLOCK_GEOM,),
     )
     conn.commit()

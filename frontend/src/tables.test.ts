@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { SEARCHED_KEY, blockRowsHtml, buildingRow, buildingRowsHtml, filterFields, networkRowsHtml, neighbourhoodRowsHtml, ownerRowsHtml, pinLast } from './tables';
-import type { BlocksCollection, BuildingRecord } from './types';
+import { SEARCHED_KEY, buildingRow, buildingRowsHtml, filterFields, networkRowsHtml, neighbourhoodRowsHtml, ownerRowsHtml, pinLast } from './tables';
+import type { BuildingRecord } from './types';
 
 const rec = (over: Partial<BuildingRecord>): BuildingRecord => ({
-  b_id: 1, address: 'A', local_area: 'West End', block_id: 1, units: 10,
+  b_id: 1, address: 'A', local_area: 'West End', units: 10,
   year_built: 1970, owner_name: 'O', owner_key: 'o', network_name: 'O', network_key: 'o',
   value_land: 1, value_bldg: 1, bldg_land_ratio: 1,
   housing_type: '', ...over,
@@ -12,13 +12,13 @@ const rec = (over: Partial<BuildingRecord>): BuildingRecord => ({
 describe('buildingRow', () => {
   it("reproduces rows_buildings' markup exactly", () => {
     const row = buildingRow(rec({
-      b_id: 7, address: '12 Oak & Elm St', block_id: 3.0, units: 40.0,
+      b_id: 7, address: '12 Oak & Elm St', units: 40.0,
       year_built: 1965.0, owner_name: 'Example "Holdings"', owner_key: 'example-holdings',
       network_name: 'Example Group', network_key: 'example-group',
       value_land: 5000000.4, value_bldg: 800000.0, bldg_land_ratio: 0.16, housing_type: 'sro',
     }));
     expect(row).toBe(
-      '<tr data-bid="7" data-owner="example-holdings" data-network="example-group" data-manager="" data-block="3" data-area="West End" ' +
+      '<tr data-bid="7" data-owner="example-holdings" data-network="example-group" data-manager="" data-area="West End" ' +
         'data-areas="" ' +
         'data-value-land="5000000" data-value-bldg="800000" data-value-ratio="0.16" data-units="40" ' +
         'data-year-built="1965" data-search="12 oak &amp; elm st west end 40 example &quot;holdings&quot; example group sro" ' +
@@ -79,8 +79,8 @@ describe('buildingRow', () => {
   });
 
   it('leaves missing values empty and keeps them out of the search text', () => {
-    const row = buildingRow(rec({ b_id: 9, address: 'X', local_area: null, block_id: null, units: null, year_built: null }));
-    expect(row).toContain('data-block="" data-area=""');
+    const row = buildingRow(rec({ b_id: 9, address: 'X', local_area: null, units: null, year_built: null }));
+    expect(row).toContain('data-manager="" data-area=""');
     expect(row).toContain('data-units="" data-year-built=""');
     expect(row).toContain('data-search="x o"');
   });
@@ -112,26 +112,6 @@ describe('buildingRowsHtml', () => {
       rec({ b_id: 4, units: 90 }),
     ]);
     expect([...html.matchAll(/data-bid="(\d+)"/g)].map((m) => m[1])).toEqual(['4', '3', '1', '2']);
-  });
-});
-
-describe('blockRowsHtml', () => {
-  it('sorts labelled blocks before (Unknown) ones and rounds like pandas', () => {
-    const fc = { type: 'FeatureCollection', schema_version: 1, features: [
-      { type: 'Feature', geometry: null, properties: { block_id: 5, block_label: '(Unknown)-01', local_area: null, buildings: 0, total_units: 0, median_year_built: null } },
-      { type: 'Feature', geometry: null, properties: { block_id: 6, block_label: 'West End-02', local_area: 'West End', buildings: 2, total_units: 25, median_year_built: 1966.5 } },
-    ] } as unknown as BlocksCollection;
-    const html = blockRowsHtml(fc);
-    expect([...html.matchAll(/data-block="(\d+)"/g)].map((m) => m[1])).toEqual(['6', '5']);
-    expect(html).toContain('<td data-sort-value="12.5">12.5</td>'); // avg units
-    expect(html).toContain('<td data-sort-value="1966">1966</td>'); // 1966.5 -> 1966 (half to even)
-  });
-
-  it('carries the overlay areas', () => {
-    const fc = { type: 'FeatureCollection', schema_version: 1, features: [
-      { type: 'Feature', geometry: null, properties: { block_id: 1, block_label: 'B-01', local_area: null, buildings: 0, total_units: 0, median_year_built: null, areas: ['deod'] } },
-    ] } as unknown as BlocksCollection;
-    expect(blockRowsHtml(fc)).toContain('data-areas="deod"');
   });
 });
 

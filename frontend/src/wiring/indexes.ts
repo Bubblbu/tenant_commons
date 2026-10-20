@@ -14,6 +14,7 @@ export function buildMapIndex(ctx: WiringContext): MapIndex {
 
   const blocks: Record<string, BlockLayer> = {};
   const blockLayers: BlockLayer[] = [];
+  const blockBuildings: Record<string, string[]> = {};
   layerBlocks.eachLayer((layer) => {
     const l = layer as unknown as BlockLayer;
     if (l && l.feature && l.feature.properties) {
@@ -22,19 +23,18 @@ export function buildMapIndex(ctx: WiringContext): MapIndex {
       if (rawId === undefined || rawId === null) return;
       const id = String(rawId);
       blocks[id] = l;
-      l._selectionRefs = 0;
       l._isFiltered = false;
       let unitTotal = Number(props.total_units);
       if (!Number.isFinite(unitTotal)) unitTotal = 0;
       l._blockUnits = unitTotal;
       const buildingCount = Number(props.buildings);
       l._blockBuildings = Number.isFinite(buildingCount) ? buildingCount : 0;
+      blockBuildings[id] = Array.isArray(props.building_ids) ? props.building_ids.map(String) : [];
       blockLayers.push(l);
     }
   });
 
   const buildings: Record<string, BuildingMarker> = {};
-  const blockBuildings: Record<string, string[]> = {};
   const owners: Record<string, BuildingMarker[]> = {};
   const networks: Record<string, BuildingMarker[]> = {};
   const hoods: Record<string, BuildingMarker[]> = {};
@@ -92,12 +92,6 @@ export function buildMapIndex(ctx: WiringContext): MapIndex {
     if (hoodKey) {
       if (!hoods[hoodKey]) hoods[hoodKey] = [];
       if (hoods[hoodKey].indexOf(marker) === -1) hoods[hoodKey].push(marker);
-    }
-
-    if (meta.block_id !== undefined && meta.block_id !== null) {
-      const blockKey = String(meta.block_id);
-      if (!blockBuildings[blockKey]) blockBuildings[blockKey] = [];
-      if (blockBuildings[blockKey].indexOf(key) === -1) blockBuildings[blockKey].push(key);
     }
   });
 

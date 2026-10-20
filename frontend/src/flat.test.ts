@@ -11,7 +11,7 @@ const network: Network = {
 
 const york: Building = {
   id: 1, origin: 'building', address: '2145 york ave', name: 'Yorkshire Apartments', also_known_as: [], pids: ['007-273-924'],
-  local_area: 'Kitsilano', block_id: 5, lat: 49.27, lon: -123.15, areas: [],
+  local_area: 'Kitsilano', lat: 49.27, lon: -123.15, areas: [],
   units: 43, units_basis: 'inventory', year_built: 1979, listed_in: ['rental_inventory'],
   value: { land: 8721000, building: 11437000, land_share: 0.43, land_share_pctl: 20 },
   issues: { count: 1, url: 'http://app.vancouver.ca/x' },
