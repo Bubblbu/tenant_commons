@@ -9,8 +9,10 @@ tc_core database path.
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
+
+from .overlay_areas import OverlayArea
 
 try:
     import tomllib
@@ -65,15 +67,10 @@ class IngestConfig:
     # fetch/cov_open_data.py) and the overlay matcher needs it for the
     # point-in-polygon local_area lookup on records with no building match.
     local_area_boundary_geojson: str = DEFAULT_BOUNDARY_GEOJSON
-    # Optional: hand-traced City "Village Plan Area" boundaries (see
-    # data/curated/villages_plan_areas.geojson's provenance) for the map's
-    # reference overlay. City/program-specific, not part of _REQUIRED_PATHS —
-    # a non-Vancouver deployment wouldn't have this.
-    villages_plan_areas_geojson: str | None = None
-    # Optional: the Chinatown boundary already used by prepare/properties.py
-    # (via DataPaths.chinatown_boundary) to flag buildings — reused here,
-    # unmodified, as a second map reference overlay.
-    chinatown_boundary_geojson: str | None = None
+    # Boundary overlays (config.toml's [[overlay_areas]]: Chinatown, DEOD,
+    # the Villages Plan Areas) — see overlay_areas.py. City-specific, so
+    # optional: a non-Vancouver deployment would name its own or none.
+    overlay_areas: list[OverlayArea] = field(default_factory=list)
     # Optional: hand-curated list of property-management companies
     # (curated/property_managers.toml). A rental licence they hold names the
     # building's manager, not its landlord (see export.apply_property_managers).
@@ -147,16 +144,15 @@ def load_ingest_config(path: str) -> IngestConfig:
         local_area_boundary_geojson=str(
             flat.get("local_area_boundary_geojson", DEFAULT_BOUNDARY_GEOJSON)
         ),
-        villages_plan_areas_geojson=(
-            str(flat["villages_plan_areas_geojson"])
-            if flat.get("villages_plan_areas_geojson")
-            else None
-        ),
-        chinatown_boundary_geojson=(
-            str(flat["chinatown_boundary_geojson"])
-            if flat.get("chinatown_boundary_geojson")
-            else None
-        ),
+        overlay_areas=[
+            OverlayArea(
+                key=str(a["key"]),
+                name=str(a["name"]),
+                source=str(a["source"]),
+                feature=str(a["feature"]) if a.get("feature") else None,
+            )
+            for a in raw.get("overlay_areas", [])
+        ],
         property_managers=(
             str(flat["property_managers"]) if flat.get("property_managers") else None
         ),

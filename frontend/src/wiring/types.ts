@@ -58,8 +58,8 @@ export interface WiringContext {
     blocks: L.GeoJSON;
     buildings: L.FeatureGroup;
     neighbourhoods: L.FeatureGroup;
-    villages: L.FeatureGroup;
-    chinatown: L.FeatureGroup;
+    /** Overlay area layers by key (Chinatown, DEOD, ...): see overlays.ts. */
+    overlays: Record<string, L.FeatureGroup>;
   };
   markersById: Record<string, L.CircleMarker>;
   ringsById: Record<string, { housing_type: string; marker: L.CircleMarker }[]>;

@@ -24,12 +24,12 @@ import {
   createBlocksLayer,
   createBoundaryRenderer,
   createBuildingLayers,
-  createChinatownLayer,
   createNeighbourhoodsLayer,
-  createVillagesLayer,
+  createOverlayLayers,
 } from './layers';
 import { initLegendToggle, renderLegend } from './legend';
 import { markerStyle } from './markers';
+import { overlayLook } from './overlays';
 import { initPopupTabs, renderPopup } from './popup/index';
 import { belowPopup } from './popup/below';
 import { initTipDismiss } from './provenance';
@@ -77,14 +77,18 @@ async function main(): Promise<void> {
   const boundaryRenderer = createBoundaryRenderer(map);
   const blocks = createBlocksLayer(artifacts.blocks);
   const neighbourhoods = createNeighbourhoodsLayer(artifacts.boundaries, boundaryRenderer).addTo(map);
-  const villages = createVillagesLayer(artifacts.villages, boundaryRenderer);
-  const chinatown = createChinatownLayer(artifacts.chinatown, boundaryRenderer).addTo(map);
+  const specialAreas = artifacts.filterConfig.special_areas;
+  const overlays = createOverlayLayers(artifacts.overlays, specialAreas, boundaryRenderer);
+  // Shown-by-default ones now; startWiring() then follows the Show on map toggles.
+  (specialAreas ?? []).forEach((a, i) => {
+    if (overlays[a.key] && overlayLook(a.key, i).shown) overlays[a.key].addTo(map);
+  });
 
-  renderLegend(artifacts.filterConfig);
+  renderLegend(artifacts.filterConfig, document, new Set(Object.keys(overlays)));
   const hoodValues = Array.from(document.querySelectorAll<HTMLInputElement>('.filter-neighbourhood-option')).map((i) => i.value);
   const restored = decodeFilterState(new URLSearchParams(window.location.search), hoodValues);
   // A ?hood= link that narrows the neighbourhoods opens framed on them.
-  const selected = selectionBounds(restored.hoods ?? [], hoodValues, areaBounds(artifacts.boundaries, artifacts.chinatown, artifacts.villages));
+  const selected = selectionBounds(restored.hoods ?? [], hoodValues, areaBounds(artifacts.boundaries, artifacts.overlays));
   // One call, and animate: false — an animated fitBounds this early races
   // watchMap()'s own start-up invalidateSize() (wiring/status-export.ts) and
   // can settle on the wrong center/zoom; there's no prior view worth
@@ -135,7 +139,7 @@ async function main(): Promise<void> {
   buildings.buildings.addTo(map);
   startWiring({
     map,
-    layers: { blocks, buildings: buildings.buildings, neighbourhoods, villages, chinatown },
+    layers: { blocks, buildings: buildings.buildings, neighbourhoods, overlays },
     markersById: buildings.markersById,
     ringsById: buildings.ringsById,
     filterConfig: artifacts.filterConfig,

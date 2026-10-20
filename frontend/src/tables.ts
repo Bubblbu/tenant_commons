@@ -17,8 +17,8 @@ export interface FilterFields {
   bid: string;
   /** lowercased, trimmed local_area */
   area: string;
-  chinatown: boolean;
-  village: boolean;
+  /** Overlay area keys (Chinatown, DEOD, ...) the building is in. */
+  areas: string[];
   owner: string;
   network: string;
   manager: string;
@@ -81,14 +81,16 @@ const roundOrNull = (v: unknown, digits = 0): number | null => {
   return n === null ? null : roundHalfEven(n, digits);
 };
 const attr = (v: number | null): string => (v === null ? '' : String(v));
+/** Overlay area keys: the flat view's '; '-joined string, or a block's array. */
+const areaList = (v: unknown): string[] =>
+  Array.isArray(v) ? v.map(String) : text(v).split(';').map((k) => k.trim()).filter((k) => k !== '');
 
 /** What the filters read about a building. The row's data-* attributes are rendered from this. */
 export function filterFields(r: BuildingRecord): FilterFields {
   return {
     bid: String(Math.trunc(Number(r.b_id))),
     area: text(r.local_area).toLowerCase().trim(),
-    chinatown: r.in_chinatown === true,
-    village: r.in_village_plan === true,
+    areas: areaList(r.areas),
     owner: groupKey(r.owner_key, r),
     network: groupKey(r.network_key, r),
     manager: managerKey(r.managed_by),
@@ -152,13 +154,11 @@ export function buildingRow(r: BuildingRecord): string {
   const a = escapeHtml(area);
   const h = escapeHtml(housing);
   const address = formatAddress(r.address);
-  const chinatown = f.chinatown ? '1' : '';
-  const village = f.village ? '1' : '';
   return (
     `<tr data-bid="${bid}" data-owner="${escapeHtml(f.owner)}" ` +
     `data-network="${escapeHtml(f.network)}" data-manager="${escapeHtml(f.manager)}" ` +
     `data-block="${block}" ` +
-    `data-area="${a}" data-chinatown="${chinatown}" data-village="${village}" ` +
+    `data-area="${a}" data-areas="${escapeHtml(f.areas.join(' '))}" ` +
     `data-value-land="${valLand}" data-value-bldg="${valBldg}" ` +
     `data-value-ratio="${ratioVal}" data-units="${units}" ` +
     `data-year-built="${year}" data-search="${escapeHtml(search)}" ` +
@@ -205,11 +205,9 @@ export function blockRowsHtml(fc: BlocksCollection): string {
       const median = num(p.median_year_built);
       const year = median === null ? '' : String(roundHalfEven(median));
       const l = escapeHtml(label);
-      const chinatown = p.in_chinatown === true ? '1' : '';
-      const village = p.in_village_plan === true ? '1' : '';
       return (
         `<tr data-block="${id}" data-area="${escapeHtml(text(p.local_area))}" ` +
-        `data-chinatown="${chinatown}" data-village="${village}" ` +
+        `data-areas="${escapeHtml(areaList(p.areas).join(' '))}" ` +
         `data-bldgs="${bldgs}" data-units="${total}">` +
         `<td class="select-cell"><input type="checkbox" class="row-select" ` +
         `data-type="block" data-target="${id}"></td>` +

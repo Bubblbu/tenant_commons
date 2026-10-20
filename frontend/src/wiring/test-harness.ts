@@ -95,6 +95,8 @@ export interface Harness {
   blocks: Record<string, FakeLayer>;
   paint: FakeLayer[];
   landlords: LandlordFilter;
+  /** Overlay area layers by key, as bootstrap.ts hands them to wiring. */
+  overlays: Record<string, FakeLayer>;
   /** b_ids passed to ctx.onFilter by the latest filter pass, numerically sorted. */
   visible(): string[];
   markerHidden(bid: number): boolean;
@@ -164,14 +166,13 @@ export function startHarness(opts: { initialFilter?: Partial<FilterState> } = {}
     });
   }
   const neighbourhoods = new FakeLayer(paint);
-  const villages = new FakeLayer(paint);
-  const chinatown = new FakeLayer(paint);
-  [blocksLayer, buildingsLayer, neighbourhoods, chinatown].forEach((l) => map.addLayer(l));
+  const overlays = { chinatown: new FakeLayer(paint), deod: new FakeLayer(paint), 'village-plan': new FakeLayer(paint) };
+  [blocksLayer, buildingsLayer, neighbourhoods, overlays.chinatown, overlays.deod].forEach((l) => map.addLayer(l));
 
   const seen: { visible: Set<string> | null; state: FilterState | null } = { visible: null, state: null };
   startWiring({
     map,
-    layers: { blocks: blocksLayer, buildings: buildingsLayer, neighbourhoods, villages, chinatown },
+    layers: { blocks: blocksLayer, buildings: buildingsLayer, neighbourhoods, overlays },
     markersById: markers,
     ringsById: rings,
     filterConfig: FIXTURE_FILTER_CONFIG,
@@ -198,7 +199,7 @@ export function startHarness(opts: { initialFilter?: Partial<FilterState> } = {}
   };
 
   return {
-    map, markers, blocks, paint, landlords,
+    map, markers, blocks, paint, landlords, overlays,
     visible: () => [...(seen.visible ?? [])].sort((a, b) => Number(a) - Number(b)),
     markerHidden: (bid) => markers[String(bid)].options.radius === 0,
     markerHighlighted: (bid) => markers[String(bid)].options.color === HIGHLIGHT,

@@ -10,7 +10,7 @@ import type { BlocksCollection, BuildingData, BuildingRecord, FilterConfig, Mark
 interface B {
   id: number; area: string; owner: string | null; units: number | null; year: number | null;
   housing: string; issues: number; block: number | null;
-  chinatown?: boolean; village?: boolean; manager?: string; searched?: string;
+  areas?: string[]; manager?: string; searched?: string;
 }
 
 const OWNERS: Record<string, { name: string; network: string; networkName: string }> = {
@@ -21,10 +21,10 @@ const OWNERS: Record<string, { name: string; network: string; networkName: strin
 const BUILDINGS: B[] = [
   { id: 1, area: 'West End', owner: 'acme', units: 40, year: 1965, housing: '', issues: 0, block: 101 },
   { id: 2, area: 'West End', owner: 'acme', units: 12, year: 1990, housing: 'sro', issues: 2, block: 101 },
-  { id: 3, area: 'West End', owner: 'birch', units: 8, year: null, housing: '', issues: 0, block: 101, village: true },
+  { id: 3, area: 'West End', owner: 'birch', units: 8, year: null, housing: '', issues: 0, block: 101, areas: ['village-plan'] },
   { id: 4, area: 'Downtown', owner: 'birch', units: 120, year: 2005, housing: 'co-op, sro', issues: 0, block: 201 },
-  { id: 5, area: 'Downtown', owner: null, units: 30, year: 1930, housing: '', issues: 1, block: 201, chinatown: true, manager: 'Tribe Management' },
-  { id: 6, area: 'Downtown', owner: null, units: null, year: 1912, housing: 'co-op', issues: 0, block: 201 },
+  { id: 5, area: 'Downtown', owner: null, units: 30, year: 1930, housing: '', issues: 1, block: 201, areas: ['chinatown', 'deod'], manager: 'Tribe Management' },
+  { id: 6, area: 'Downtown', owner: null, units: null, year: 1912, housing: 'co-op', issues: 0, block: 201, areas: ['deod'] },
   { id: 7, area: 'Strathcona', owner: 'acme', units: 6, year: 1908, housing: '', issues: 3, block: 301 },
   { id: 8, area: 'Strathcona', owner: null, units: 16, year: 1975, housing: '', issues: 0, block: 301, searched: '2026-10-06' },
   { id: 9, area: 'Strathcona', owner: 'birch', units: 60, year: 2015, housing: '', issues: 0, block: 301 },
@@ -51,8 +51,7 @@ function record(b: B): BuildingRecord {
     housing_type: b.housing,
     n_issues: b.issues,
     block_id: b.block,
-    in_chinatown: b.chinatown === true,
-    in_village_plan: b.village === true,
+    areas: b.areas?.join('; ') ?? null,
     value_land: null,
     value_bldg: null,
     bldg_land_ratio: null,
@@ -89,19 +88,19 @@ function block(id: number, area: string, buildings: number, units: number) {
     geometry: { type: 'Polygon' as const, coordinates: [[[x, 49.28], [x + 0.001, 49.28], [x + 0.001, 49.281], [x, 49.28]]] },
     properties: {
       block_id: id, block_label: `Block ${id}`, local_area: area, buildings, total_units: units,
-      median_year_built: null, in_chinatown: false, in_village_plan: false,
+      median_year_built: null, areas: [],
     },
   };
 }
 
 export const FIXTURE_BLOCKS: BlocksCollection = {
   type: 'FeatureCollection',
-  schema_version: 2,
+  schema_version: 3,
   features: [block(101, 'West End', 3, 60), block(201, 'Downtown', 3, 150), block(301, 'Strathcona', 4, 86), block(401, 'Strathcona', 0, 0)],
 };
 
 export const FIXTURE_FILTER_CONFIG: FilterConfig = {
-  schema_version: 2,
+  schema_version: 3,
   neighbourhoods: [
     { name: 'Downtown', count: 4, units: 154 },
     { name: 'Strathcona', count: 3, units: 82 },
@@ -109,6 +108,7 @@ export const FIXTURE_FILTER_CONFIG: FilterConfig = {
   ],
   special_areas: [
     { key: 'chinatown', name: 'Chinatown', count: 1, units: 30 },
+    { key: 'deod', name: 'DEOD', count: 2, units: 30 },
     { key: 'village-plan', name: 'Villages Plan', count: 1, units: 8 },
   ],
   dataset_totals: { buildings: 10, units: 296 },

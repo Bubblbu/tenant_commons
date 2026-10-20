@@ -240,6 +240,31 @@ describe('select all', () => {
   });
 });
 
+describe('Show on map > overlay areas', () => {
+  const show = (key: string) => `.viz-show-overlay[data-area="${key}"]`;
+
+  it('draws each overlay area while it and Neighbourhood boundaries are ticked', () => {
+    const h = startHarness();
+    const drawn = () => Object.keys(h.overlays).filter((k) => h.map.hasLayer(h.overlays[k]));
+    expect(drawn()).toEqual(['chinatown', 'deod']); // Villages Plan starts hidden
+    h.setChecked(show('deod'), false);
+    expect(drawn()).toEqual(['chinatown']);
+    h.setChecked(show('village-plan'), true);
+    expect(drawn()).toEqual(['chinatown', 'village-plan']);
+    h.setChecked('#viz-show-neighbourhoods', false);
+    expect(drawn()).toEqual([]);
+    h.setChecked('#viz-show-neighbourhoods', true);
+    h.click('#filter-reset');
+    expect(drawn()).toEqual(['chinatown', 'deod']);
+  });
+
+  it('filters by DEOD like any other overlay area', () => {
+    const h = startHarness();
+    h.setChecked(hood('deod'), true);
+    expect(h.visible()).toEqual(['5', '6']);
+  });
+});
+
 describe('Clear and Reset', () => {
   it('clears one section, and Reset clears everything', () => {
     const h = startHarness();

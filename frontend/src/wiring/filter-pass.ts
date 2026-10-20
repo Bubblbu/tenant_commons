@@ -88,8 +88,7 @@ export function initFilterPass(deps: FilterPassDeps, doc: Document): FilterPass 
     return {
       id,
       area: row ? (row.getAttribute('data-area') || '').toLowerCase().trim() : '',
-      chinatown: row ? row.getAttribute('data-chinatown') === '1' : false,
-      village: row ? row.getAttribute('data-village') === '1' : false,
+      areas: row ? (row.getAttribute('data-areas') || '').split(' ').filter(Boolean) : [],
       buildingIds: index.blockBuildings[id] || [],
     };
   });

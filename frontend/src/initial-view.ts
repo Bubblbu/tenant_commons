@@ -5,7 +5,7 @@
  * to Leaflet's fitBounds by bootstrap.ts.
  */
 import type { Geometry, Position } from 'geojson';
-import type { BoundaryCollection } from './types';
+import type { BoundaryCollection, OverlayCollection } from './types';
 
 export type LatLonBounds = [[number, number], [number, number]];
 
@@ -43,24 +43,21 @@ function collectionBounds(fc: BoundaryCollection): LatLonBounds | null {
 
 /**
  * Bounds per Filters > Neighbourhoods value: each neighbourhood by its
- * lowercased name (as legend.ts writes the checkbox values), plus the two
- * special areas under their filter keys.
+ * lowercased name (as legend.ts writes the checkbox values), plus each
+ * overlay area under its key.
  */
-export function areaBounds(
-  neighbourhoods: BoundaryCollection,
-  chinatown: BoundaryCollection,
-  villages: BoundaryCollection,
-): Map<string, LatLonBounds> {
+export function areaBounds(neighbourhoods: BoundaryCollection, overlays: OverlayCollection): Map<string, LatLonBounds> {
   const out = new Map<string, LatLonBounds>();
   for (const f of neighbourhoods.features) {
     const key = String(f.properties?.name ?? '').trim().toLowerCase();
     const b = geometryBounds(f.geometry);
     if (key && b) out.set(key, union(out.get(key) ?? null, b)!);
   }
-  const ct = collectionBounds(chinatown);
-  if (ct) out.set('chinatown', ct);
-  const vp = collectionBounds(villages);
-  if (vp) out.set('village-plan', vp);
+  for (const f of overlays.features) {
+    const key = f.properties?.area;
+    const b = geometryBounds(f.geometry);
+    if (key && b) out.set(key, union(out.get(key) ?? null, b)!);
+  }
   return out;
 }
 

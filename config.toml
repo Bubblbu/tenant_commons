@@ -17,8 +17,28 @@ coops = "data/raw/chf_bc/coops_vancouver.csv"
 ownership_claims = "data/curated/ownership_claims.csv"
 lotr_ownership = "data/raw/samwise/samwise-export.csv"
 lotr_searches = "data/raw/samwise/searches"
-villages_plan_areas_geojson = "data/curated/villages_plan_areas.geojson"
-chinatown_boundary_geojson = "data/curated/chinatown_boundary.geojson"
 property_managers = "data/curated/property_managers.toml"
 manager_listings = "data/raw/property_managers"
 strata_lot_pids = "data/curated/strata_lot_pids.csv"
+
+# Boundary overlays a building can belong to alongside its neighbourhood:
+# each is a Filters > Neighbourhoods entry (after the separator) and a
+# Show on map toggle. `feature` picks one polygon by its `name`; without it
+# every feature in `source` belongs to the area. `key` is in shared links,
+# so keep it stable.
+[[overlay_areas]]
+key = "chinatown"
+name = "Chinatown"
+source = "data/raw/boundaries/DTES_sub_zoning/DTES_sub_zoning.shp"
+feature = "Chinatown"
+
+[[overlay_areas]]
+key = "deod"
+name = "DEOD"
+source = "data/raw/boundaries/DTES_sub_zoning/DTES_sub_zoning.shp"
+feature = "DEOD"
+
+[[overlay_areas]]
+key = "village-plan"
+name = "Villages Plan"
+source = "data/curated/villages_plan_areas.geojson"

@@ -17,7 +17,7 @@ def _building(**overrides) -> dict:
     base = dict(
         id=1, origin="building", address="1 Main St", name=None, also_known_as=[], pids=[],
         local_area="Kitsilano", block_id=None, lat=49.2, lon=-123.1,
-        in_chinatown=False, in_village_plan=False, units=10, units_basis="inventory",
+        areas=[], units=10, units_basis="inventory",
         year_built=1970, listed_in=["rental_inventory"], value=None, issues=None,
         parties=[], network_id=None,
         registry_search={"status": "not_searched", "date": None},

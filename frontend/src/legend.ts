@@ -5,10 +5,11 @@
  */
 import { LEGEND_LEFT_OFFSET, MOBILE_BREAKPOINT_PX } from './config';
 import { escapeHtml, groupThousands } from './html';
+import { overlayLegendRowsHtml, overlayTogglesHtml } from './overlays';
 import type { FilterConfig, NeighbourhoodSummary, SpecialAreaSummary } from './types';
 
 /**
- * Chinatown / Villages Plan Areas: rendered after a separator, in the same
+ * Overlay areas (Chinatown, DEOD, Villages Plan): rendered after a separator, in the same
  * checkbox list and with the same `.filter-neighbourhood-option` class as
  * the real neighbourhoods above (so wiring's Area Clear and its
  * hoodInputs query pick them up for free) — they're additional area flags a
@@ -63,9 +64,21 @@ export function blockTicks(max: number): string[] {
   return [0, 0.2, 0.4, 0.6, 0.8, 1].map((f) => groupThousands(f === 1 ? max : Math.round(max * f)));
 }
 
-export function renderLegend(fc: FilterConfig, doc: Document = document): void {
+/**
+ * `drawable`: the overlay areas with outlines on the map (default: every
+ * special area) — only those get a Show on map toggle and a legend row.
+ */
+export function renderLegend(
+  fc: FilterConfig,
+  doc: Document = document,
+  drawable: Set<string> = new Set((fc.special_areas ?? []).map((a) => a.key)),
+): void {
   const hoods = doc.getElementById('filter-neighbourhoods');
   if (hoods) hoods.innerHTML = hoodTagsHtml(fc.neighbourhoods, fc.special_areas);
+  const toggles = doc.getElementById('viz-overlay-areas');
+  if (toggles) toggles.innerHTML = overlayTogglesHtml(fc.special_areas, drawable);
+  const legendRows = doc.getElementById('legend-overlay-rows');
+  if (legendRows) legendRows.innerHTML = overlayLegendRowsHtml(fc.special_areas, drawable);
   const max = blockLegendMax(fc);
   const scale = doc.getElementById('block-legend-scale');
   if (scale) scale.innerHTML = blockTicks(max).map((t) => `<span>${escapeHtml(t)}</span>`).join('');

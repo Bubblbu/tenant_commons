@@ -7,7 +7,7 @@ const party = (p: Partial<Party> & Pick<Party, 'role' | 'name'>): Party => ({
 });
 const base = (b: Partial<Building> & Pick<Building, 'id' | 'address'>): Building => ({
   origin: 'building', name: null, also_known_as: [], pids: [], local_area: null, block_id: null, lat: 49.2, lon: -123.1,
-  in_chinatown: false, in_village_plan: false, units: null, units_basis: null, year_built: null, listed_in: [],
+  areas: [], units: null, units_basis: null, year_built: null, listed_in: [],
   value: null, issues: null, parties: [], network_id: null, registry_search: { status: 'not_searched', date: null },
   coop: null, sro: null, rezoning: null, ...b,
 });

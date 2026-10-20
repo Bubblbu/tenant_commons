@@ -6,7 +6,7 @@ import type { FilterState } from './filter-state';
 
 const none: FilterState = { hoods: [], housing: [], landlords: [], onlyIssues: false, onlyOwned: false, onlyUnits: false, thresholds: {} };
 const f = (bid: string, o: Partial<FilterFields> = {}): FilterFields => ({
-  bid, area: 'west end', chinatown: false, village: false, owner: '', network: '', manager: '',
+  bid, area: 'west end', areas: [], owner: '', network: '', manager: '',
   housingTypes: [], nIssues: null, hasOwner: false, metrics: { units: 10 }, ...o,
 });
 const unitsSpec: MetricSpec = { key: 'units', attr: 'units', bins: [{ start: 0, end: 10 }, { start: 10, end: 20 }] };
@@ -17,12 +17,15 @@ describe('filterBuildings', () => {
     expect(ids(filterBuildings([f('1'), f('2')], none, []).visible)).toEqual(['1', '2']);
   });
 
-  it('matches an area, or a special-area flag, when areas are ticked', () => {
-    const fields = [f('1'), f('2', { area: 'downtown', chinatown: true }), f('3', { area: 'downtown' })];
+  it('matches an area, or any overlay area of the row, when areas are ticked', () => {
+    const fields = [
+      f('1'), f('2', { area: 'downtown', areas: ['chinatown'] }), f('3', { area: 'downtown' }),
+      f('4', { area: 'strathcona', areas: ['chinatown', 'deod'] }),
+    ];
     expect(ids(filterBuildings(fields, { ...none, hoods: ['west end'] }, []).visible)).toEqual(['1']);
-    expect(ids(filterBuildings(fields, { ...none, hoods: ['chinatown'] }, []).visible)).toEqual(['2']);
-    const village = [f('4', { area: 'kits', village: true })];
-    expect(ids(filterBuildings(village, { ...none, hoods: ['village-plan'] }, []).visible)).toEqual(['4']);
+    expect(ids(filterBuildings(fields, { ...none, hoods: ['chinatown'] }, []).visible)).toEqual(['2', '4']);
+    expect(ids(filterBuildings(fields, { ...none, hoods: ['deod'] }, []).visible)).toEqual(['4']);
+    expect(ids(filterBuildings(fields, { ...none, hoods: ['deod', 'west end'] }, []).visible)).toEqual(['1', '4']);
   });
 
   it('matches landlord tiles by owner, network or manager key', () => {
@@ -64,8 +67,8 @@ describe('filterBuildings', () => {
 });
 
 describe('blockVisibility', () => {
-  const b = (id: string, o: Partial<{ area: string; chinatown: boolean; village: boolean; buildingIds: string[] }> = {}) =>
-    ({ id, area: 'west end', chinatown: false, village: false, buildingIds: ['1'], ...o });
+  const b = (id: string, o: Partial<{ area: string; areas: string[]; buildingIds: string[] }> = {}) =>
+    ({ id, area: 'west end', areas: [] as string[], buildingIds: ['1'], ...o });
 
   it('hides a block whose buildings are all filtered out', () => {
     expect(ids(blockVisibility([b('A'), b('B', { buildingIds: ['2'] })], new Set(['1']), [], false))).toEqual(['B']);

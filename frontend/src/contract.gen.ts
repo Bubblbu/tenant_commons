@@ -7,13 +7,12 @@
 
 export type Address = string;
 export type AlsoKnownAs = string[];
+export type Areas = string[];
 export type BlockId = number | null;
 export type OwnershipModel = ("non_profit" | "equity") | null;
 export type Status = ("open_waitlist" | "closed") | null;
 export type Url = string | null;
 export type Id = number;
-export type InChinatown = boolean;
-export type InVillagePlan = boolean;
 export type Count = number;
 export type Url1 = string | null;
 export type Lat = number | null;
@@ -74,7 +73,7 @@ export type Land = number;
 export type LandShare = number;
 export type LandSharePctl = number;
 export type YearBuilt = number | null;
-export type SchemaVersion = 2;
+export type SchemaVersion = 3;
 export type AlsoNamed = string[];
 export type Buildings = number;
 export type Kind1 = "person" | "company";
@@ -91,7 +90,7 @@ export type Buildings1 = number;
 export type OpenIssues = number;
 export type PropertiesOnTitle = number | null;
 export type Units1 = number;
-export type SchemaVersion1 = 2;
+export type SchemaVersion1 = 3;
 
 /**
  * Schema root only: one place the frontend's types are generated from.
@@ -118,11 +117,10 @@ export interface Records {
 export interface Building {
   address: Address;
   also_known_as: AlsoKnownAs;
+  areas: Areas;
   block_id: BlockId;
   coop: Coop | null;
   id: Id;
-  in_chinatown: InChinatown;
-  in_village_plan: InVillagePlan;
   issues: Issues | null;
   lat: Lat;
   listed_in: ListedIn;

@@ -10,7 +10,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 FIXTURES = REPO_ROOT / "frontend" / "fixtures"
 FILES = [
     "filter_config.json", "marker_metadata.json", "building_records.json",
-    "networks.json", "blocks.geojson", "local-area-boundary.geojson",
+    "networks.json", "blocks.geojson", "local-area-boundary.geojson", "overlay_areas.geojson",
 ]
 
 
@@ -37,7 +37,7 @@ def test_fixtures_cover_every_source_and_carry_the_contract_version():
     markers = json.loads((FIXTURES / "marker_metadata.json").read_text())["markers"]
     assert {m["source"] for m in markers} == {"building", "overlay_sro", "overlay_coop"}
     for name in FILES[:5]:
-        assert json.loads((FIXTURES / name).read_text())["schema_version"] == 2, name
+        assert json.loads((FIXTURES / name).read_text())["schema_version"] == 3, name
 
 
 def test_fixtures_exercise_every_popup_case():

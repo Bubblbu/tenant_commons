@@ -18,5 +18,11 @@ export const MAP_THEME = {
     unscaledFill: '#f0f0f0',
     filteredFill: '#f5f5f5',
   },
-  boundary: { neighbourhood: '#ff8c00', villages: '#7b3fa0', chinatown: '#c0392b', labelHalo: '#fff' },
+  boundary: {
+    neighbourhood: '#ff8c00',
+    /** Overlay areas by key (overlays.ts); one not listed takes overlayFallback by position. */
+    overlays: { chinatown: '#c0392b', deod: '#00838f', 'village-plan': '#7b3fa0' },
+    overlayFallback: ['#6d4c41', '#2e7d32', '#ad1457', '#283593'],
+    labelHalo: '#fff',
+  },
 } as const;

@@ -28,6 +28,7 @@ sys.path.insert(0, str(REPO_ROOT / "src"))
 
 from tc_core.db import init_db  # noqa: E402
 from tc_core.export import export_artifacts  # noqa: E402
+from tc_core.overlay_areas import OverlayArea  # noqa: E402
 
 NOW = datetime(2026, 1, 1, tzinfo=timezone.utc)
 TS = "2026-01-01T00:00:00+00:00"
@@ -188,7 +189,7 @@ def build(out_dir: Path) -> None:
         boundary.write_text(json.dumps(BOUNDARY), encoding="utf-8")
         villages = Path(tmp) / "villages_plan_areas.geojson"
         villages.write_text(json.dumps(VILLAGES), encoding="utf-8")
-        chinatown = Path(tmp) / "chinatown_boundary.geojson"
+        chinatown = Path(tmp) / "chinatown.geojson"
         chinatown.write_text(json.dumps(CHINATOWN), encoding="utf-8")
         pid_map = Path(tmp) / "pid_address_map.csv"
         pid_map.write_text(PID_ADDRESS_MAP, encoding="utf-8")
@@ -197,8 +198,10 @@ def build(out_dir: Path) -> None:
             out_dir,
             pid_address_map_path=str(pid_map),
             boundary_geojson_path=str(boundary),
-            villages_geojson_path=str(villages),
-            chinatown_geojson_path=str(chinatown),
+            overlay_areas=[
+                OverlayArea("chinatown", "Chinatown", str(chinatown)),
+                OverlayArea("village-plan", "Villages Plan", str(villages)),
+            ],
             now=NOW,
         )
 

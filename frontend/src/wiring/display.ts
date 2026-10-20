@@ -29,8 +29,7 @@ export function initDisplay(
   const layerBuildings = ctx.layers.buildings;
   const layerBlocks = ctx.layers.blocks;
   const layerNeighbourhoods = ctx.layers.neighbourhoods;
-  const layerVillages = ctx.layers.villages;
-  const layerChinatown = ctx.layers.chinatown;
+  const overlayLayers = ctx.layers.overlays;
 
   let showHousingTypeChecked = false;
   let showIssuesChecked = false;
@@ -48,8 +47,8 @@ export function initDisplay(
   const showBuildingsChk = doc.getElementById('viz-show-buildings') as HTMLInputElement | null;
   const vizBlocksChk = doc.getElementById('viz-show-blocks') as HTMLInputElement | null;
   const vizNeighbourhoodsChk = doc.getElementById('viz-show-neighbourhoods') as HTMLInputElement | null;
-  const vizVillagesChk = doc.getElementById('viz-show-villages') as HTMLInputElement | null;
-  const vizChinatownChk = doc.getElementById('viz-show-chinatown') as HTMLInputElement | null;
+  // One per overlay area (legend.ts renders them from special_areas).
+  const vizOverlayChks = Array.from(doc.querySelectorAll<HTMLInputElement>('.viz-show-overlay'));
   const legendContainerEl = doc.getElementById('legend-map');
   const legendBlocksEl = doc.getElementById('legend-blocks-section');
   const legendBuildingDetailsEl = doc.getElementById('legend-building-details-section');
@@ -65,20 +64,17 @@ export function initDisplay(
     }
   }
 
-  function boundaryVisibility(): { neighbourhoods: boolean; chinatown: boolean; villages: boolean } {
+  function boundaryVisibility(): { neighbourhoods: boolean; overlays: Record<string, boolean> } {
     const neighbourhoods = vizNeighbourhoodsChk ? vizNeighbourhoodsChk.checked : true;
-    return {
-      neighbourhoods,
-      chinatown: neighbourhoods && (vizChinatownChk ? vizChinatownChk.checked : true),
-      villages: neighbourhoods && (vizVillagesChk ? vizVillagesChk.checked : false),
-    };
+    const overlays: Record<string, boolean> = {};
+    for (const chk of vizOverlayChks) overlays[chk.dataset.area ?? ''] = neighbourhoods && chk.checked;
+    return { neighbourhoods, overlays };
   }
 
   function syncBoundaryLayers(): void {
     const v = boundaryVisibility();
     toggleLayerVisibility(layerNeighbourhoods, v.neighbourhoods);
-    toggleLayerVisibility(layerChinatown, v.chinatown);
-    toggleLayerVisibility(layerVillages, v.villages);
+    for (const [key, layer] of Object.entries(overlayLayers)) toggleLayerVisibility(layer, v.overlays[key] === true);
   }
 
   function setLegendDisplay(el: HTMLElement | null, show: boolean): void {
@@ -102,7 +98,7 @@ export function initDisplay(
     const showBuildingDetailsLegend = showHousingTypeChecked || showIssuesChecked;
     setLegendDisplay(legendBuildingDetailsEl, showBuildingDetailsLegend);
     const boundaries = boundaryVisibility();
-    const showBoundariesLegend = boundaries.neighbourhoods || boundaries.chinatown || boundaries.villages;
+    const showBoundariesLegend = boundaries.neighbourhoods || Object.values(boundaries.overlays).some(Boolean);
     setLegendDisplay(legendBoundariesEl, showBoundariesLegend);
     if (legendContainerEl) {
       const shouldShow = (showBlocksLegend && legendBlocksEl) ||
@@ -217,10 +213,10 @@ export function initDisplay(
   } else {
     toggleLayerVisibility(layerBlocks, true);
   }
-  // Chinatown and Villages Plan sit under Neighbourhood boundaries in Show
-  // on map: each is drawn only while it and the parent are ticked.
+  // Overlay areas sit under Neighbourhood boundaries in Show on map: each
+  // is drawn only while it and the parent are ticked.
   syncBoundaryLayers();
-  [vizNeighbourhoodsChk, vizChinatownChk, vizVillagesChk].forEach((chk) => {
+  [vizNeighbourhoodsChk, ...vizOverlayChks].forEach((chk) => {
     if (!chk) return;
     chk.addEventListener('change', () => {
       syncBoundaryLayers();
@@ -248,8 +244,8 @@ export function initDisplay(
       restack.now();
     }
     if (vizNeighbourhoodsChk) vizNeighbourhoodsChk.checked = true;
-    if (vizVillagesChk) vizVillagesChk.checked = false;
-    if (vizChinatownChk) vizChinatownChk.checked = true;
+    // Back to each area's start-up state (overlays.ts's `shown`).
+    for (const chk of vizOverlayChks) chk.checked = chk.defaultChecked;
     syncBoundaryLayers();
     if (vizShowHousingTypeChk) vizShowHousingTypeChk.checked = false;
     if (vizShowIssuesChk) vizShowIssuesChk.checked = false;

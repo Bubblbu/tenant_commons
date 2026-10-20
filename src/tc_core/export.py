@@ -1,8 +1,9 @@
 """Exports tc_core's SQLite data for the map.
 
 `export_artifacts()` writes the frontend artifact set (filter_config.json,
-marker_metadata.json, building_records.json, networks.json, blocks.geojson and
-the local-area boundary), each with a `schema_version`. building_records.json
+marker_metadata.json, building_records.json, networks.json, blocks.geojson,
+the local-area boundary and overlay_areas.geojson), each JSON file of our
+own with a `schema_version`. building_records.json
 and networks.json are validated against tc_core/contract.py. That directory is the only interface
 between tc_core and the frontend.
 
@@ -54,6 +55,7 @@ from .metrics.registry_owners import (
     entity_kinds,
 )
 from .normalize import sanitize_owner
+from .overlay_areas import OverlayArea, load_area_features
 from .sro_names import SroName, load_sro_names
 from .sro_names import clean_sro_name as _clean_sro_name
 
@@ -630,22 +632,50 @@ def resolve_local_area_from_block_numbers(
     return pl.Series("local_area", local_area, dtype=pl.String)
 
 
-def load_boundary_polygons(geojson_path: str | None) -> list:
-    """Every feature's geometry from a boundary GeoJSON (Chinatown, Villages
-    Plan Areas), as shapely objects. Missing/empty path -> no polygons, so
-    callers get an all-False flag rather than needing their own guard.
+def load_overlay_areas(areas: list[OverlayArea]) -> list[tuple[OverlayArea, list]]:
+    """Each configured overlay area with its (name, polygon) features. An
+    area whose source file is missing gets no polygons, so its flag is
+    all-False rather than failing the export.
     """
-    if not geojson_path or not Path(geojson_path).exists():
-        return []
-    data = json.loads(Path(geojson_path).read_text())
-    return [shape(f["geometry"]) for f in data.get("features", []) if f.get("geometry")]
+    return [
+        (area, load_area_features(area.source, area.feature) if Path(area.source).exists() else [])
+        for area in areas
+    ]
+
+
+def area_keys(flags: dict[str, pl.Series], height: int) -> pl.Series:
+    """The keys of every area flagged True on each row, in config order."""
+    if not flags:
+        return pl.Series("areas", [[]] * height, dtype=pl.List(pl.String))
+    keys = pl.DataFrame(flags).select(
+        areas=pl.concat_list(
+            pl.when(pl.col(key)).then(pl.lit(key)).otherwise(pl.lit(None, pl.String)) for key in flags
+        ).list.drop_nulls()
+    )
+    return keys["areas"]
+
+
+def _overlay_feature_collection(loaded: list[tuple[OverlayArea, list]]) -> dict:
+    """Every overlay polygon, tagged with its area key and its label: the
+    feature's own name (one per Village Plan Area) or else the area's name.
+    """
+    features = [
+        {
+            "type": "Feature",
+            "geometry": _round_geometry(mapping(geom)),
+            "properties": {"area": area.key, "name": label or area.name},
+        }
+        for area, parts in loaded
+        for label, geom in parts
+    ]
+    return {"type": "FeatureCollection", "features": features}
 
 
 def flag_points_in_polygons(points_df: pl.DataFrame, polygons: list) -> pl.Series:
     """True where a building's point falls inside (or right on the edge of)
     any of `polygons` — the same STRtree point-in-polygon technique as
     resolve_local_area_from_block_numbers above, used here to flag buildings
-    within a boundary overlay (e.g. Chinatown) rather than to resolve a
+    within an overlay area (e.g. Chinatown) rather than to resolve a
     neighbourhood label.
     """
     flags = [False] * points_df.height
@@ -754,6 +784,7 @@ def reconstruct_filter_config(
     points_df: pl.DataFrame,
     blocks_df: pl.DataFrame,
     now: datetime,
+    overlay_areas: list[OverlayArea] = (),
 ) -> dict[str, object]:
     cfg: dict[str, object] = {}
 
@@ -783,26 +814,25 @@ def reconstruct_filter_config(
         for area, count, units in neighbourhoods.iter_rows()
     ]
 
-    # Chinatown/Villages Plan Areas: rendered as two more Filters >
-    # Neighbourhoods entries after a separator (see legend.ts), not folded
-    # into cfg["neighbourhoods"] above since they're boundary overlays a
-    # building can belong to *in addition to* its real local_area, not an
+    # Overlay areas (Chinatown, DEOD, Villages Plan): rendered as more
+    # Filters > Neighbourhoods entries after a separator (see legend.ts), not
+    # folded into cfg["neighbourhoods"] above since they're boundary overlays
+    # a building can belong to *in addition to* its real local_area, not an
     # alternative value of it.
-    def _special_area(key: str, name: str, flag_col: str) -> dict:
-        if flag_col not in buildings_only.columns:
-            return {"key": key, "name": name, "count": 0, "units": 0}
-        flagged = buildings_only.filter(pl.col(flag_col))
+    def _special_area(area: OverlayArea) -> dict:
+        flagged = (
+            buildings_only.filter(pl.col("areas").list.contains(area.key))
+            if "areas" in buildings_only.columns
+            else buildings_only.clear()
+        )
         return {
-            "key": key,
-            "name": name,
+            "key": area.key,
+            "name": area.name,
             "count": flagged.height,
             "units": int(round(flagged["units"].sum())) if flagged.height else 0,
         }
 
-    cfg["special_areas"] = [
-        _special_area("chinatown", "Chinatown", "in_chinatown"),
-        _special_area("village-plan", "Villages Plan", "in_village_plan"),
-    ]
+    cfg["special_areas"] = [_special_area(area) for area in overlay_areas]
 
     valid_coords = pts.drop_nulls(["lat", "lon"])
     bounds = None
@@ -886,8 +916,7 @@ def export_artifacts(
     out_dir: str | Path,
     pid_address_map_path: str | None = None,
     boundary_geojson_path: str | None = None,
-    villages_geojson_path: str | None = None,
-    chinatown_geojson_path: str | None = None,
+    overlay_areas: list[OverlayArea] = (),
     now: datetime | None = None,
     property_managers_path: str | None = None,
 ) -> None:
@@ -908,25 +937,28 @@ def export_artifacts(
         load_listing_aliases(property_managers_path),
     )
 
-    # Chinatown/Villages Plan Areas double as filterable "special areas"
-    # (Filters > Neighbourhoods, after the separator) alongside local_area —
-    # a building/block can be in a real neighbourhood *and* one of these
-    # overlays at once, so they're flags of their own rather than folded
-    # into local_area.
-    chinatown_polygons = load_boundary_polygons(chinatown_geojson_path)
-    village_polygons = load_boundary_polygons(villages_geojson_path)
+    # Overlay areas (Chinatown, DEOD, Villages Plan) double as filterable
+    # "special areas" (Filters > Neighbourhoods, after the separator)
+    # alongside local_area — a building/block can be in a real neighbourhood
+    # *and* any of these at once, so each row carries the list of areas it's
+    # in rather than having them folded into local_area.
+    loaded_areas = load_overlay_areas(list(overlay_areas))
+    polygons = {area.key: [geom for _, geom in parts] for area, parts in loaded_areas}
     points_df = points_df.with_columns(
-        in_chinatown=flag_points_in_polygons(points_df, chinatown_polygons),
-        in_village_plan=flag_points_in_polygons(points_df, village_polygons),
+        areas=area_keys(
+            {k: flag_points_in_polygons(points_df, polys) for k, polys in polygons.items()}, points_df.height
+        )
     )
 
     blocks_df = reconstruct_blocks(conn, points_df)
     blocks_df = blocks_df.with_columns(
-        in_chinatown=flag_geoms_intersecting_polygons(blocks_df["geom_parsed"], chinatown_polygons),
-        in_village_plan=flag_geoms_intersecting_polygons(blocks_df["geom_parsed"], village_polygons),
+        areas=area_keys(
+            {k: flag_geoms_intersecting_polygons(blocks_df["geom_parsed"], polys) for k, polys in polygons.items()},
+            blocks_df.height,
+        )
     )
 
-    filter_cfg = reconstruct_filter_config(conn, points_df, blocks_df, now)
+    filter_cfg = reconstruct_filter_config(conn, points_df, blocks_df, now, list(overlay_areas))
     building_payload, network_payload, median_share = _contract_records(conn, points_df)
     filter_cfg["land_share_median"] = median_share
 
@@ -950,15 +982,7 @@ def export_artifacts(
             boundary_geojson_path, out_dir / "local-area-boundary.geojson"
         )
 
-    if villages_geojson_path:
-        shutil.copyfile(
-            villages_geojson_path, out_dir / "villages_plan_areas.geojson"
-        )
-
-    if chinatown_geojson_path:
-        shutil.copyfile(
-            chinatown_geojson_path, out_dir / "chinatown_boundary.geojson"
-        )
+    _write_json(out_dir / "overlay_areas.geojson", _overlay_feature_collection(loaded_areas))
 
 
 def _write_json(path: Path, payload: object) -> None:
@@ -974,8 +998,7 @@ def _blocks_feature_collection(blocks_df: pl.DataFrame) -> dict:
         "median_year_built",
         "local_area",
         "block_label",
-        "in_chinatown",
-        "in_village_plan",
+        "areas",
     ]
     property_cols = [col for col in property_cols if col in blocks_df.columns]
     features = []

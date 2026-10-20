@@ -4,7 +4,7 @@ import type { MetricSummary } from './metric-format';
 
 export interface Threshold { min: number | null; max: number | null }
 export interface FilterState {
-  /** lowercased area keys, incl. 'chinatown' / 'village-plan'; [] = every area */
+  /** lowercased area keys, incl. overlay area keys ('chinatown', 'deod', 'village-plan'); [] = every area */
   hoods: string[];
   housing: string[];
   landlords: PickOption[];

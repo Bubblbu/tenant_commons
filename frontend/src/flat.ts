@@ -15,7 +15,7 @@ export const FLAT_COLUMNS = [
   'network_evidence_registry', 'network_evidence_city', 'network_evidence_research',
   'pids', 'registry_no_filing', 'value_land', 'value_bldg', 'bldg_land_ratio', 'land_share_pctl',
   'housing_type', 'rezoning_status', 'n_issues', 'issues_details',
-  'in_chinatown', 'in_village_plan', 'lat', 'lon',
+  'areas', 'lat', 'lon',
 ];
 
 const first = (b: Building, role: Party['role']): Party | null => b.parties.find((p) => p.role === role) ?? null;
@@ -59,8 +59,7 @@ export function flatten(b: Building, networks: Record<string, Network>): Buildin
     rezoning_status: b.rezoning?.status ?? null,
     n_issues: b.issues?.count ?? null,
     issues_details: b.issues?.url ?? null,
-    in_chinatown: b.in_chinatown,
-    in_village_plan: b.in_village_plan,
+    areas: b.areas.length ? b.areas.join('; ') : null,
     lat: b.lat,
     lon: b.lon,
   };

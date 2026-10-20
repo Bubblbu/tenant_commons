@@ -20,7 +20,7 @@ describe('filterFields', () => {
       network_key: 'nw<1>', network_name: 'N', managed_by: 'Tribe Management',
       housing_type: 'co-op, sro', n_issues: 2.7, units: 12.9, year_built: 1965,
       value_land: 1234567.5, value_bldg: null, bldg_land_ratio: 0.12345,
-      in_chinatown: true, in_village_plan: false,
+      areas: 'chinatown; deod',
     };
     const f = filterFields(r);
     const row = renderedRow(r);
@@ -30,8 +30,7 @@ describe('filterFields', () => {
     expect(a('owner')).toBe(f.owner);
     expect(a('network')).toBe(f.network);
     expect(a('manager')).toBe(f.manager);
-    expect(a('chinatown')).toBe(f.chinatown ? '1' : '');
-    expect(a('village')).toBe(f.village ? '1' : '');
+    expect(a('areas')).toBe(f.areas.join(' '));
     expect(a('has-owner')).toBe(f.hasOwner ? '1' : '');
     expect(a('n-issues')).toBe(attrOf(f.nIssues));
     expect((a('housing-type') ?? '').split(',').map((t) => t.trim()).filter(Boolean)).toEqual(f.housingTypes);

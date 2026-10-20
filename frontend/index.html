@@ -766,8 +766,7 @@
       <div class="legend-heading">Boundaries</div>
       <div class="legend-key">
         <div class="legend-key-row"><span class="legend-swatch" style="background:transparent;border:2px solid #ff8c00;"></span> Neighbourhoods</div>
-        <div class="legend-key-row"><span class="legend-swatch" style="background:transparent;border:2px solid #c0392b;"></span> Chinatown</div>
-        <div class="legend-key-row"><span class="legend-swatch" style="background:transparent;border:2px dashed #7b3fa0;"></span> Village Plan Area</div>
+        <div id="legend-overlay-rows"></div>
       </div>
       <div class="legend-note">Villages Planning Program boundary is hand-traced from the City's reference map, approximate.</div>
     </div>
@@ -1244,7 +1243,7 @@
     color: #777;
   }
 
-  /* Separates Chinatown/Villages Plan (boundary overlays) from the real
+  /* Separates the overlay areas (Chinatown, DEOD, ...) from the real
      neighbourhoods above them in the same checkbox list — same list/class
      (so the Area Clear button still covers them), visually set apart since
      they're a different kind of "area" a building can belong to. */
@@ -1653,10 +1652,8 @@
           <label><input type="checkbox" id="viz-show-empty-blocks"> Include empty blocks</label>
         </div>
         <label><input type="checkbox" id="viz-show-neighbourhoods" checked> Neighbourhood boundaries</label>
-        <div class="display-children" data-parent="viz-show-neighbourhoods">
-          <label><input type="checkbox" id="viz-show-chinatown" checked> Chinatown</label>
-          <label><input type="checkbox" id="viz-show-villages"> Villages Plan</label>
-        </div>
+        <!-- One toggle per overlay area (Chinatown, DEOD, ...), rendered by legend.ts. -->
+        <div class="display-children" data-parent="viz-show-neighbourhoods" id="viz-overlay-areas"></div>
       </div>
     </section>
     <section class="panel-group">

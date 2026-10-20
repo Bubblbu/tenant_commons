@@ -1,15 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import { areaBounds, geometryBounds, selectionBounds, type LatLonBounds } from './initial-view';
-import type { BoundaryCollection } from './types';
+import type { BoundaryCollection, OverlayCollection } from './types';
 
 const square = (lon0: number, lat0: number, lon1: number, lat1: number) => ({
   type: 'Polygon' as const,
   coordinates: [[[lon0, lat0], [lon1, lat0], [lon1, lat1], [lon0, lat1], [lon0, lat0]]],
 });
 
-const fc = (...features: { name?: string; geometry: ReturnType<typeof square> }[]): BoundaryCollection => ({
+const fc = (...features: { name?: string; area?: string; geometry: ReturnType<typeof square> }[]): BoundaryCollection => ({
   type: 'FeatureCollection',
-  features: features.map((f) => ({ type: 'Feature', properties: { name: f.name }, geometry: f.geometry })),
+  features: features.map((f) => ({ type: 'Feature', properties: { name: f.name, ...(f.area ? { area: f.area } : {}) }, geometry: f.geometry })),
 });
 
 describe('geometryBounds', () => {
@@ -28,11 +28,14 @@ describe('geometryBounds', () => {
 });
 
 describe('areaBounds', () => {
-  it('keys neighbourhoods by lowercased name and the special areas by filter key', () => {
+  it('keys neighbourhoods by lowercased name and the overlay areas by their key', () => {
     const areas = areaBounds(
       fc({ name: 'West End', geometry: square(0, 0, 1, 1) }),
-      fc({ geometry: square(5, 5, 6, 6) }),
-      fc({ name: 'A', geometry: square(7, 7, 8, 8) }, { name: 'B', geometry: square(9, 9, 10, 10) }),
+      fc(
+        { area: 'chinatown', name: 'Chinatown', geometry: square(5, 5, 6, 6) },
+        { area: 'village-plan', name: 'A', geometry: square(7, 7, 8, 8) },
+        { area: 'village-plan', name: 'B', geometry: square(9, 9, 10, 10) },
+      ) as unknown as OverlayCollection,
     );
     expect(areas.get('west end')).toEqual([[0, 0], [1, 1]]);
     expect(areas.get('chinatown')).toEqual([[5, 5], [6, 6]]);

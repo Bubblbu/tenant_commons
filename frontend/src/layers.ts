@@ -2,11 +2,10 @@
 import type { PathOptions } from 'leaflet';
 import * as L from 'leaflet';
 import { blockPopupHtml, blockStyle, maxTotalUnits } from './blocks';
-import { CHINATOWN_LABEL, CHINATOWN_STYLE, chinatownLabelHtml } from './chinatown';
 import { RING_OPACITY, RING_SPACING, RING_WEIGHT, ringColor, type RingType, type StyledMarker } from './markers';
 import { NEIGHBOURHOOD_STYLE, labelPosition, neighbourhoodLabelHtml } from './neighbourhoods';
-import type { BlocksCollection, BoundaryCollection, BoundaryProperties, VillagesCollection } from './types';
-import { VILLAGE_STYLE, villageLabelHtml } from './villages';
+import { overlayLabelHtml, overlayLook, overlayPathOptions } from './overlays';
+import type { BlocksCollection, BoundaryCollection, BoundaryProperties, OverlayCollection, SpecialAreaSummary } from './types';
 
 export function createBlocksLayer(fc: BlocksCollection): L.GeoJSON {
   const maxUnits = maxTotalUnits(fc);
@@ -20,9 +19,8 @@ export function createBlocksLayer(fc: BlocksCollection): L.GeoJSON {
 
 /**
  * One outline + one name label per feature — the shape shared by
- * neighbourhoods, villages and the Chinatown boundary. `labelName` picks
- * the label text off each feature's properties (or ignores them, for a
- * fixed label like Chinatown's).
+ * neighbourhoods and the overlay areas. `labelName` picks the label text
+ * off each feature's properties.
  */
 function createBoundaryLayer(
   fc: BoundaryCollection,
@@ -70,13 +68,26 @@ export function createNeighbourhoodsLayer(fc: BoundaryCollection, renderer: L.Re
   return createBoundaryLayer(fc, NEIGHBOURHOOD_STYLE, neighbourhoodLabelHtml, nameProperty, renderer);
 }
 
-export function createVillagesLayer(fc: VillagesCollection, renderer: L.Renderer): L.FeatureGroup {
-  return createBoundaryLayer(fc, VILLAGE_STYLE, villageLabelHtml, nameProperty, renderer);
-}
-
-/** The source file carries no per-feature name, so every feature gets the same fixed label. */
-export function createChinatownLayer(fc: BoundaryCollection, renderer: L.Renderer): L.FeatureGroup {
-  return createBoundaryLayer(fc, CHINATOWN_STYLE, chinatownLabelHtml, () => CHINATOWN_LABEL, renderer);
+/** One layer per overlay area that has polygons, keyed by area, coloured by its place in `areas`. */
+export function createOverlayLayers(
+  fc: OverlayCollection,
+  areas: SpecialAreaSummary[] | undefined,
+  renderer: L.Renderer,
+): Record<string, L.FeatureGroup> {
+  const layers: Record<string, L.FeatureGroup> = {};
+  (areas ?? []).forEach((area, i) => {
+    const features = fc.features.filter((f) => f.properties?.area === area.key);
+    if (features.length === 0) return;
+    const look = overlayLook(area.key, i);
+    layers[area.key] = createBoundaryLayer(
+      { type: 'FeatureCollection', features } as BoundaryCollection,
+      overlayPathOptions(look),
+      (name) => overlayLabelHtml(name, look.color),
+      nameProperty,
+      renderer,
+    );
+  });
+  return layers;
 }
 
 export interface BuildingLayers {

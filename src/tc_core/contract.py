@@ -12,7 +12,7 @@ from typing import Annotated, Literal
 
 from pydantic import AfterValidator, BaseModel, ConfigDict, Field, Strict
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 
 _SENTINELS = {"(unknown)", "unknown"}
 
@@ -106,8 +106,9 @@ class Building(_Model):
     block_id: Int | None
     lat: float | None
     lon: float | None
-    in_chinatown: bool
-    in_village_plan: bool
+    # Keys of the overlay areas (config.toml's [[overlay_areas]]) the
+    # building is in, e.g. ["chinatown"]; filter_config's special_areas names them.
+    areas: list[Text]
     units: Int | None
     units_basis: Literal["inventory", "licence_fee", "sro_rooms"] | None
     year_built: Int | None
@@ -160,12 +161,12 @@ class Network(_Model):
 
 
 class BuildingRecordsFile(_Model):
-    schema_version: Literal[2]
+    schema_version: Literal[3]
     records: dict[str, Building]
 
 
 class NetworksFile(_Model):
-    schema_version: Literal[2]
+    schema_version: Literal[3]
     networks: dict[str, Network]
 
 

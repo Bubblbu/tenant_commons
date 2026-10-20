@@ -9,24 +9,22 @@ import type { FilterState } from './filter-state';
 
 export interface MetricSpec { key: string; attr: string; bins: { start: number; end: number }[] }
 export interface FilterResult { visible: Set<string>; binCounts: Record<string, number[]> }
-export interface BlockFields { id: string; area: string; chinatown: boolean; village: boolean; buildingIds: string[] }
+export interface BlockFields { id: string; area: string; areas: string[]; buildingIds: string[] }
 
 /**
- * No area ticked means every area. Chinatown and the Villages Plan areas are
- * flags a building carries alongside its own local_area, so a row matches if
- * its area is ticked OR it is flagged for a ticked special area.
+ * No area ticked means every area. Overlay areas (Chinatown, DEOD, the
+ * Villages Plan) are keys a building carries alongside its own local_area,
+ * so a row matches if its area is ticked OR any of its overlay areas is.
  */
-export function areaMatches(hoods: string[], area: string, chinatown: boolean, village: boolean): boolean {
+export function areaMatches(hoods: string[], area: string, areas: string[]): boolean {
   if (hoods.length === 0) return true;
   if (hoods.includes(area)) return true;
-  if (chinatown && hoods.includes('chinatown')) return true;
-  if (village && hoods.includes('village-plan')) return true;
-  return false;
+  return areas.some((key) => hoods.includes(key));
 }
 
 /** Every filter except the per-metric thresholds. */
 function baseMatches(f: FilterFields, s: FilterState): boolean {
-  if (!areaMatches(s.hoods, f.area, f.chinatown, f.village)) return false;
+  if (!areaMatches(s.hoods, f.area, f.areas)) return false;
   if (s.landlords.length > 0 && !selectionMatches(s.landlords, f)) return false;
   if (s.onlyIssues && !(f.nIssues !== null && f.nIssues > 0)) return false;
   if (s.housing.length > 0 && !s.housing.some((t) => f.housingTypes.includes(t))) return false;
@@ -84,7 +82,7 @@ export function filterBuildings(fields: FilterFields[], state: FilterState, metr
 export function blockVisibility(blocks: BlockFields[], visible: Set<string>, hoods: string[], showEmpty: boolean): Set<string> {
   const hidden = new Set<string>();
   for (const b of blocks) {
-    const hoodMatch = areaMatches(hoods, b.area, b.chinatown, b.village);
+    const hoodMatch = areaMatches(hoods, b.area, b.areas);
     const hide = b.buildingIds.length === 0
       ? !showEmpty || !hoodMatch
       : !b.buildingIds.some((id) => visible.has(id)) || !hoodMatch;

@@ -13,7 +13,7 @@ import type {
   FilterConfig,
   MapArtifacts,
   MarkerRecord,
-  VillagesCollection,
+  OverlayCollection,
 } from './types';
 
 export class ArtifactError extends Error {
@@ -58,27 +58,25 @@ export function buildingViews(
 }
 
 export async function loadMapArtifacts(): Promise<MapArtifacts> {
-  const [filterConfig, markerMetadata, blocks, boundaries, villages, chinatown] = await Promise.all([
+  const [filterConfig, markerMetadata, blocks, boundaries, overlays] = await Promise.all([
     fetchJson('filter_config.json'),
     fetchJson('marker_metadata.json'),
     fetchJson('blocks.geojson'),
     fetchJson('local-area-boundary.geojson'),
-    fetchJson('villages_plan_areas.geojson'),
-    fetchJson('chinatown_boundary.geojson'),
+    fetchJson('overlay_areas.geojson'),
   ]);
   checkSchemaVersion('filter_config.json', filterConfig);
   checkSchemaVersion('marker_metadata.json', markerMetadata);
   checkSchemaVersion('blocks.geojson', blocks);
-  // local-area-boundary.geojson, villages_plan_areas.geojson and
-  // chinatown_boundary.geojson are passed through unchanged (the City's
-  // file; two hand-curated reference layers); none carry a schema_version.
+  // local-area-boundary.geojson is the City's file passed through unchanged,
+  // and overlay_areas.geojson a plain FeatureCollection; neither carries a
+  // schema_version.
   return {
     filterConfig: filterConfig as FilterConfig,
     markers: (markerMetadata as { markers: MarkerRecord[] }).markers,
     blocks: blocks as BlocksCollection,
     boundaries: boundaries as BoundaryCollection,
-    villages: villages as VillagesCollection,
-    chinatown: chinatown as BoundaryCollection,
+    overlays: overlays as OverlayCollection,
   };
 }
 

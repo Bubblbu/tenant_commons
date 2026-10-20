@@ -58,7 +58,7 @@ def test_marker_metadata_carries_coordinates(tmp_path):
     export_artifacts(conn, tmp_path)
 
     meta = json.loads((tmp_path / "marker_metadata.json").read_text())
-    assert meta["schema_version"] == 2
+    assert meta["schema_version"] == 3
     record = meta["markers"][0]
     assert record["lat"] == 49.28
     assert record["lon"] == -123.1
@@ -288,3 +288,69 @@ def test_networks_json_is_the_public_contract(tmp_path):
     export_artifacts(conn, tmp_path)
 
     NetworksFile.model_validate_json((tmp_path / "networks.json").read_text())
+
+def _square(lon, lat, d):
+    return {"type": "Polygon", "coordinates": [[[lon, lat], [lon + d, lat], [lon + d, lat + d], [lon, lat + d], [lon, lat]]]}
+
+
+def test_buildings_and_blocks_list_the_overlay_areas_they_are_in(tmp_path):
+    import geopandas
+    from shapely.geometry import Polygon, shape
+
+    from tc_core.overlay_areas import OverlayArea
+
+    conn = sqlite3.connect(":memory:")
+    init_db(conn)
+    _seed(conn)  # one building at (49.28, -123.1)
+    # A projected shapefile like raw/boundaries/DTES_sub_zoning: named zones,
+    # BC Albers, one with a self-intersecting (bow-tie) ring.
+    zones = geopandas.GeoDataFrame(
+        {"name": ["Here", "Elsewhere", "Bowtie"]},
+        geometry=[
+            shape(_square(-123.11, 49.27, 0.02)),
+            shape(_square(-123.19, 49.21, 0.01)),
+            Polygon([(-123.5, 49.0), (-123.4, 49.1), (-123.4, 49.0), (-123.5, 49.1)]),
+        ],
+        crs="EPSG:4326",
+    ).to_crs("EPSG:3005")
+    shp = tmp_path / "zones.shp"
+    zones.to_file(shp)
+    areas = [
+        OverlayArea("here", "Here Zone", str(shp), "Here"),
+        OverlayArea("elsewhere", "Elsewhere", str(shp), "Elsewhere"),
+        OverlayArea("bowtie", "Bowtie", str(shp), "Bowtie"),
+        OverlayArea("absent", "Absent", str(tmp_path / "missing.shp")),
+    ]
+    out = tmp_path / "out"
+
+    export_artifacts(conn, out, overlay_areas=areas)
+
+    [building] = json.loads((out / "building_records.json").read_text())["records"].values()
+    assert building["areas"] == ["here"]
+    [block] = json.loads((out / "blocks.geojson").read_text())["features"]
+    assert block["properties"]["areas"] == ["here", "elsewhere"]  # the block spans both
+    special = json.loads((out / "filter_config.json").read_text())["special_areas"]
+    assert [(a["key"], a["name"], a["count"]) for a in special] == [
+        ("here", "Here Zone", 1), ("elsewhere", "Elsewhere", 0), ("bowtie", "Bowtie", 0), ("absent", "Absent", 0),
+    ]
+    overlay = json.loads((out / "overlay_areas.geojson").read_text())
+    assert [(f["properties"]["area"], f["properties"]["name"]) for f in overlay["features"]] == [
+        ("here", "Here"), ("elsewhere", "Elsewhere"), ("bowtie", "Bowtie"),
+    ]
+    assert all(shape(f["geometry"]).is_valid for f in overlay["features"])
+
+
+def test_an_overlay_area_naming_a_missing_feature_fails_loudly(tmp_path):
+    import pytest
+
+    from tc_core.overlay_areas import OverlayArea
+
+    src = tmp_path / "zones.geojson"
+    src.write_text(json.dumps({"type": "FeatureCollection", "features": [
+        {"type": "Feature", "properties": {"name": "Gastown"}, "geometry": _square(-123.11, 49.28, 0.01)},
+    ]}))
+    conn = sqlite3.connect(":memory:")
+    init_db(conn)
+    _seed(conn)
+    with pytest.raises(ValueError, match="Chinatwon"):
+        export_artifacts(conn, tmp_path / "out", overlay_areas=[OverlayArea("ct", "Chinatown", str(src), "Chinatwon")])

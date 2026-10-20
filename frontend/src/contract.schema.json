@@ -14,6 +14,13 @@
           "title": "Also Known As",
           "type": "array"
         },
+        "areas": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Areas",
+          "type": "array"
+        },
         "block_id": {
           "anyOf": [
             {
@@ -38,14 +45,6 @@
         "id": {
           "title": "Id",
           "type": "integer"
-        },
-        "in_chinatown": {
-          "title": "In Chinatown",
-          "type": "boolean"
-        },
-        "in_village_plan": {
-          "title": "In Village Plan",
-          "type": "boolean"
         },
         "issues": {
           "anyOf": [
@@ -237,8 +236,7 @@
         "block_id",
         "lat",
         "lon",
-        "in_chinatown",
-        "in_village_plan",
+        "areas",
         "units",
         "units_basis",
         "year_built",
@@ -266,7 +264,7 @@
           "type": "object"
         },
         "schema_version": {
-          "const": 2,
+          "const": 3,
           "title": "Schema Version",
           "type": "integer"
         }
@@ -524,7 +522,7 @@
           "type": "object"
         },
         "schema_version": {
-          "const": 2,
+          "const": 3,
           "title": "Schema Version",
           "type": "integer"
         }

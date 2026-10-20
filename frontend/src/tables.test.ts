@@ -19,7 +19,7 @@ describe('buildingRow', () => {
     }));
     expect(row).toBe(
       '<tr data-bid="7" data-owner="example-holdings" data-network="example-group" data-manager="" data-block="3" data-area="West End" ' +
-        'data-chinatown="" data-village="" ' +
+        'data-areas="" ' +
         'data-value-land="5000000" data-value-bldg="800000" data-value-ratio="0.16" data-units="40" ' +
         'data-year-built="1965" data-search="12 oak &amp; elm st west end 40 example &quot;holdings&quot; example group sro" ' +
         'data-housing-type="sro" data-n-issues="" data-has-owner="1">' +
@@ -96,10 +96,10 @@ describe('buildingRow', () => {
     expect(buildingRow(rec({ b_id: 12 }))).toContain('data-n-issues=""');
   });
 
-  it('carries the Chinatown/Villages Plan boundary flags for the neighbourhood filter', () => {
-    expect(buildingRow(rec({ b_id: 13, in_chinatown: true }))).toContain('data-chinatown="1" data-village=""');
-    expect(buildingRow(rec({ b_id: 14, in_village_plan: true }))).toContain('data-chinatown="" data-village="1"');
-    expect(buildingRow(rec({ b_id: 15 }))).toContain('data-chinatown="" data-village=""');
+  it('carries the overlay areas for the neighbourhood filter', () => {
+    expect(buildingRow(rec({ b_id: 13, areas: 'chinatown' }))).toContain('data-areas="chinatown"');
+    expect(buildingRow(rec({ b_id: 14, areas: 'chinatown; deod' }))).toContain('data-areas="chinatown deod"');
+    expect(buildingRow(rec({ b_id: 15 }))).toContain('data-areas=""');
   });
 });
 
@@ -127,11 +127,11 @@ describe('blockRowsHtml', () => {
     expect(html).toContain('<td data-sort-value="1966">1966</td>'); // 1966.5 -> 1966 (half to even)
   });
 
-  it('carries the Chinatown/Villages Plan boundary flags', () => {
+  it('carries the overlay areas', () => {
     const fc = { type: 'FeatureCollection', schema_version: 1, features: [
-      { type: 'Feature', geometry: null, properties: { block_id: 1, block_label: 'B-01', local_area: null, buildings: 0, total_units: 0, median_year_built: null, in_chinatown: true, in_village_plan: false } },
+      { type: 'Feature', geometry: null, properties: { block_id: 1, block_label: 'B-01', local_area: null, buildings: 0, total_units: 0, median_year_built: null, areas: ['deod'] } },
     ] } as unknown as BlocksCollection;
-    expect(blockRowsHtml(fc)).toContain('data-chinatown="1" data-village=""');
+    expect(blockRowsHtml(fc)).toContain('data-areas="deod"');
   });
 });
 

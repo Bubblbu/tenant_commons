@@ -6,7 +6,7 @@ Everything under `data/` is ignored by git except this README and the
 | Folder | Meaning |
 |---|---|
 | `raw/` | As received from the source. Never hand-edited. One folder per source, each with a `MANIFEST.md`. |
-| `curated/` | Hand-authored: `ownership_claims.csv`, `property_managers.toml`, `landlord_mapping.toml` (retired 2026-09-24: its groupings live in `ownership_claims.csv`; kept for history), `chinatown_boundary.geojson`, `villages_plan_areas.{geojson,shp,...}`. No backup in git — keep your own copy. |
+| `curated/` | Hand-authored: `ownership_claims.csv`, `property_managers.toml`, `landlord_mapping.toml` (retired 2026-09-24: its groupings live in `ownership_claims.csv`; kept for history), `chinatown_boundary.geojson` (retired 2026-10-20: the map's Chinatown is the polygon in `raw/boundaries/DTES_sub_zoning`; kept for history), `villages_plan_areas.{geojson,shp,...}`. No backup in git — keep your own copy. |
 | `derived/` | Regenerable by scripts; safe to delete and rebuild. Includes the SQLite db. |
 | `exports/` | Reserved for what leaves the pipeline. The map's feed is `derived/artifacts/`. |
 

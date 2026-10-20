@@ -9,7 +9,7 @@ def row(**kw):
     base = dict(
         b_id=7, source="building", address="396 e 2nd ave", building_name=None, other_names=[],
         local_area="Mount Pleasant", block_id=12, lat=49.27, lon=-123.09,
-        in_chinatown=False, in_village_plan=False, units=53, building_source="rental inventory",
+        areas=[], units=53, building_source="rental inventory",
         year_built=1978.0, value_land=18949000.0, value_bldg=534000.0, n_issues=None,
         issues_details=None, network_key="unknown", network_source=None,
         registry_owner_pids=[], registry_no_filing=None, registry_retrieved=None,

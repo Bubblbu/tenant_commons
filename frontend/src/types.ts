@@ -26,9 +26,10 @@ export interface NeighbourhoodSummary {
   units: number;
 }
 
-/** Chinatown / Villages Plan Areas — boundary overlays a building can belong
- * to in addition to (not instead of) its local_area. Rendered as two more
- * Filters > Neighbourhoods entries, after a separator. */
+/** Overlay areas (config.toml's [[overlay_areas]]: Chinatown, DEOD, the
+ * Villages Plan) — boundaries a building can belong to in addition to (not
+ * instead of) its local_area. Rendered as more Filters > Neighbourhoods
+ * entries, after a separator, in this order. */
 export interface SpecialAreaSummary {
   key: string;
   name: string;
@@ -68,8 +69,8 @@ export interface BlockProperties {
   buildings: number | null;
   total_units: number | null;
   median_year_built: number | null;
-  in_chinatown?: boolean | null;
-  in_village_plan?: boolean | null;
+  /** Overlay area keys the block's outline overlaps. */
+  areas?: string[] | null;
 }
 
 export type BlocksCollection = FeatureCollection<Geometry, BlockProperties> & { schema_version: number };
@@ -82,8 +83,15 @@ export interface BoundaryProperties {
 
 export type BoundaryCollection = FeatureCollection<Geometry, BoundaryProperties>;
 
-/** villages_plan_areas.geojson: same shape as a boundary collection (name + polygon), no geo_point_2d. */
-export type VillagesCollection = BoundaryCollection;
+export interface OverlayProperties {
+  /** The overlay area's key (a special_areas key). */
+  area: string;
+  /** The label: the feature's own name (one per Village Plan Area) or the area's. */
+  name: string;
+}
+
+/** overlay_areas.geojson: every overlay area's polygons, tagged by area. */
+export type OverlayCollection = FeatureCollection<Geometry, OverlayProperties>;
 
 /** What the map draws: small enough to fetch before anything else. */
 export interface MapArtifacts {
@@ -91,8 +99,7 @@ export interface MapArtifacts {
   markers: MarkerRecord[];
   blocks: BlocksCollection;
   boundaries: BoundaryCollection;
-  villages: VillagesCollection;
-  chinatown: BoundaryCollection;
+  overlays: OverlayCollection;
 }
 
 /** The building records and networks: the popup, tables and filters read these. */
