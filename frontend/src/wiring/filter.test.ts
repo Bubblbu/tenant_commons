@@ -117,6 +117,13 @@ describe('classification filters', () => {
       { ownerTypes: ['private'], legalForms: ['numbered_company'] })).toBe(false);
   });
 
+  it('legal form leaves the other chosen owner types alone', () => {
+    const state = { ownerTypes: ['private', 'non_profit'], legalForms: ['company'] };
+    expect(pass({ ownerTypes: ['non_profit'] }, state)).toBe(true);
+    expect(pass({ ownerTypes: ['private'], legalForms: ['numbered_company'] }, state)).toBe(false);
+    expect(pass({ ownerTypes: ['non_profit', 'private'], legalForms: ['numbered_company'] }, state)).toBe(true);
+  });
+
   it('include inferred off drops inferred owner types and market values', () => {
     expect(pass({ ownerTypes: ['private'], ownerInferred: true }, { ownerTypes: ['private'], includeInferred: false })).toBe(false);
     expect(pass({ market: 'market', marketInferred: true }, { market: ['market'], includeInferred: false })).toBe(false);

@@ -31,11 +31,15 @@ _NAME_RULES: list[tuple[str, re.Pattern[str]]] = [
         r"^province of british columbia$|board of parks and recreation|^school district",
         re.I)),
     ("coop", re.compile(r"\bco-?op(erative)?\b", re.I)),
-    ("non_profit", re.compile(
-        r"\b(society|foundation|association|church|parish|diocese|synod|ywca|ymca|benevolen(t|ce)|legion|"
-        r"young (wo)?men'?s christian association)\b", re.I)),
     ("numbered_company", re.compile(
         r"^\d{6,}\s*(b\.?\s*c\.?|british columbia)\s*(ltd|limited|inc|corp)", re.I)),
+    # A corporate suffix outweighs an organisation word ("Foundation
+    # Enterprises Ltd"), unless the name says society or association.
+    ("company", re.compile(
+        r"^(?!.*\b(society|association)\b).*\b(ltd|limited|inc|incorporated|corp|corporation)\.?$", re.I)),
+    ("non_profit", re.compile(
+        r"\b(society|societe|foundation|association|church|parish|diocese|synod|mission|ministr(y|ies)|habitation|"
+        r"ywca|ymca|benevolen(t|ce)|legion|young (wo)?men'?s christian association)\b", re.I)),
     ("partnership", re.compile(r"\b(limited partnership|partnership|l\.?p\.?)\s*$", re.I)),
     ("company", re.compile(r"\btrust company\b", re.I)),
     ("trust", re.compile(r"\btrust\b", re.I)),
@@ -50,7 +54,7 @@ _NAME_RULES: list[tuple[str, re.Pattern[str]]] = [
     # person written given-name first, as the old network kind guess had it.
     ("individual", re.compile(
         r"^(?!.*\b(housing|community|services?|centre|center|council|club|fund|residences?|estates?|"
-        r"place|court|manor|towers?|villa|alley|lodge|house|homes)\b)[A-Za-z'.-]+( [A-Za-z'.-]+){1,3}$",
+        r"place|court|manor|towers?|villa|alley|lodge|house|homes?|rentals?|living|wealth|capital)\b)[A-Za-z'.-]+( [A-Za-z'.-]+){1,3}$",
         re.I)),
 ]
 
@@ -218,12 +222,14 @@ def _owner_axis(
         value = OWNER_TYPE_OF_KIND[classify(operator.name).kind] if operator else "unknown"
         if value in ("non_profit", "coop", "government"):
             return OwnerAxis(value=value, basis=["non_market_list"], inferred=True)
+    # A property manager's licence says who runs the building, not who owns it.
     licensed = next((p for p in owners if p.sources[0].type == "licence"), None) or next(
-        (p for p in parties if p.role == "licensee"), None)
+        (p for p in parties if p.role == "licensee" and p.same_as != "manager"), None)
     if licensed:
         c = classify(licensed.name)
         value = OWNER_TYPE_OF_KIND[c.kind]
-        if value != "unknown":
+        # The City's non-market list outweighs a licence holder's name read as private.
+        if value != "unknown" and not (value == "private" and facts.on_non_market_list):
             forms = [c.kind] if value == "private" else []
             return OwnerAxis(value=value, legal_forms=forms, basis=_unique(["licence", c.basis]), inferred=True)
     return None

@@ -33,9 +33,10 @@ function baseMatches(f: FilterFields, s: FilterState): boolean {
   if (s.onlyOwned && !f.hasOwner) return false;
   if (s.ownerTypes.length > 0) {
     if (!s.includeInferred && f.ownerInferred) return false;
-    if (!s.ownerTypes.some((t) => f.ownerTypes.includes(t))) return false;
+    // Legal form narrows Private only; other chosen owner types match as they are.
+    const formMatches = s.legalForms.length === 0 || s.legalForms.some((t) => f.legalForms.includes(t));
+    if (!s.ownerTypes.some((t) => f.ownerTypes.includes(t) && (t !== 'private' || formMatches))) return false;
   }
-  if (s.legalForms.length > 0 && !s.legalForms.some((t) => f.legalForms.includes(t))) return false;
   if (s.market.length > 0) {
     if (!s.includeInferred && f.marketInferred) return false;
     if (!s.market.includes(f.market)) return false;

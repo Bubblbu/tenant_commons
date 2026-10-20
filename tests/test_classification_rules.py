@@ -175,3 +175,30 @@ def test_in_registry_knows_only_the_spelling_filed_with_the_registry():
                          filed={"Siddoo Kashmir Holdings Ltd"})
     assert c.in_registry("Siddoo Kashmir Holdings Ltd")
     assert not c.in_registry("Siddoo Kashmir Holding Limited") and not c.in_registry("Someone Else Ltd")
+
+
+@pytest.mark.parametrize("name, kind", [
+    ("Union Gospel Mission", "non_profit"),
+    ("Calling Ministries", "non_profit"),
+    ("Societe De Habitation Laverendrye", "non_profit"),
+    ("St. Luke's Home", "unknown"),
+    ("Foundation Enterprises Ltd", "company"),
+    ("Church Street Holdings Ltd", "company"),
+    ("Coast Foundation Society (1974)", "non_profit"),
+    ("Hollyburn Rentals", "unknown"),
+])
+def test_organisation_words_and_corporate_suffixes(name, kind):
+    assert kind_from_name(name) == kind
+
+
+def test_licence_fallback_never_makes_a_non_market_building_privately_held_by_a_person():
+    parties = [_p("licensee", "PAL Vancouver", "licence")]
+    c = classify_building(parties, CLASSIFY, BuildingFacts(on_non_market_list=True))
+    assert c.owner is None and c.market.value == "non_market"
+
+
+def test_a_property_managers_licence_says_nothing_about_the_owner():
+    parties = [_p("manager", "Tribe Rental Management Inc", "licence"),
+               _p("licensee", "Tribe Rental Management Inc", "licence", same_as="manager")]
+    c = classify_building(parties, CLASSIFY, BuildingFacts())
+    assert c.owner is None and c.market is None
