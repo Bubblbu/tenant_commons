@@ -87,6 +87,10 @@ Built with an eye toward generalizing to a broader `claims` pattern later (see "
 
 Every owner entity gets a kind (government / non-profit / co-op / individual / company / numbered company / trust / partnership) and every building an owner type, market status, operator type and scale (`metrics/sector.py`): from `entity_kind` claims, the registry's individual-or-corporation record, name rules, the City-owned properties list (`raw_city_owned_properties`, joined on a folio's land coordinate), and the co-op, SRO and non-market lists. The rental licence holder is a weaker signal, never the owner: anything not from title, a claim or City land is published as *inferred* with its basis. Nothing known is null. Exported in contract v5 (`Party.kind`, `Building.classification`, `NetworkTotals.assessed_value`); research CSVs via `uv run python scripts/classification_report.py`. See docs/superpowers/specs/2026-10-20-building-classification-design.md.
 
+### Housing facts (2026-10-20)
+
+Each building carries plain facts the City publishes, listed with their source and no derived categories (`metrics/housing.py`, contract v6 `Building.housing`): its 2024 rental licence type (Apartment house / Rooming house / 99-year lease — 2024 is the last year licences named the building type, and the only types published with addresses; `raw_licences_2024`), whether it is on the City's purpose-built rental list (FOI 2024-698, `raw_buildings.foi_release`), its zoning district, and for non-market housing the City's unit counts by clientele ("families" = units with 2+ bedrooms; seniors = 55+; other = single non-seniors) and operator (`raw_non_market`). Seniors housing = at least four fifths of units for seniors. Licences and projects match a building by any of its addresses. The popup shows Non-market / Seniors / Co-op / SRO badges and one facts line; Housing type chips filter on them. Organizers read size, form/age and landlord to pick buildings to doorknock; non-market, co-op and SRO buildings are mostly set aside but must be unmistakable when a tenant reaches out.
+
 ### Ownership modeling direction (2026-10-20)
 
 The direction is a **BODS-like model** ([Beneficial Ownership Data Standard](https://standard.openownership.org/)): statements about entities, persons, and the ownership/control relationships between them, each with its own source and date. BODS hasn't worked out land and real estate as an asset; exploring that gap is the project's long-term interest — see Open Ownership's [Bridging the gap for effective asset transparency](https://www.openownership.org/en/publications/bridging-the-gap-for-effective-asset-transparency/). Vancouver has the ingredients: land title / LOTR interest holders, the City's SRO inventory naming who's behind a company, managers and licensees, and VTU research linking shell companies.
@@ -210,6 +214,7 @@ SQLite schema, ingest for Open Data / FOI (plus LOTR, SRO, co-ops, rezoning, lis
 - [x] Separate each building's owner (LOTR reporting body or licence holder) from its landlord network, with provenance indicators — see docs/superpowers/specs/2026-09-23-ownership-layers-design.md
 - [x] Popup v2: tabbed Summary / Ownership chain / Building on export contract v2 — see docs/superpowers/specs/2026-10-08-building-popup-and-contract-v2-design.md
 - [x] Owner type / legal form / rents filters and landlord-portfolio sliders (spec 2026-10-20)
+- [x] Housing facts per building (licence type, purpose-built list, zoning, non-market units/operator) with Non-market and Seniors chips
 - [ ] Polish filters/sidebar to match or exceed current site's functionality (neighbourhood, assessed value, unit sliders)
 - [ ] Marker clustering/canvas rendering if point count warrants it
 
