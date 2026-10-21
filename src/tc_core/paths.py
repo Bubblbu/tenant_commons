@@ -25,7 +25,6 @@ class DataPaths:
         self.cov_foi = self.raw / "cov_foi"
         self.vanmaps = self.raw / "vanmaps"
         self.chf_bc = self.raw / "chf_bc"
-        self.nationbuilder = self.raw / "nationbuilder"
         self.samwise = self.raw / "samwise"
 
         self.property_addresses_csv = self.cov("property-addresses", "csv")
@@ -41,7 +40,6 @@ class DataPaths:
 
         self.vanmaps_addresses = self.vanmaps / "addresses.geojson"
         self.coops = self.chf_bc / "coops_vancouver.csv"
-        self.membership_full = self.nationbuilder / "membership_full.csv"
         self.samwise_export = self.samwise / "samwise-export.csv"
 
         # curated/

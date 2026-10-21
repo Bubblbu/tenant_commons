@@ -17,7 +17,6 @@ CONFIG_KEYS = {
     "blocks": "block_outlines_csv",
     "block_numbers": "block_numbers_csv",
     "local_area_boundary": "local_area_boundary_csv",
-    "vtu_raw": "membership_full",
     "tc_core_db": "db",
     "pid_address_map": "pid_address_map",
     "sro_housing": "sro_housing",

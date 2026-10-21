@@ -23,9 +23,7 @@ except ModuleNotFoundError:  # pragma: no cover - only for <3.11
 DEFAULT_DB_PATH = "data/derived/tc_core.db"
 DEFAULT_BOUNDARY_GEOJSON = "data/raw/cov_open_data/local-area-boundary.geojson"
 DEFAULT_ARTIFACTS_DIR = "data/derived/artifacts"
-# "vtu_raw" is the raw NationBuilder export (data/raw/nationbuilder/), allow-
-# listed down to a few columns by ingest/membership.py.
-_REQUIRED_PATHS = ("buildings", "addresses", "blocks", "block_numbers", "vtu_raw")
+_REQUIRED_PATHS = ("buildings", "addresses", "blocks", "block_numbers")
 
 
 @dataclass
@@ -34,7 +32,6 @@ class IngestConfig:
     addresses: str
     blocks: str
     block_numbers: str
-    vtu_raw: str
     db_path: str = DEFAULT_DB_PATH
     # Optional: manually-curated ownership research CSV (see
     # ingest/ownership_claims.py). Not in _REQUIRED_PATHS — unlike the other
@@ -122,7 +119,6 @@ def load_ingest_config(path: str) -> IngestConfig:
         addresses=str(flat["addresses"]),
         blocks=str(flat["blocks"]),
         block_numbers=str(flat["block_numbers"]),
-        vtu_raw=str(flat["vtu_raw"]),
         db_path=str(flat.get("tc_core_db", DEFAULT_DB_PATH)),
         ownership_claims=(
             str(flat["ownership_claims"]) if flat.get("ownership_claims") else None

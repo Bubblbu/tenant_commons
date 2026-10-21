@@ -7,14 +7,6 @@ own with a `schema_version`. building_records.json
 and networks.json are validated against tc_core/contract.py. That directory is the only interface
 between tc_core and the frontend.
 
-VTU membership data (per-building/per-block member counts, membership-year
-history, the VTU/non-VTU marker split) is deliberately excluded from every
-artifact here — it's sensitive per CLAUDE.md's sensitivity model (§11) and
-this is a public-facing export. `reconstruct_points()` still computes it
-internally (member_count, has_vtu_member, etc. stay on the DataFrame) since
-other internal-only consumers may need it, but none of that reaches
-`export_artifacts()`'s output files. See CLAUDE.md's sensitivity-model notes.
-
 Blocks are not an entity: `reconstruct_blocks` joins buildings to the raw
 City block outlines by point-in-polygon here, at export, and blocks.geojson
 lists each block's buildings. Nothing else carries a block id.
@@ -45,7 +37,6 @@ from .geometry import parse_geom
 from .ingest.building_names import pick_building_name
 from .ingest.overlay_write import BUILDING_OVERLAY_COLUMNS
 from .metrics.building_metrics import BUILDING_METRICS, build_building_metrics
-from .metrics.membership_metrics import compute_building_member_metrics
 from .metrics.portfolios import build_landlord_portfolios
 from .metrics.registry_owners import (
     build_interest_holders,
@@ -93,7 +84,6 @@ def _where(df: pl.DataFrame, mask: pl.Expr, **values) -> pl.DataFrame:
 
 def reconstruct_points(
     conn: sqlite3.Connection,
-    now: datetime,
     pid_address_map_path: str | None = None,
     property_managers: set[str] | None = None,
     listing_aliases: dict[str, str] | None = None,
@@ -117,23 +107,6 @@ def reconstruct_points(
         .rename({"building_id": "b_id", "display_name": "licence_holder", "owner_key": "licence_key"})
     )
 
-    members = query_frame(conn, "SELECT * FROM vtu_membership WHERE building_id IS NOT NULL")
-    metrics = compute_building_member_metrics(members, now).rename({"building_id": "b_id"})
-
-    merged = buildings.join(
-        metrics.with_columns(pl.col("b_id").cast(pl.Int64)), on="b_id", how="left", maintain_order="left"
-    ).with_columns(
-        pl.col("member_count").fill_null(0),
-        pl.col("member_count_all").fill_null(0),
-    )
-    merged = merged.with_columns(
-        has_vtu_member=pl.col("member_count") > 0,
-        members_payload=_objects(v if isinstance(v, list) else [] for v in merged["members_payload"].to_list()),
-        member_share_building=pl.when(pl.col("units") > 0)
-        .then(pl.min_horizontal(pl.col("member_count") / pl.col("units"), pl.lit(1.0)))
-        .otherwise(0.0),
-    )
-
     # Two ownership layers (docs/superpowers/specs/2026-09-23-ownership-layers-design.md):
     # the building's own owner — its primary LOTR reporting body, else the
     # licence holder — and its network — the confirmed common_owner cluster
@@ -142,7 +115,7 @@ def reconstruct_points(
     portfolios = (
         build_landlord_portfolios(conn, pid_address_map_path) if pid_address_map_path else {}
     )
-    merged = _assign_ownership(merged, registry, portfolios)
+    merged = _assign_ownership(buildings, registry, portfolios)
     # "Searched the registry, no filing": public as a date only (search notes stay internal).
     no_filing = build_registry_searches(conn, pid_address_map_path) if pid_address_map_path else {}
     # Who stands behind the owners: name and interest type only (spec 2026-10-08 §3).
@@ -163,16 +136,13 @@ def reconstruct_points(
         [
             "addr_key", "address", "lat", "lon", "units", "building_source", "year_built", "n_issues",
             "issues_details",
-            "member_count", "has_vtu_member", "member_share_building",
             "owner_name", "owner_key", "owner_source", "registered_owners", "registry_pids",
             "registry_retrieved", "registry_no_filing", "registry_owner_pids", "interest_holders",
             "licence_holder", "managed_by",
             "managed_by_source", "listings", "network_key", "network_name",
             "network_source", "network_name_source", "network_entities",
             "network_properties_on_title", "network_evidence",
-            "member_count_all", "members_payload", "value_land",
-            "value_bldg", "bldg_land_ratio", "local_area", "b_id",
-            "latest_membership_year", "source",
+            "value_land", "value_bldg", "bldg_land_ratio", "local_area", "b_id", "source",
             *BUILDING_OVERLAY_COLUMNS,
         ]
     )
@@ -543,7 +513,7 @@ def _append_overlay_housing(
     """
     flags = [
         pl.col(col).cast(pl.Boolean).fill_null(False)
-        for col in ("is_coop", "is_sro", "is_rezoning", "has_vtu_member")
+        for col in ("is_coop", "is_sro", "is_rezoning")
         if col in points.columns
     ]
     overlay = query_frame(conn, "SELECT * FROM overlay_housing")
@@ -566,11 +536,6 @@ def _append_overlay_housing(
         registry_pids=_objects([] for _ in range(n)),
         registry_owner_pids=_objects([] for _ in range(n)),
         interest_holders=_objects([] for _ in range(n)),
-        member_count=pl.lit(0),
-        member_count_all=pl.lit(0),
-        has_vtu_member=pl.lit(False),
-        member_share_building=pl.lit(0.0),
-        members_payload=_objects([] for _ in range(n)),
     )
     # Only the points frame's own columns, in its order; the rest stay null.
     overlay = overlay.select([c for c in points.columns if c in overlay.columns])
@@ -757,9 +722,7 @@ def assign_blocks(points_df: pl.DataFrame, block_geoms: list, block_ids: list[in
 def reconstruct_blocks(conn: sqlite3.Connection, points_df: pl.DataFrame) -> pl.DataFrame:
     """Every City block, citywide, with the buildings that fall in it.
 
-    Overlay housing records aren't buildings and join no block. Membership
-    is deliberately never aggregated here: this frame only feeds the public
-    blocks.geojson.
+    Overlay housing records aren't buildings and join no block.
     """
     blocks_raw = query_frame(conn, "SELECT raw_block_id AS block_id, geom FROM raw_blocks").with_columns(
         pl.col("block_id").cast(pl.Int64), pl.col("geom").cast(pl.String)
@@ -816,8 +779,8 @@ def reconstruct_filter_config(
 
     # Building-describing aggregates (neighbourhood counts/units, dataset
     # totals, building_metrics) must exclude overlay_housing rows (source
-    # overlay_sro/overlay_coop) — they're SRO/co-op records with no units,
-    # value or membership data, not buildings; counting them here would
+    # overlay_sro/overlay_coop) — they're SRO/co-op records with no units
+    # or value data, not buildings; counting them here would
     # inflate the map's "Buildings" stat (see _append_overlay_housing).
     # bounds stays over every mapped point below since overlay rows are
     # still drawn on the map.
@@ -955,7 +918,7 @@ def export_artifacts(
     out_dir.mkdir(parents=True, exist_ok=True)
 
     points_df = reconstruct_points(
-        conn, now, pid_address_map_path,
+        conn, pid_address_map_path,
         load_property_managers(property_managers_path) | managers_from_claims(conn),
         load_listing_aliases(property_managers_path),
     )
@@ -1101,7 +1064,7 @@ def _contract_records(
     """building_records.json and networks.json payloads, validated against
     the public contract (tc_core/contract.py — a validation error fails the
     export), plus the city's median land share. The contract models are the
-    allowlist: VTU membership data, lineage internals and claim notes on
+    allowlist: lineage internals and claim notes on
     points_df have no field to land in (spec 2026-10-08)."""
     rows = list(points_df.iter_rows(named=True))
     shares = LandShares(

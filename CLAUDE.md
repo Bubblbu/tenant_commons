@@ -36,7 +36,7 @@ The manually-curated ownership knowledge — built from tenant testimony and res
 ### Known data sources (Q4)
 - **Vancouver Open Data platform** — addresses, shapefiles/boundary files, rental business licences.
 - **City of Vancouver FOI records** — purpose-built rental inventory (address, year built, size, name). Periodic, public.
-- **VTU NationBuilder exports** — membership data, manually anonymized by removing sensitive fields before use. Controlled internally, updated on VTU's own cadence.
+- **VTU NationBuilder exports** — membership data. **Removed from the pipeline 2026-10-20:** nothing public used it, and keeping it out means the database behind the public map holds no membership data at all. If an internal tool needs it (Section 4), it gets its own store, joined by address.
 - **Manual research / tenant reports** — common ownership across shell companies, identified through tenant testimony. Grows piecemeal, no external source — this is the project's core IP.
 - **Third-party online sources** — e.g. CHF BC's co-op housing list. Scraped/pulled from another organization's own site, not the City or VTU.
 
@@ -105,10 +105,10 @@ Full data lineage tracking (tracing every derived value back to its exact source
 **What *is* built now (~1 hour of work):** every row in every table (raw and merged) gets a stable, permanent ID, and the build pipeline writes a `source_row_ids` field alongside each merged/derived output row, even though nothing reads or displays it yet. This means historical pipeline runs aren't lost if/when real lineage tooling gets built later.
 
 ### Data transparency (Q8b)
-Raw source tables (Open Data extract, FOI list, NationBuilder export, ownership_claims) are kept as **separate browsable SQLite tables**, not collapsed into one merged dataframe early in the pipeline. No lineage tracing between them yet (see above) — just visibility into inputs alongside the merged/final view.
+Raw source tables (Open Data extract, FOI list, ownership_claims) are kept as **separate browsable SQLite tables**, not collapsed into one merged dataframe early in the pipeline. No lineage tracing between them yet (see above) — just visibility into inputs alongside the merged/final view.
 
 ### Sensitivity model (Q11)
-**Field-level flags, tagged incrementally, default-public.** Not every field classified up front (too much upfront work for the time budget) — instead, known-sensitive fields are flagged now (VTU membership counts/IDs, tenant names/identifying details in claim notes), everything else defaults to public, and new fields get flagged *at the moment they're added* if they touch tenant identity or membership. This is a discipline to maintain, not just a one-time setup.
+**Field-level flags, tagged incrementally, default-public.** Not every field classified up front (too much upfront work for the time budget) — instead, known-sensitive fields are flagged now (tenant names/identifying details in claim notes; VTU membership is kept out of the pipeline entirely), everything else defaults to public, and new fields get flagged *at the moment they're added* if they touch tenant identity or membership. This is a discipline to maintain, not just a one-time setup.
 
 **Public ownership data (2026-09-23).** LOTR reporting bodies and interest holders — including private individuals — are shown on the public map as the province publishes them; owners can seek removal through the registry's own channels. Claim provenance in public artifacts is limited to source *types* and counts: `public_registry` shows as "provincial registry", `city_record` (a City of Vancouver record, e.g. the SRO inventory naming the person behind a company) as "City records", every other type collapses to "VTU research" so the map never signals that a tenant reported on a landlord, and `source_note` never leaves the database (`metrics/portfolios.py::EVIDENCE_BUCKET`). A network's entity names are public even when only VTU research links them (ruling 2026-09-24) (a canary test in `tests/test_export_ownership.py` enforces this). Full provenance is for the internal app. Owners and operators named in the City's SRO inventory (an FOI release), including private individuals, are shown as published on the same basis (ruling 2026-09-24); the export expands the inventory's abbreviations (`sro_names.py::SRO_NAME_ALIASES`) and applies the curated corrections in `src/tc_core/sro_names.txt` (cut-off and misspelt names, joint owners, the person behind a company, a named lessee). Its `behind:` pairs become `city_record` claims via `uv run python scripts/update_sro_claims.py`. LOTR interest holders (including trustees, settlors and partners) are published with name, interest type and PIDs only; residence, citizenship and registered-address fields are never exported (`metrics/registry_owners.py::build_interest_holders` reads none of them; canary in `tests/test_export_ownership.py`).
 
@@ -184,7 +184,7 @@ The thin vertical slice (SQLite → export → Vite/Leaflet map) is done and liv
 
 ### Phase 0 — Thin slice (done)
 
-SQLite schema, ingest for Open Data / FOI / NationBuilder (plus LOTR, SRO, co-ops, rezoning, listings), merge/dedup with `source_row_ids`, the public-field allowlist (`contract.py`, membership never exported), and the Vite + TypeScript Leaflet map with sidebar tables — all built and live. The Streamlit app from the original Phase 0 was never built; it's superseded by Section 4.
+SQLite schema, ingest for Open Data / FOI (plus LOTR, SRO, co-ops, rezoning, listings), merge/dedup with `source_row_ids`, the public-field allowlist (`contract.py`), and the Vite + TypeScript Leaflet map with sidebar tables — all built and live. The Streamlit app from the original Phase 0 was never built; it's superseded by Section 4.
 
 ### Phase 1 — Deepen
 

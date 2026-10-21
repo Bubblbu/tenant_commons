@@ -33,7 +33,7 @@ def test_source_distinguishes_buildings_from_overlay_records():
     init_db(conn)
     _seed(conn)
 
-    pts = reconstruct_points(conn, datetime(2026, 9, 20, tzinfo=timezone.utc))
+    pts = reconstruct_points(conn)
 
     assert set(pts["source"]) == {"building", "overlay_coop", "overlay_sro"}
     assert pts.filter(pl.col("source") == "building")["addr_key"].to_list() == ["100 main st"]
@@ -44,7 +44,7 @@ def test_b_id_is_unique_across_both_origins():
     init_db(conn)
     _seed(conn)
 
-    pts = reconstruct_points(conn, datetime(2026, 9, 20, tzinfo=timezone.utc))
+    pts = reconstruct_points(conn)
 
     assert pts["b_id"].is_unique().all()
     assert pts.height == 3
@@ -55,12 +55,11 @@ def test_overlay_rows_have_no_units_or_owner():
     init_db(conn)
     _seed(conn)
 
-    pts = reconstruct_points(conn, datetime(2026, 9, 20, tzinfo=timezone.utc))
+    pts = reconstruct_points(conn)
     overlay = pts.filter(pl.col("source") != "building")
 
     assert overlay["units"].is_null().all()
     assert (overlay["owner_name"] == "(Unknown)").all()
-    assert (overlay["member_count"] == 0).all()
 
 
 def test_filter_config_counts_only_buildings():
@@ -69,7 +68,7 @@ def test_filter_config_counts_only_buildings():
     _seed(conn)
 
     now = datetime(2026, 9, 20, tzinfo=timezone.utc)
-    pts = reconstruct_points(conn, now)
+    pts = reconstruct_points(conn)
     blocks = reconstruct_blocks(conn, pts)
     cfg = reconstruct_filter_config(conn, pts, blocks, now)
 

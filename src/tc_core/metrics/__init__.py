@@ -1,1 +1,1 @@
-"""Derived metrics: per-building/block summaries, membership counts, and claims-derived landlord portfolios."""
+"""Derived metrics: per-building/block summaries and claims-derived landlord portfolios."""

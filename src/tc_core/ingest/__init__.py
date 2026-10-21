@@ -4,7 +4,6 @@ Order matters for FK dependencies: raw tables first, then the merge step
 (which needs both raw_buildings and raw_addresses), then overlays (matches raw_sro/raw_coops/
 raw_rezoning against the merged buildings: flags matched buildings, writes
 the rest to overlay_housing; needs the local-area boundary GeoJSON), then
-membership (needs buildings.addr_key to resolve building_id), then
 ownership_claims last (independent of everything else, but kept at the end
 since it's the one optional/persistent source).
 
@@ -44,7 +43,6 @@ from .block_numbers import ingest_raw_block_numbers
 from .blocks import ingest_raw_blocks
 from .building_names import derive_building_names
 from .manager_listings import ingest_manager_listings
-from .membership import ingest_membership
 from .merge import run_merge
 from .overlay_write import ingest_overlays
 from .ownership_claims import ingest_ownership_claims
@@ -136,9 +134,6 @@ def run_ingest(conn: sqlite3.Connection, config: IngestConfig) -> dict[str, int]
     )
     counts["building_names"] = run_source(
         conn, run_id, "building_names", derive_building_names, conn
-    )
-    counts["vtu_membership"] = run_source(
-        conn, run_id, "vtu_membership", ingest_membership, conn, config.vtu_raw
     )
     if config.ownership_claims:
         counts["ownership_claims"] = run_source(

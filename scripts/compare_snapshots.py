@@ -6,8 +6,8 @@ A snapshot is a copy of data/curated/ and data/derived/. Files are compared
 byte for byte, except the SQLite db, which is compared table by table,
 ignoring run timestamps (*_at columns) and the append-only ingest_runs log.
 
-Snapshots hold the database, VTU membership included, so they must live
-outside the repo; `snapshot` refuses a destination inside it.
+Snapshots hold the database, claim notes and reporters included, so they
+must live outside the repo; `snapshot` refuses a destination inside it.
 
 Usage:
   uv run python scripts/compare_snapshots.py snapshot DEST
@@ -34,7 +34,7 @@ PARTS = ("curated", "derived")
 def snapshot(dest: Path) -> None:
     dest = dest.resolve()
     if dest.is_relative_to(REPO_ROOT):
-        sys.exit(f"refusing to snapshot inside the repo (it holds membership data): {dest}")
+        sys.exit(f"refusing to snapshot inside the repo (it holds claim notes): {dest}")
     if dest.exists():
         sys.exit(f"already exists: {dest}")
     for part in PARTS:

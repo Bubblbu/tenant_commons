@@ -7,7 +7,7 @@ including searches with no filing) into raw_lotr_searches.
 Decoupled from the main tc_core rebuild cadence — like
 scripts/update_claims.py, this deliberately does NOT call init_db(), since
 that drops and recreates every REBUILDABLE table (buildings, addresses,
-blocks, membership); doing that here would silently wipe them for a script
+blocks); doing that here would silently wipe them for a script
 whose whole point is touching LOTR data only.
 
 Both steps are idempotent: ingest_raw_lotr() replaces raw_lotr_ownership's

@@ -263,8 +263,6 @@ def test_search_notes_never_reach_any_artifact(tmp_path):
 
 
 def test_points_carry_per_owner_pids_and_interest_holders(tmp_path):
-    from datetime import datetime, timezone
-
     from tc_core.export import reconstruct_points
 
     conn = sqlite3.connect(":memory:")
@@ -275,7 +273,7 @@ def test_points_carry_per_owner_pids_and_interest_holders(tmp_path):
         "data_fetch_status, ingested_at) VALUES ('008-173-613', 'ST. GEORGE ESTATES LTD.', "
         "'INTEREST_HOLDER', 'RENER, GEORGE', 'SUCCESS', 'now')"
     )
-    points = reconstruct_points(conn, datetime(2026, 1, 1, tzinfo=timezone.utc), pid_map)
+    points = reconstruct_points(conn, pid_map)
     rows = {r["address"]: r for r in points.iter_rows(named=True)}
     st_george = rows["522 e 8th ave"]
     assert st_george["registry_owner_pids"] == [{"name": "ST. GEORGE ESTATES LTD.", "pids": ["008-173-613"]}]

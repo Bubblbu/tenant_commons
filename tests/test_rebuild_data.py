@@ -21,7 +21,6 @@ def _config(tmp_path, db, artifacts, boundary):
         'addresses = "unused.csv"\n'
         'blocks = "unused.csv"\n'
         'block_numbers = "unused.csv"\n'
-        'vtu_raw = "unused.csv"\n'
         f'tc_core_db = "{db}"\n'
         f'artifacts = "{artifacts}"\n'
         f'local_area_boundary_geojson = "{boundary}"\n'
