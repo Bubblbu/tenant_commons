@@ -34,6 +34,9 @@
             }
           ]
         },
+        "housing": {
+          "$ref": "#/$defs/Housing"
+        },
         "id": {
           "title": "Id",
           "type": "integer"
@@ -240,7 +243,8 @@
         "coop",
         "sro",
         "rezoning",
-        "classification"
+        "classification",
+        "housing"
       ],
       "title": "Building",
       "type": "object"
@@ -256,7 +260,7 @@
           "type": "object"
         },
         "schema_version": {
-          "const": 5,
+          "const": 6,
           "title": "Schema Version",
           "type": "integer"
         }
@@ -407,6 +411,57 @@
         "vtu_research"
       ],
       "title": "Evidence",
+      "type": "object"
+    },
+    "Housing": {
+      "additionalProperties": false,
+      "description": "Plain facts the City publishes about the building (spec 2026-10-20, housing type).",
+      "properties": {
+        "licence_types": {
+          "items": {
+            "enum": [
+              "Apartment house",
+              "Rooming house",
+              "Apartment house (99-year lease)"
+            ],
+            "type": "string"
+          },
+          "title": "Licence Types",
+          "type": "array"
+        },
+        "non_market": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/NonMarketHousing"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "purpose_built": {
+          "title": "Purpose Built",
+          "type": "boolean"
+        },
+        "zoning": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Zoning"
+        }
+      },
+      "required": [
+        "licence_types",
+        "purpose_built",
+        "zoning",
+        "non_market"
+      ],
+      "title": "Housing",
       "type": "object"
     },
     "Issues": {
@@ -643,7 +698,7 @@
           "type": "object"
         },
         "schema_version": {
-          "const": 5,
+          "const": 6,
           "title": "Schema Version",
           "type": "integer"
         }
@@ -653,6 +708,44 @@
         "networks"
       ],
       "title": "NetworksFile",
+      "type": "object"
+    },
+    "NonMarketHousing": {
+      "additionalProperties": false,
+      "description": "The City's non-market housing list: units by clientele, and operator.",
+      "properties": {
+        "family_units": {
+          "title": "Family Units",
+          "type": "integer"
+        },
+        "operators": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Operators",
+          "type": "array"
+        },
+        "other_units": {
+          "title": "Other Units",
+          "type": "integer"
+        },
+        "seniors": {
+          "title": "Seniors",
+          "type": "boolean"
+        },
+        "seniors_units": {
+          "title": "Seniors Units",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "family_units",
+        "seniors_units",
+        "other_units",
+        "operators",
+        "seniors"
+      ],
+      "title": "NonMarketHousing",
       "type": "object"
     },
     "OperatorAxis": {

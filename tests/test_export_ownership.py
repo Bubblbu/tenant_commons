@@ -450,3 +450,28 @@ def test_buildings_with_no_landlord_are_not_pooled_into_one_portfolio(tmp_path):
     metrics = json.loads((out / "filter_config.json").read_text())["building_metrics"]
     assert metrics["portfolio_units"]["max"] == max(n["totals"]["units"] for n in networks(out).values())
     assert records(out)["4 nobody st"]["classification"]["scale"] is None
+
+
+def test_buildings_carry_their_plain_housing_facts(tmp_path):
+    def housing(conn):
+        conn.execute("UPDATE raw_buildings SET foi_release = '2024-698', zoning_district = 'RM-4' "
+                     "WHERE address = '522 e 8th ave'")
+        conn.execute("UPDATE buildings SET source_row_ids = '[' || (SELECT raw_building_id FROM raw_buildings "
+                     "WHERE address = '522 e 8th ave') || ']' WHERE addr_key = '522 e 8th ave'")
+        conn.execute("INSERT INTO raw_licences_2024 (licencenumber, status, businesstype, house, street, ingested_at) "
+                     "VALUES ('24-1', 'Inactive', 'Apartment House *Historic*', '522', 'E 8TH AVE', 'now')")
+        conn.execute("INSERT INTO raw_non_market (index_number, address, project_status, operator, clientele_families, "
+                     "clientele_seniors, clientele_other, ingested_at) "
+                     "VALUES ('1', '1 Solo St', 'Completed', 'New Chelsea Society', 0, 40, 2, 'now')")
+        conn.commit()
+
+    recs = records(_export(tmp_path, extra=housing))
+    assert recs["522 e 8th ave"]["housing"] == {
+        "licence_types": ["Apartment house"], "purpose_built": True, "zoning": "RM-4", "non_market": None,
+    }
+    assert recs["1 solo st"]["housing"]["non_market"] == {
+        "family_units": 0, "seniors_units": 40, "other_units": 2, "operators": ["New Chelsea Society"], "seniors": True,
+    }
+    assert recs["3 nobody st"]["housing"] == {
+        "licence_types": [], "purpose_built": False, "zoning": None, "non_market": None,
+    }

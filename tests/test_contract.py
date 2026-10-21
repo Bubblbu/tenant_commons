@@ -23,6 +23,7 @@ def _building(**overrides) -> dict:
         registry_search={"status": "not_searched", "date": None},
         coop=None, sro=None, rezoning=None,
         classification={"owner": None, "market": None, "operator": None, "scale": None},
+        housing={"licence_types": [], "purpose_built": False, "zoning": None, "non_market": None},
     )
     base.update(overrides)
     return base

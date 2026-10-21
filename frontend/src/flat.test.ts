@@ -25,6 +25,7 @@ const york: Building = {
   network_id: 'net:cressey', registry_search: { status: 'filed', date: null },
   coop: null, sro: { rooms: 10, occupancy: 'open', owner_sector: 'private', operator_sector: null }, rezoning: null,
   classification: { owner: null, market: null, operator: null, scale: null },
+  housing: { licence_types: [], purpose_built: false, zoning: null, non_market: null },
 };
 
 describe('flatten', () => {

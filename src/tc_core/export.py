@@ -44,6 +44,7 @@ from .metrics.registry_owners import (
     build_registry_searches,
     building_pids,
 )
+from .metrics.housing import housing_facts
 from .metrics.sector import EntityClassifier, ScaleThresholds, city_owned_buildings
 from .normalize import sanitize_owner
 from .overlay_areas import OverlayArea, load_area_features
@@ -1072,11 +1073,14 @@ def _contract_records(
     )
     clusters = resolve_entity_clusters(conn)
     classify = EntityClassifier.from_conn(conn)
+    # Overlay-only records (SRO/co-op with no building row) have no facts.
+    housing = housing_facts(conn)
     buildings = BuildingRecordsFile(
         schema_version=SCHEMA_VERSION,
         records={
             str(int(r["b_id"])): build_building(
-                r, shares=shares, clusters=clusters, classify=classify, thresholds=thresholds
+                r, shares=shares, clusters=clusters, classify=classify, thresholds=thresholds,
+                housing=housing.get(int(r["b_id"])) if r.get("source") == "building" else None,
             )
             for r in rows
         },
