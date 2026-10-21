@@ -3,7 +3,7 @@ import type { Building } from '../contract.gen';
 import { escapeHtml } from '../html';
 import { provenanceIcon } from '../provenance';
 import { LABELS } from './labels';
-import { formatCurrencyCompact, linked, sourceText } from './format';
+import { formatCurrencyCompact, linked, plural, sourceText } from './format';
 import type { PopupContext } from './index';
 
 const section = (title: string, body: string) => `<div class="popup-lbl">${title}</div>${body}`;
@@ -60,6 +60,36 @@ function coop(b: Building): string {
     (c.url ? row('More', linked('CHF BC listing', c.url)) : ''));
 }
 
+/** The City's plain facts about the building: licence type, purpose-built list, zoning (age and size are in the header). */
+function housingFacts(b: Building): string {
+  const h = b.housing;
+  const parts = [
+    ...h.licence_types.map((t) => `${t} (2024 City licence)`),
+    h.purpose_built ? "on the City's purpose-built rental list" : '',
+    h.zoning ? `zoned ${h.zoning}` : '',
+  ].filter(Boolean);
+  return parts.length ? `<div class="popup-muted popup-housing">${escapeHtml(parts.join(' · '))}</div>` : '';
+}
+
+/** Who runs non-market housing and who its units are for (the City's clientele counts). A co-op
+ * runs itself, so it shows only the unit mix. */
+function nonMarketLine(b: Building): string {
+  const nm = b.housing.non_market;
+  if (!nm) return '';
+  const parts = [
+    b.coop ? '' : nm.operators.length ? `Non-market housing operated by ${nm.operators.join(' and ')}` : 'Non-market housing',
+    nm.seniors_units ? plural(nm.seniors_units, 'seniors unit', 'seniors units') : '',
+    nm.family_units ? `${plural(nm.family_units, 'family-size unit', 'family-size units')} (2+ bedrooms)` : '',
+    nm.other_units ? plural(nm.other_units, 'unit for singles', 'units for singles') : '',
+  ].filter(Boolean);
+  return parts.length ? `<div class="popup-housing">${escapeHtml(parts.join(' · '))}</div>` : '';
+}
+
+function housing(b: Building): string {
+  const body = housingFacts(b) + nonMarketLine(b);
+  return body ? section('Housing', body) : '';
+}
+
 export function renderBuilding(b: Building, ctx: PopupContext): string {
   const aka = b.also_known_as.length ? `<div class="popup-muted">${escapeHtml(`Also known as ${b.also_known_as.join(', ')}`)}</div>` : '';
   const issues = b.issues
@@ -67,5 +97,5 @@ export function renderBuilding(b: Building, ctx: PopupContext): string {
     : '';
   const listed = b.listed_in.map((s) => sourceText({ type: s, as_of: null, url: null }, ctx.licenceYear)).join(' · ');
   const records = listed ? section('Records', `<div class="popup-muted">${escapeHtml(`Listed in ${listed}`)}</div>`) : '';
-  return aka + value(b, ctx) + rezoning(b) + sro(b) + coop(b) + issues + records;
+  return aka + housing(b) + value(b, ctx) + rezoning(b) + sro(b) + coop(b) + issues + records;
 }

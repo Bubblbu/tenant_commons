@@ -65,3 +65,23 @@ describe('renderBuilding, co-op without status', () => {
     expect(t).not.toContain('Model');
   });
 });
+
+describe('renderBuilding, housing facts', () => {
+  const t = (html: string) => { const d = document.createElement('div'); d.innerHTML = html; return d.textContent!.replace(/\s+/g, ' '); };
+  const nm = { family_units: 12, seniors_units: 40, other_units: 0, operators: ['New Chelsea Society'], seniors: true };
+
+  it('lists the City facts without repeating the header\'s year and units', () => {
+    const html = renderBuilding({ ...YORK, housing: { licence_types: ['Apartment house'], purpose_built: true, zoning: 'RM-4', non_market: null } }, CTX);
+    expect(t(html)).toContain("Apartment house (2024 City licence) · on the City's purpose-built rental list · zoned RM-4");
+    expect(t(html)).not.toContain('built 1979');
+  });
+
+  it('gives non-market operator and units, and only the unit mix for a co-op', () => {
+    expect(t(renderBuilding({ ...YORK, housing: { licence_types: [], purpose_built: false, zoning: null, non_market: nm } }, CTX)))
+      .toContain('Non-market housing operated by New Chelsea Society · 40 seniors units · 12 family-size units (2+ bedrooms)');
+    const coop = t(renderBuilding({ ...YORK, coop: { status: null, ownership_model: 'non_profit', url: null },
+      housing: { licence_types: [], purpose_built: false, zoning: null, non_market: nm } }, CTX));
+    expect(coop).toContain('40 seniors units');
+    expect(coop).not.toContain('operated by');
+  });
+});

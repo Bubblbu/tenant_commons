@@ -3,7 +3,7 @@ import { formatAddress } from '../address';
 import type { Building, Network, NetworkEntity, Party } from '../contract.gen';
 import { escapeHtml } from '../html';
 import { evidenceParts, provenanceIcon } from '../provenance';
-import { kindChip } from './classification';
+import { classificationHeadline, kindChip } from './classification';
 import { LABELS } from './labels';
 import { linked, monthYear, plural, sourceText } from './format';
 import type { PopupContext } from './index';
@@ -142,5 +142,6 @@ function buildingNode(b: Building, ctx: PopupContext): string {
 export function renderOwnership(b: Building, ctx: PopupContext): string {
   const network = networkNode(b, ctx);
   // The chain line runs from the network into this building; alone, there is no chain.
-  return network ? `<div class="chain">${network}${buildingNode(b, ctx)}</div>` : buildingNode(b, ctx);
+  const chain = network ? `<div class="chain">${network}${buildingNode(b, ctx)}</div>` : buildingNode(b, ctx);
+  return classificationHeadline(b) + chain;
 }
