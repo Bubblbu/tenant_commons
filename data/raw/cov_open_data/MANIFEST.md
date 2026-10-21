@@ -9,6 +9,7 @@
 |---|---|---|
 | block-numbers.csv | 2026-09-18 | 800K |
 | block-outlines.csv | 2026-09-18 | 11M |
+| city-owned-properties.csv | 2026-09-24 | 795K |
 | local-area-boundary.csv | 2026-09-18 | 56K |
 | property-addresses.csv | 2026-09-18 | 18M |
 | business-licences.geojson | 2026-09-18 | 136M |

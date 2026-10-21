@@ -3,6 +3,8 @@
 import pytest
 
 from tc_core.export_contract import LandShares, build_building, build_networks, land_share
+from tc_core.metrics.sector import EntityClassifier
+from tc_core.normalize import sanitize_owner
 
 
 def row(**kw):
@@ -136,12 +138,14 @@ def _wall_rows():
 def test_network_entities_merge_spellings_and_same_entity_claims():
     clusters = {"Chris Wall": "Chris Wall / WALL, CHRISTOPHER ROBERT",
                 "WALL, CHRISTOPHER ROBERT": "Chris Wall / WALL, CHRISTOPHER ROBERT"}
-    kinds = {"WALL, CHRISTOPHER ROBERT": "person", "1030163 B.C. LTD.": "company"}
-    ents = build_networks(_wall_rows(), clusters=clusters, kinds=kinds)["net:wall"].entities
+    classify = EntityClassifier(registry={sanitize_owner("WALL, CHRISTOPHER ROBERT"): "individual",
+                                          sanitize_owner("1030163 B.C. LTD."): "corporation"},
+                                filed={"WALL, CHRISTOPHER ROBERT", "1030163 B.C. LTD."})
+    ents = build_networks(_wall_rows(), clusters=clusters, classify=classify)["net:wall"].entities
     got = [(e.name, e.also_named, e.kind, e.buildings) for e in ents]
     assert got == [
-        ("WALL, CHRISTOPHER ROBERT", ["Chris Wall"], "person", 0),
-        ("1030163 B.C. LTD.", ["1030163 BC Ltd"], "company", 2),  # registry spelling; both buildings
+        ("WALL, CHRISTOPHER ROBERT", ["Chris Wall"], "individual", 0),
+        ("1030163 B.C. LTD.", ["1030163 BC Ltd"], "numbered_company", 2),  # registry spelling; both buildings
         # Punctuation-only variants merge; different words (Corp/Corporation) do not.
         ("Cressey Development Corp", [], "company", 0),
         ("Cressey Development Corporation", [], "company", 0),
@@ -150,7 +154,7 @@ def test_network_entities_merge_spellings_and_same_entity_claims():
 
 
 def test_entity_kind_falls_back_to_the_name():
-    ents = build_networks(_wall_rows(), clusters={}, kinds={})["net:wall"].entities
+    ents = build_networks(_wall_rows(), clusters={})["net:wall"].entities
     kinds = {e.name: e.kind for e in ents}
-    assert kinds["Chris Wall"] == "person" and kinds["UNITED ROOMS INC."] == "company"
-    assert kinds["1030163 B.C. LTD."] == "company"
+    assert kinds["Chris Wall"] == "individual" and kinds["UNITED ROOMS INC."] == "company"
+    assert kinds["1030163 B.C. LTD."] == "numbered_company"

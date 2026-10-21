@@ -3,6 +3,7 @@ import { formatAddress } from '../address';
 import type { Building, Network, NetworkEntity, Party } from '../contract.gen';
 import { escapeHtml } from '../html';
 import { evidenceParts, provenanceIcon } from '../provenance';
+import { kindChip } from './classification';
 import { LABELS } from './labels';
 import { linked, monthYear, plural, sourceText } from './format';
 import type { PopupContext } from './index';
@@ -17,17 +18,21 @@ const collapsed = (label: string, items: string[]) =>
 
 function entityItem(e: NetworkEntity): string {
   const aka = e.also_named.length ? provenanceIcon(`Also named: ${e.also_named.join('; ')}`) : '';
-  const held = e.kind === 'person' ? ''
+  const held = e.kind === 'individual' ? ''
     : ` <span class="popup-muted">${e.buildings ? plural(e.buildings, 'building', 'buildings') : 'not on the map'}</span>`;
   return `${escapeHtml(e.name)}${held}${aka}`;
 }
 
-/** The network's people, then its companies (most buildings on the map first, as exported). */
+const KIND_ORDER = ['individual', 'company', 'numbered_company', 'trust', 'partnership', 'non_profit', 'coop', 'government'] as const;
+
+/** The network's members grouped by kind, people first (most buildings on the map first, as exported). */
 function entityLists(entities: NetworkEntity[]): string {
-  const people = entities.filter((e) => e.kind === 'person');
-  const companies = entities.filter((e) => e.kind === 'company');
-  const lists = collapsed(plural(people.length, 'person', 'people'), people.map(entityItem)) +
-    collapsed(plural(companies.length, 'company', 'companies'), companies.map(entityItem));
+  const lists = KIND_ORDER.map((kind) => {
+    const group = entities.filter((e) => e.kind === kind);
+    const [one, many] = LABELS.kindPlural[kind];
+    return collapsed(plural(group.length, one, many), group.map(entityItem));
+  }).join('') + collapsed(plural(entities.filter((e) => !e.kind).length, 'other', 'others'),
+    entities.filter((e) => !e.kind).map(entityItem));
   return lists && `<div class="popup-muted net-entities-intro">Linked in this network:</div>${lists}`;
 }
 
@@ -79,15 +84,15 @@ function registryLine(p: Party): string {
 function ownersBody(owners: Party[], ctx: PopupContext): string {
   if (owners.length <= 1) {
     const [o] = owners;
-    return `<strong>${escapeHtml(o.name)}</strong>${icon(o, ctx)}${registryLine(o)}`;
+    return `<strong>${escapeHtml(o.name)}</strong>${kindChip(o)}${icon(o, ctx)}${registryLine(o)}`;
   }
   const samePids = owners.every((o) => o.pids.join() === owners[0].pids.join());
   if (samePids) {
     const names = owners.map((o) => o.name);
     const joined = `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
-    return `Jointly owned by <strong>${escapeHtml(joined)}</strong>${icon(owners[0], ctx)}${registryLine(owners[0])}`;
+    return `Jointly owned by <strong>${escapeHtml(joined)}</strong>${owners.map(kindChip).join('')}${icon(owners[0], ctx)}${registryLine(owners[0])}`;
   }
-  return owners.map((o) => `<div><strong>${escapeHtml(o.name)}</strong> ${escapeHtml(`(${o.pids.length === 1 ? 'PID' : 'PIDs'} ${o.pids.join(', ')})`)}${icon(o, ctx)}</div>`).join('');
+  return owners.map((o) => `<div><strong>${escapeHtml(o.name)}</strong>${kindChip(o)} ${escapeHtml(`(${o.pids.length === 1 ? 'PID' : 'PIDs'} ${o.pids.join(', ')})`)}${icon(o, ctx)}</div>`).join('');
 }
 
 function licenceLine(b: Building, role: 'owner' | 'manager', shownName: string, ctx: PopupContext): string {
@@ -106,7 +111,7 @@ function onTitle(b: Building, ctx: PopupContext): string {
   const searched = b.registry_search.status === 'no_filing' && b.registry_search.date
     ? muted(escapeHtml(`No filing in the land title registry (searched ${b.registry_search.date})`)) : '';
   if (!owners.length) return row('On title', NOT_ON_RECORD + searched);
-  const holders = roles(b, 'interest_holder').map((h) => escapeHtml(`${h.name}${h.interest ? ` (${h.interest})` : ''}`));
+  const holders = roles(b, 'interest_holder').map((h) => escapeHtml(`${h.name}${h.interest ? ` (${h.interest})` : ''}`) + kindChip(h));
   return row('On title', ownersBody(owners, ctx) + licenceLine(b, 'owner', owners[0].name, ctx) + searched +
     collapsed(plural(holders.length, 'interest holder', 'interest holders'), holders));
 }
@@ -116,15 +121,17 @@ function managedBy(b: Building, ctx: PopupContext): string {
   const managers = roles(b, 'manager').map((m) => {
     const listing = m.sources.find((s) => s.type === 'listing');
     const seen = listing?.as_of ? muted(escapeHtml(`company website, seen ${monthYear(listing.as_of)}`)) : '';
-    return `<div><strong>${linked(m.name, listing?.url ?? null)}</strong>${icon(m, ctx)}${seen}${licenceLine(b, 'manager', m.name, ctx)}</div>`;
+    return `<div><strong>${linked(m.name, listing?.url ?? null)}</strong>${kindChip(m)}${icon(m, ctx)}${seen}${licenceLine(b, 'manager', m.name, ctx)}</div>`;
   }).join('');
-  return row('Managed by', managers || NOT_ON_RECORD);
+  const op = b.classification.operator;
+  const operator = op && managers ? muted(escapeHtml(`Operator: ${LABELS.ownerType[op.value].toLowerCase()}`)) : '';
+  return row('Managed by', (managers + operator) || NOT_ON_RECORD);
 }
 
 /** The City's landlord of record, when it is neither the owner nor the manager. */
 function licensedTo(b: Building, ctx: PopupContext): string {
   const lic = roles(b, 'licensee')[0];
-  return lic && lic.same_as === null ? row('Licensed to', `${escapeHtml(lic.name)}${icon(lic, ctx)}`) : '';
+  return lic && lic.same_as === null ? row('Licensed to', `${escapeHtml(lic.name)}${kindChip(lic)}${icon(lic, ctx)}`) : '';
 }
 
 function buildingNode(b: Building, ctx: PopupContext): string {

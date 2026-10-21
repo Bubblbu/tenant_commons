@@ -9,7 +9,7 @@ export const LEGEND_LEFT_OFFSET = SIDEBAR_WIDTH + 20;
 export const MOBILE_BREAKPOINT_PX = 768;
 
 /** The artifact contract version this frontend understands (spec §4). */
-export const EXPECTED_SCHEMA_VERSION = 4;
+export const EXPECTED_SCHEMA_VERSION = 5;
 
 /** Artifact files live at <base>/data/ (served or copied by artifacts-plugin.ts). */
 export function artifactUrl(name: string): string {

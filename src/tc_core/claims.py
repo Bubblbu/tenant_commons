@@ -49,6 +49,19 @@ _CLAIM_FIELDS = (
 # entity_b is display text (never an entity — see record_claim()).
 NETWORK_LABEL = "network_label"
 
+# Claims about one entity (spec 2026-10-20): entity_a is the entity, entity_b
+# a value from the relationship's vocabulary — never an entity.
+ENTITY_KIND = "entity_kind"
+INSTITUTIONAL = "institutional"
+ENTITY_KINDS = (
+    "government", "non_profit", "coop", "individual", "company",
+    "numbered_company", "trust", "partnership",
+)
+INSTITUTIONAL_KINDS = ("reit", "pension_fund", "insurer", "asset_manager", "other")
+ATTRIBUTE_RELATIONSHIPS = {ENTITY_KIND: ENTITY_KINDS, INSTITUTIONAL: INSTITUTIONAL_KINDS}
+# entity_b values that are text, not entities.
+_VALUE_RELATIONSHIPS = (NETWORK_LABEL, *ATTRIBUTE_RELATIONSHIPS)
+
 
 def _resolve_entity_label(conn: sqlite3.Connection, entity: str) -> str:
     """clean_owner_label() plus an automatic collapse onto an existing
@@ -104,6 +117,13 @@ def record_claim(
     entity_a = _resolve_entity_label(conn, entity_a)
     if relationship == NETWORK_LABEL:
         entity_b = " ".join(str(entity_b).split())
+    elif relationship in ATTRIBUTE_RELATIONSHIPS:
+        entity_b = str(entity_b).strip().lower()
+        if entity_b not in ATTRIBUTE_RELATIONSHIPS[relationship]:
+            raise ValueError(
+                f"record_claim: {relationship} value {entity_b!r} is not one of "
+                f"{', '.join(ATTRIBUTE_RELATIONSHIPS[relationship])}"
+            )
     else:
         entity_b = _resolve_entity_label(conn, entity_b)
     claim_key = claim_key or uuid.uuid4().hex
@@ -155,11 +175,12 @@ def list_known_entities(conn: sqlite3.Connection) -> list[str]:
     For future form autocomplete, and as the basis for the soft
     duplicate-warning check in ingest/ownership_claims.py.
     """
+    placeholders = ", ".join("?" * len(_VALUE_RELATIONSHIPS))
     rows = conn.execute(
         "SELECT entity_a AS entity FROM ownership_claims "
-        "UNION SELECT entity_b FROM ownership_claims WHERE relationship != ? "
+        f"UNION SELECT entity_b FROM ownership_claims WHERE relationship NOT IN ({placeholders}) "
         "ORDER BY 1",
-        (NETWORK_LABEL,),
+        _VALUE_RELATIONSHIPS,
     ).fetchall()
     return [r[0] for r in rows]
 
@@ -308,3 +329,22 @@ def confirmed_group_edges(conn: sqlite3.Connection) -> list[tuple[str, str]]:
         "WHERE relationship IN ('common_owner', 'same_entity') AND status = 'active' AND confidence = 'confirmed'"
     ).fetchall()
     return [(a, b) for a, b in rows]
+
+
+def entity_attribute_claims(
+    conn: sqlite3.Connection, relationship: str, *, include_unconfirmed: bool = False
+) -> dict[str, tuple[str, str]]:
+    """{sanitize_owner(entity): (value, source_type)} from the most recently
+    updated active claim of `relationship` (entity_kind or institutional).
+    Confirmed-only unless include_unconfirmed, like the cluster resolvers."""
+    confidences = ("confirmed", "unconfirmed") if include_unconfirmed else ("confirmed",)
+    placeholders = ", ".join("?" * len(confidences))
+    rows = conn.execute(
+        f"""
+        SELECT entity_a, entity_b, source_type FROM ownership_claims
+        WHERE relationship = ? AND status = 'active' AND confidence IN ({placeholders})
+        ORDER BY updated_at, claim_id
+        """,
+        (relationship, *confidences),
+    ).fetchall()
+    return {sanitize_owner(a): (value, source) for a, value, source in rows}

@@ -4,10 +4,14 @@ import type { FilterFields } from '../tables';
 import { blockVisibility, filterBuildings, type MetricSpec } from './filter';
 import type { FilterState } from './filter-state';
 
-const none: FilterState = { hoods: [], housing: [], landlords: [], onlyIssues: false, onlyOwned: false, onlyUnits: false, thresholds: {} };
+const none: FilterState = {
+  hoods: [], housing: [], landlords: [], onlyIssues: false, onlyOwned: false, onlyUnits: false, thresholds: {},
+  ownerTypes: [], legalForms: [], market: [], includeInferred: true,
+};
 const f = (bid: string, o: Partial<FilterFields> = {}): FilterFields => ({
   bid, area: 'west end', areas: [], owner: '', network: '', manager: '',
-  housingTypes: [], nIssues: null, hasOwner: false, metrics: { units: 10 }, ...o,
+  housingTypes: [], nIssues: null, hasOwner: false, metrics: { units: 10 },
+  ownerTypes: [], legalForms: [], ownerInferred: false, market: '', ...o,
 });
 const unitsSpec: MetricSpec = { key: 'units', attr: 'units', bins: [{ start: 0, end: 10 }, { start: 10, end: 20 }] };
 const ids = (s: Set<string>) => [...s].sort();
@@ -88,5 +92,41 @@ describe('blockVisibility', () => {
 
   it('hides a block with no area while an area filter is on', () => {
     expect(ids(blockVisibility([b('X', { area: '' })], new Set(['1']), ['west end'], false))).toEqual(['X']);
+  });
+});
+
+describe('classification filters', () => {
+  const pass = (o: Partial<FilterFields>, s: Partial<FilterState>) =>
+    filterBuildings([f('1', o)], { ...none, ...s }, []).visible.size === 1;
+
+  it('mixed matches any of its parts', () => {
+    expect(pass({ ownerTypes: ['non_profit', 'private'] }, { ownerTypes: ['private'] })).toBe(true);
+    expect(pass({ ownerTypes: ['non_profit', 'private'] }, { ownerTypes: ['government'] })).toBe(false);
+  });
+
+  it('unknown building passes only when no type is ticked', () => {
+    expect(pass({ ownerTypes: [] }, {})).toBe(true);
+    expect(pass({ ownerTypes: [] }, { ownerTypes: ['private'] })).toBe(false);
+    expect(pass({ market: '' }, { market: ['market'] })).toBe(false);
+  });
+
+  it('legal form narrows private owners', () => {
+    expect(pass({ ownerTypes: ['private'], legalForms: ['numbered_company'] },
+      { ownerTypes: ['private'], legalForms: ['numbered_company'] })).toBe(true);
+    expect(pass({ ownerTypes: ['private'], legalForms: ['company'] },
+      { ownerTypes: ['private'], legalForms: ['numbered_company'] })).toBe(false);
+  });
+
+  it('legal form leaves the other chosen owner types alone', () => {
+    const state = { ownerTypes: ['private', 'non_profit'], legalForms: ['company'] };
+    expect(pass({ ownerTypes: ['non_profit'] }, state)).toBe(true);
+    expect(pass({ ownerTypes: ['private'], legalForms: ['numbered_company'] }, state)).toBe(false);
+    expect(pass({ ownerTypes: ['non_profit', 'private'], legalForms: ['numbered_company'] }, state)).toBe(true);
+  });
+
+  it('include inferred off drops inferred owner types, but rents always count inferred values', () => {
+    expect(pass({ ownerTypes: ['private'], ownerInferred: true }, { ownerTypes: ['private'], includeInferred: false })).toBe(false);
+    expect(pass({ market: 'market' }, { market: ['market'], includeInferred: false })).toBe(true);
+    expect(pass({ market: 'non_market' }, { market: ['non_market'], includeInferred: false })).toBe(true);
   });
 });

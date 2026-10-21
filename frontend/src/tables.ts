@@ -25,6 +25,12 @@ export interface FilterFields {
   housingTypes: string[];
   nIssues: number | null;
   hasOwner: boolean;
+  /** The owner type, or each part of a mixed one; [] when not known. */
+  ownerTypes: string[];
+  legalForms: string[];
+  ownerInferred: boolean;
+  /** 'market' | 'non_market' | '' when not known. */
+  market: string;
   /** Keyed by a metric summary's attr: 'units', 'year-built', 'value-land', 'value-bldg', 'value-ratio'. */
   metrics: Record<string, number | null>;
 }
@@ -92,12 +98,18 @@ export function filterFields(r: BuildingRecord): FilterFields {
     housingTypes: text(r.housing_type).split(',').map((t) => t.trim()).filter((t) => t !== ''),
     nIssues: truncOrNull(r.n_issues),
     hasOwner: !notOnRecord(r.owner_key),
+    ownerTypes: r.owner_type === 'mixed' ? areaList(r.owner_parts) : r.owner_type ? [text(r.owner_type)] : [],
+    legalForms: areaList(r.owner_legal_forms),
+    ownerInferred: r.owner_inferred === true,
+    market: text(r.market),
     metrics: {
       units: truncOrNull(r.units),
       'year-built': truncOrNull(r.year_built),
       'value-land': roundOrNull(r.value_land),
       'value-bldg': roundOrNull(r.value_bldg),
       'value-ratio': roundOrNull(r.bldg_land_ratio, 3),
+      'portfolio-units': truncOrNull(r.portfolio_units),
+      'portfolio-value': roundOrNull(r.portfolio_value),
     },
   };
 }

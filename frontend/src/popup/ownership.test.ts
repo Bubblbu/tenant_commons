@@ -83,7 +83,7 @@ describe('renderOwnership', () => {
   });
 
   it('distinguishes joint owners of one parcel from owners of separate parcels', () => {
-    const owner = (name: string, pids: string[]) => ({ role: 'owner' as const, name, entity_key: name, kind: null,
+    const owner = (name: string, pids: string[]) => ({ role: 'owner' as const, name, entity_key: name, kind: null, institutional: null,
       interest: null, pids, same_as: null, sources: [{ type: 'registry' as const, as_of: '2026-01-01', url: null }] });
     const joint: Building = { ...BIDWELL, network_id: null, parties: [owner('RENER, ALENKA', ['1']), owner('RENER, GEORGE', ['1'])] };
     const split: Building = { ...BIDWELL, network_id: null, parties: [owner('A LTD.', ['1']), owner('B LTD.', ['2'])] };
@@ -152,5 +152,27 @@ describe('renderOwnership, highlight the network', () => {
 
   it('has no toggle without a network node', () => {
     expect(dom(renderOwnership(BIDWELL, CTX)).querySelector('.network-highlight')).toBeNull();
+  });
+});
+
+describe('network members by kind', () => {
+  it('groups network members by kind', () => {
+    const net = { ...NETWORKS['net:cressey'], entities: [
+      { name: 'Kim, Phil', also_named: [], kind: 'individual' as const, buildings: 0 },
+      { name: '0733603 BC Ltd', also_named: [], kind: 'numbered_company' as const, buildings: 3 },
+      { name: '0733604 BC Ltd', also_named: [], kind: 'numbered_company' as const, buildings: 1 },
+      { name: 'Kim Holdings Ltd', also_named: [], kind: 'company' as const, buildings: 2 },
+      { name: 'Who Knows', also_named: [], kind: null, buildings: 1 },
+    ] };
+    const t = text(renderOwnership(YORK, { ...CTX, networks: { ...NETWORKS, 'net:cressey': net } }));
+    expect(t).toContain('1 person');
+    expect(t).toContain('2 numbered companies');
+    expect(t).toContain('1 company');
+    expect(t).toContain('1 other');
+  });
+
+  it('puts a kind chip after the owner on title', () => {
+    const york = { ...YORK, parties: YORK.parties.map((p) => (p.role === 'owner' ? { ...p, kind: 'company' as const } : p)) };
+    expect(dom(renderOwnership(york, CTX)).querySelector('.node.bldg .popup-kind')!.textContent).toBe('company');
   });
 });

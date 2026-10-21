@@ -93,7 +93,7 @@ export function initFilterPass(deps: FilterPassDeps, doc: Document): FilterPass 
     };
   });
 
-  const sectionEls = (['area', 'ownership', 'building', 'value'] as const).reduce(
+  const sectionEls = (['area', 'landlord', 'type', 'building'] as const).reduce(
     (acc, sec) => {
       acc[sec] = {
         count: doc.getElementById('filter-count-' + sec),
@@ -184,17 +184,26 @@ export function initFilterPass(deps: FilterPassDeps, doc: Document): FilterPass 
   if (controls.onlyUnits) controls.onlyUnits.addEventListener('change', apply);
   controls.hoodInputs.forEach((inp) => inp.addEventListener('change', apply));
 
-  controls.housingChips.forEach((chip) => {
+  [...controls.housingChips, ...controls.legalFormChips, ...controls.marketChips].forEach((chip) => {
     chip.addEventListener('click', () => {
       chip.setAttribute('aria-pressed', chip.getAttribute('aria-pressed') === 'true' ? 'false' : 'true');
       apply();
     });
   });
+  // Owner type also gates the legal form chips (only for private owners).
+  controls.ownerTypeChips.forEach((chip) => {
+    chip.addEventListener('click', () => {
+      chip.setAttribute('aria-pressed', chip.getAttribute('aria-pressed') === 'true' ? 'false' : 'true');
+      writeFilterState(controls, readFilterState(controls));
+      apply();
+    });
+  });
+  if (controls.includeInferred) controls.includeInferred.addEventListener('change', apply);
 
   function clearSection(section: FilterSection): void {
     // writeFilterState(landlords.set([])) only replaces the tiles; clear()
     // also empties any typed-but-unpicked search text and closes the list.
-    if (section === 'ownership') controls.landlords?.clear();
+    if (section === 'landlord') controls.landlords?.clear();
     writeFilterState(controls, clearSectionState(readFilterState(controls), section, metricSection));
     apply();
   }
@@ -202,7 +211,7 @@ export function initFilterPass(deps: FilterPassDeps, doc: Document): FilterPass 
     const btn = sectionEls[sec].clear;
     if (!btn) return;
     btn.addEventListener('click', (e) => {
-      // Inside <summary> (Assessed value), don't also toggle the section.
+      // Inside <summary>, don't also toggle the section.
       e.preventDefault();
       clearSection(sec);
     });

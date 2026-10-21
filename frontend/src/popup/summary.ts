@@ -2,6 +2,7 @@
 import type { Building, Party } from '../contract.gen';
 import { escapeHtml } from '../html';
 import { evidenceParts, provenanceIcon } from '../provenance';
+import { classificationHeadline } from './classification';
 import { LABELS } from './labels';
 import { linked, plural, sourceText } from './format';
 import type { PopupContext } from './index';
@@ -62,6 +63,6 @@ export function renderSummary(b: Building, ctx: PopupContext): string {
     ? row('Licensed to', `${escapeHtml(licensee.name)}${icon(licensee, ctx)}`) : '';
   const issues = b.issues
     ? `<div class="popup-issues">${linked(plural(b.issues.count, 'outstanding City issue', 'outstanding City issues'), b.issues.url)}</div>` : '';
-  return badges(b) + rezoningAlert(b) + row('Owned by', ownedBy(b, ctx)) + row('Managed by', managedBy(b, ctx)) +
+  return badges(b) + classificationHeadline(b) + rezoningAlert(b) + row('Owned by', ownedBy(b, ctx)) + row('Managed by', managedBy(b, ctx)) +
     licensed + portfolio(b, ctx) + issues;
 }

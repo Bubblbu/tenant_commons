@@ -16,6 +16,7 @@ DROP TABLE IF EXISTS raw_block_numbers;
 DROP TABLE IF EXISTS raw_sro;
 DROP TABLE IF EXISTS raw_coops;
 DROP TABLE IF EXISTS raw_rezoning;
+DROP TABLE IF EXISTS raw_city_owned_properties;
 DROP TABLE IF EXISTS overlay_housing;
 DROP TABLE IF EXISTS strata_lot_pids;
 DROP VIEW IF EXISTS block_stats;  -- retired 2026-10-20; dropped for older databases
@@ -159,6 +160,21 @@ CREATE TABLE raw_rezoning (
     latitude REAL,
     longitude REAL,
     link TEXT,
+    ingested_at TEXT NOT NULL
+);
+
+-- The City's own land (Open Data city-owned-properties): joins to buildings
+-- on land_coord = a folio's first 8 digits. type is the holding fund
+-- (CAPITAL FUND, PROPERTY ENDOWMENT FUND, VAHEF, Vancouver Public Housing Corp).
+CREATE TABLE raw_city_owned_properties (
+    raw_city_owned_id INTEGER PRIMARY KEY,
+    building_no TEXT,
+    sap_address TEXT,
+    geom TEXT,
+    geo_local_area TEXT,
+    land_coord TEXT,
+    type TEXT,
+    geo_point_2d TEXT,
     ingested_at TEXT NOT NULL
 );
 

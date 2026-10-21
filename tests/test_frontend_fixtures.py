@@ -37,7 +37,7 @@ def test_fixtures_cover_every_source_and_carry_the_contract_version():
     markers = json.loads((FIXTURES / "marker_metadata.json").read_text())["markers"]
     assert {m["source"] for m in markers} == {"building", "overlay_sro", "overlay_coop"}
     for name in FILES[:5]:
-        assert json.loads((FIXTURES / name).read_text())["schema_version"] == 4, name
+        assert json.loads((FIXTURES / name).read_text())["schema_version"] == 5, name
 
 
 def test_fixtures_exercise_every_popup_case():

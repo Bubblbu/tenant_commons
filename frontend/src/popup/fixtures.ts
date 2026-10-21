@@ -3,36 +3,37 @@ import type { Building, Network, Party } from '../contract.gen';
 import type { PopupContext } from './index';
 
 const party = (p: Partial<Party> & Pick<Party, 'role' | 'name'>): Party => ({
-  entity_key: p.name.toLowerCase(), kind: null, interest: null, pids: [], same_as: null, sources: [], ...p,
+  entity_key: p.name.toLowerCase(), kind: null, institutional: null, interest: null, pids: [], same_as: null, sources: [], ...p,
 });
 const base = (b: Partial<Building> & Pick<Building, 'id' | 'address'>): Building => ({
   origin: 'building', name: null, also_known_as: [], pids: [], local_area: null, lat: 49.2, lon: -123.1,
   areas: [], units: null, units_basis: null, year_built: null, listed_in: [],
   value: null, issues: null, parties: [], network_id: null, registry_search: { status: 'not_searched', date: null },
-  coop: null, sro: null, rezoning: null, ...b,
+  coop: null, sro: null, rezoning: null,
+  classification: { owner: null, market: null, operator: null, scale: null }, ...b,
 });
 
 export const NETWORKS: Record<string, Network> = {
   'net:cressey': { id: 'net:cressey', name: 'Cressey Development Group', name_source: 'claim', tier: 'confirmed',
     evidence: { registry: 7, city_records: 0, vtu_research: 9 },
     entities: [
-      { name: 'Cressey, Norman Edward', also_named: ['Norman Cressey'], kind: 'person', buildings: 0 },
-      { name: 'Cressey, Scott Edward', also_named: [], kind: 'person', buildings: 0 },
+      { name: 'Cressey, Norman Edward', also_named: ['Norman Cressey'], kind: 'individual', buildings: 0 },
+      { name: 'Cressey, Scott Edward', also_named: [], kind: 'individual', buildings: 0 },
       { name: 'Victoria Place Apts. Ltd.', also_named: [], kind: 'company', buildings: 2 },
       { name: 'Yorkshire Place Apts. Ltd.', also_named: ['Yorkshire Place Apt Ltd'], kind: 'company', buildings: 1 },
       ...Array.from({ length: 14 }, (_, i) => ({ name: `Cressey Holding ${i} Ltd`, also_named: [], kind: 'company' as const, buildings: 0 })),
     ],
-    totals: { buildings: 10, units: 609, open_issues: 2, properties_on_title: 10 } },
+    totals: { buildings: 10, units: 609, assessed_value: null, open_issues: 2, properties_on_title: 10 } },
   'net:lotus': { id: 'net:lotus', name: 'Lotus Capital', name_source: 'claim', tier: 'confirmed',
     evidence: { registry: 55, city_records: 0, vtu_research: 8 },
     entities: [{ name: 'A Ltd', also_named: [], kind: 'company', buildings: 1 }],
-    totals: { buildings: 10, units: 500, open_issues: 3, properties_on_title: 11 } },
+    totals: { buildings: 10, units: 500, assessed_value: null, open_issues: 3, properties_on_title: 11 } },
   'bc-housing': { id: 'bc-housing', name: 'BC Housing', name_source: 'default', tier: 'name_match',
     evidence: { registry: 0, city_records: 0, vtu_research: 0 }, entities: [],
-    totals: { buildings: 33, units: 2000, open_issues: 90, properties_on_title: null } },
+    totals: { buildings: 33, units: 2000, assessed_value: null, open_issues: 90, properties_on_title: null } },
   'feliz-enterprises-ltd': { id: 'feliz-enterprises-ltd', name: 'Feliz Enterprises Ltd', name_source: 'default',
     tier: 'name_match', evidence: { registry: 0, city_records: 0, vtu_research: 0 }, entities: [],
-    totals: { buildings: 1, units: 265, open_issues: 0, properties_on_title: null } },
+    totals: { buildings: 1, units: 265, assessed_value: null, open_issues: 0, properties_on_title: null } },
 };
 
 export const YORK = base({

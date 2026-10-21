@@ -22,6 +22,7 @@ def _building(**overrides) -> dict:
         parties=[], network_id=None,
         registry_search={"status": "not_searched", "date": None},
         coop=None, sro=None, rezoning=None,
+        classification={"owner": None, "market": None, "operator": None, "scale": None},
     )
     base.update(overrides)
     return base

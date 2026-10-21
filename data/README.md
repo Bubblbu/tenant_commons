@@ -18,6 +18,7 @@ uv run python scripts/prepare_data.py                           # derived/interi
 uv run python -m tc_core.ingest --config config.toml            # derived/tc_core.db
 uv run python scripts/export_pid_address_map.py                 # derived/pid_address_map.csv
 uv run python scripts/rebuild_data.py                           # derived/artifacts (the frontend's input)
+uv run python scripts/classification_report.py                 # derived/classification (research CSVs, not public)
 cd frontend && npm ci && npm run build                          # frontend/dist (see frontend/README.md)
 ```
 

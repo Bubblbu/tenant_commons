@@ -8,6 +8,10 @@
 .tc-popup .popup-k { color: #777; min-width: 78px; font-size: 12px; padding-top: 1px; }
 .tc-popup .popup-tier { display: inline-block; font-size: 10.5px; padding: 1px 6px; border-radius: 8px; background: #e6f2e8; color: #1d6b33; margin-left: 4px; }
 .tc-popup .popup-tier.weak { background: #f1efe6; color: #7a6a2a; }
+/* Building classification (spec 2026-10-20): inferred parts read softer. */
+.tc-popup .popup-classification { font-size: 12px; color: #27354a; margin: 0 0 6px; }
+.tc-popup .popup-class.inferred { color: #6b7080; text-decoration: underline dotted; text-underline-offset: 2px; }
+.tc-popup .popup-kind { display: inline-block; font-size: 10.5px; padding: 0 6px; border-radius: 8px; background: #eef0f4; color: #4a5160; margin-left: 4px; font-weight: normal; }
 .tc-popup .popup-badge { display: inline-block; font-size: 11px; padding: 1px 7px; border-radius: 8px; background: #eaeef7; color: #2c4a86; margin: 0 4px 4px 0; }
 .tc-popup .popup-alert { background: #fdf3e2; border-left: 3px solid #d08a1a; padding: 4px 8px; font-size: 12px; margin: 4px 0 8px; border-radius: 3px; }
 .tc-popup .popup-issues { color: #b5332c; font-size: 12px; margin-top: 6px; }

@@ -12,7 +12,7 @@ from typing import Annotated, Literal
 
 from pydantic import AfterValidator, BaseModel, ConfigDict, Field, Strict
 
-SCHEMA_VERSION = 4
+SCHEMA_VERSION = 5
 
 _SENTINELS = {"(unknown)", "unknown"}
 
@@ -34,6 +34,19 @@ SourceType = Literal[
 ]
 Role = Literal["owner", "interest_holder", "manager", "licensee"]
 Sector = Literal["private", "non_profit", "government", "chinese_society"]
+# Not known is null, never "unknown" (no sentinels, see module docstring).
+Kind = Literal[
+    "government", "non_profit", "coop", "individual", "company",
+    "numbered_company", "trust", "partnership",
+]
+Institutional = Literal["reit", "pension_fund", "insurer", "asset_manager", "other"]
+OwnerType = Literal["government", "non_profit", "coop", "private", "mixed"]
+# Where a classification came from. Claims show only as their bucket.
+Basis = Literal[
+    "name_rule", "registry", "licence", "listing", "city_owned", "non_market_list",
+    "chf_bc", "sro_inventory", "claim_registry", "claim_city_records", "vtu_research",
+]
+Scale = Literal["single", "small_portfolio", "large_portfolio"]
 
 
 class _Model(BaseModel):
@@ -50,7 +63,8 @@ class Party(_Model):
     role: Role
     name: Text
     entity_key: Text
-    kind: None = None  # reserved for the sector project
+    kind: Kind | None = None
+    institutional: Institutional | None = None
     interest: Text | None = None
     pids: list[Text] = []
     same_as: Literal["owner", "manager"] | None = None
@@ -94,6 +108,38 @@ class Rezoning(_Model):
     url: Text | None = None
 
 
+
+class OwnerAxis(_Model):
+    value: OwnerType
+    legal_forms: list[Kind] = []  # the private owners' kinds
+    parts: list[OwnerType] = []  # when mixed
+    # public_land_leasehold: City land, someone else on title (a leasehold).
+    reason: Literal["owners_differ", "public_land_leasehold"] | None = None
+    basis: list[Basis]
+    # True when the owner is not confirmed on title, a claim or the City's
+    # own land list (licence holder, SRO inventory, co-op or non-market list).
+    inferred: bool
+
+
+class MarketAxis(_Model):
+    value: Literal["non_market", "market"]
+    basis: list[Basis]
+    inferred: bool
+
+
+class OperatorAxis(_Model):
+    value: OwnerType
+    basis: list[Basis]
+
+
+class Classification(_Model):
+    """Each axis is null when nothing is known about it."""
+
+    owner: OwnerAxis | None
+    market: MarketAxis | None
+    operator: OperatorAxis | None
+    scale: Scale | None
+
 class Building(_Model):
     id: Int
     origin: Literal["building", "overlay_sro", "overlay_coop"]
@@ -120,6 +166,7 @@ class Building(_Model):
     coop: Coop | None
     sro: Sro | None
     rezoning: Rezoning | None
+    classification: Classification
 
 
 class Evidence(_Model):
@@ -135,6 +182,9 @@ class Evidence(_Model):
 class NetworkTotals(_Model):
     buildings: Int
     units: Int
+    # Land + building assessed value of its buildings on the map: a lower
+    # bound on the landlord's holdings. Null when none has a value.
+    assessed_value: Int | None
     open_issues: Int
     properties_on_title: Int | None
 
@@ -145,7 +195,7 @@ class NetworkEntity(_Model):
 
     name: Text  # the registry's spelling where there is one
     also_named: list[Text]
-    kind: Literal["person", "company"]
+    kind: Kind | None
     buildings: Int  # buildings on the map it owns (on title, jointly, or per the SRO inventory)
 
 
@@ -160,12 +210,12 @@ class Network(_Model):
 
 
 class BuildingRecordsFile(_Model):
-    schema_version: Literal[4]
+    schema_version: Literal[5]
     records: dict[str, Building]
 
 
 class NetworksFile(_Model):
-    schema_version: Literal[4]
+    schema_version: Literal[5]
     networks: dict[str, Network]
 
 

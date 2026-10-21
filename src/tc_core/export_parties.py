@@ -11,10 +11,11 @@ from __future__ import annotations
 
 import math
 import re
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from urllib.parse import urlparse
 
 from .contract import Party, Source
+from .metrics.sector import EntityClass
 from .normalize import sanitize_owner
 
 _SUFFIXES = {"ltd", "limited", "inc", "incorporated", "corp", "corporation", "co", "company", "the"}
@@ -99,7 +100,11 @@ def _managers(row: Mapping[str, object], clusters: Mapping[str, str]) -> list[Pa
     return [_party("manager", name, sources) for name, sources in found]
 
 
-def build_parties(row: Mapping[str, object], clusters: Mapping[str, str]) -> list[Party]:
+def build_parties(
+    row: Mapping[str, object],
+    clusters: Mapping[str, str],
+    classify: Callable[[str], EntityClass] | None = None,
+) -> list[Party]:
     owners = _owners(row)
     holders = [
         _party("interest_holder", h["name"], [Source(type="registry", as_of=_date(row.get("registry_retrieved")))],
@@ -119,4 +124,9 @@ def build_parties(row: Mapping[str, object], clusters: Mapping[str, str]) -> lis
                     match.sources.append(Source(type="licence"))
                 break
         parties.append(_party("licensee", licence, [Source(type="licence")], same_as=same_as))
+    if classify is not None:
+        for p in parties:
+            c = classify(p.name)
+            p.kind = None if c.kind == "unknown" else c.kind
+            p.institutional = c.institutional
     return parties
