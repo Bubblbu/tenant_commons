@@ -17,6 +17,8 @@ DROP TABLE IF EXISTS raw_sro;
 DROP TABLE IF EXISTS raw_coops;
 DROP TABLE IF EXISTS raw_rezoning;
 DROP TABLE IF EXISTS raw_city_owned_properties;
+DROP TABLE IF EXISTS raw_licences_2024;
+DROP TABLE IF EXISTS raw_non_market;
 DROP TABLE IF EXISTS overlay_housing;
 DROP TABLE IF EXISTS strata_lot_pids;
 DROP VIEW IF EXISTS block_stats;  -- retired 2026-10-20; dropped for older databases
@@ -175,6 +177,34 @@ CREATE TABLE raw_city_owned_properties (
     land_coord TEXT,
     type TEXT,
     geo_point_2d TEXT,
+    ingested_at TEXT NOT NULL
+);
+
+-- 2024 rental licences by building type (ingest/raw_housing_sources.py).
+CREATE TABLE raw_licences_2024 (
+    raw_licence_2024_id INTEGER PRIMARY KEY,
+    licencenumber TEXT,
+    status TEXT,
+    businesstype TEXT,          -- e.g. "Apartment House *Historic*"
+    house TEXT,
+    street TEXT,
+    geo_point_2d TEXT,
+    ingested_at TEXT NOT NULL
+);
+
+-- The City's non-market housing list: unit counts by clientele and operator.
+CREATE TABLE raw_non_market (
+    raw_non_market_id INTEGER PRIMARY KEY,
+    index_number TEXT,
+    name TEXT,
+    address TEXT,
+    project_status TEXT,
+    occupancy_year TEXT,
+    operator TEXT,
+    clientele_families INTEGER,  -- units with 2+ bedrooms
+    clientele_seniors INTEGER,   -- units for people typically over 55
+    clientele_other INTEGER,     -- units for single non-seniors
+    url TEXT,
     ingested_at TEXT NOT NULL
 );
 
