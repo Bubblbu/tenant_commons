@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Bulk-import ownership_claims from a CSV, without re-running the full
-tc_core pipeline (buildings/addresses/blocks/membership stay untouched).
+tc_core pipeline (buildings/addresses/blocks stay untouched).
 
 Upserts by claim_key — safe to re-run repeatedly as the claims CSV evolves
 (existing claim_key -> updates that row in place; new claim_key -> inserts).
@@ -10,7 +10,7 @@ src/tc_core/claims.py for the underlying semantics.
 Assumes the database has already been initialized at least once (via
 scripts/rebuild_data.py or `python -m tc_core.ingest`) — this script
 deliberately does NOT call init_db(), since that drops and recreates every
-REBUILDABLE table (buildings, addresses, blocks, membership); doing that
+REBUILDABLE table (buildings, addresses, blocks); doing that
 here would silently wipe them for a script whose whole point is touching
 claims only.
 

@@ -6,8 +6,7 @@ ingest). It is produced by the real export_artifacts() from an in-memory
 database, so its shape is the real contract, not a hand-written copy. It
 proves the build and the contract shape, not the data.
 
-Invented only: no real addresses, owners or membership (vtu_membership stays
-empty). Deterministic: fixed timestamps, so regenerating reproduces the
+Invented only: no real addresses or owners. Deterministic: fixed timestamps, so regenerating reproduces the
 committed bytes — tests/test_frontend_fixtures.py checks that.
 
 Usage: uv run python scripts/make_frontend_fixtures.py [--out frontend/fixtures]

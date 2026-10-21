@@ -62,8 +62,7 @@ format, cadence, quirks). It stops there.
 | [`coops_vancouver.csv`](#coops_vancouvercsv) | Third-party online | 2026-08-04 | Periodic (re-run script) | `tc_core` |
 | [Landlord listings](#landlord-listings) | Third-party online (company websites) | 2026-09-30 | Periodic (re-run scripts) | `tc_core` |
 | [`samwise-export.csv`](#samwise-exportcsv) | Third-party online (BC LOTR, via `samwise`) | 2026-09-16 | Ad hoc | `tc_core` |
-| [`membership_full.csv`](#membership_fullcsv) | Internal / organizational | TODO | VTU's own cadence | `tc_core` |
-| [`vtu_members.csv`](#vtu_memberscsv) | Internal / organizational — likely orphaned ⚠️ | — | — | none found |
+| [VTU membership](#vtu-membership-nationbuilder--retired-2026-10-20) | Internal / organizational — retired | — | — | none |
 
 ⚠️ = flagged for your attention, see that source's entry.
 
@@ -507,48 +506,15 @@ not the City's Open Data portal, not FOI, not VTU's own systems.
 
 ## Internal / organizational
 
-VTU's own data, not pulled from any public source. The one category here
-that's genuinely sensitive — see `CLAUDE.md` Section 3's sensitivity model
-rather than this doc for how field-level access is handled.
+### VTU membership (NationBuilder) — retired 2026-10-20
 
-### `membership_full.csv`
-
-- **What it is:** VTU's NationBuilder membership export — 154 columns
-  (emails, phone, ethnicity, religion, donation history, marital status,
-  and more), of which only `nationbuilder_id`, `primary_address1`,
-  `tag_list`, and `updated_at` are ever read.
-- **Origin:** VTU's NationBuilder account, exported by VTU on its own
-  cadence. Not a public pull — controlled internally.
-- **License/attribution:** N/A (internal data) — but see sensitivity note
-  below regarding what may ever be exported publicly.
-- **⚠️ Sensitivity:** this is the one source containing directly
-  identifying/sensitive tenant data. `tc_core/ingest/membership.py`
-  enforces an explicit column allow-list at the CSV-read layer itself
-  (`pd.read_csv(usecols=...)`), so the other ~150 columns never become an
-  in-memory column, let alone a database row. The address column is
-  hardcoded to `primary_address1` rather than found via substring search —
-  a reordered NationBuilder export could otherwise silently start reading a
-  different address-like column (`address_address1`, `billing_address1`,
-  `mailing_address1`, `work_address1`, `user_submitted_address1` all exist)
-  with no error. See `CLAUDE.md` Section 3 ("Sensitivity model") for the
-  broader field-level flagging approach this feeds into.
-- **Access method:** manual export from NationBuilder by VTU; not
-  scriptable from this project's side.
-- **Output location:** `data/raw/nationbuilder/membership_full.csv`.
-- **Consumed by:** `tc_core` (`ingest/membership.py`).
-- **Refresh cadence:** VTU's own cadence — TODO: confirm how often VTU
-  re-exports and whether there's a standing arrangement for this.
-
-### `vtu_members.csv`
-
-- **⚠️ Likely orphaned.** 566 rows, only 3 columns
-  (`nationbuilder_id`, `primary_address1`, `address`) — looks like an older,
-  already-narrowed export that predates `membership_full.csv`. No code in
-  `tc_core` references this file by name
-  (confirmed via repo-wide search); `config.toml`'s `vtu_raw` path points at
-  `membership_full.csv` only.
-- **Recommendation:** confirm it's genuinely unused, then either delete it
-  or move it out of `data/raw/nationbuilder/`, since it looks like a live input there.
+VTU's NationBuilder membership export (`data/raw/nationbuilder/membership_full.csv`,
+154 columns of personal data) used to be ingested, allow-listed down to an ID,
+address, tags and update date, into a `vtu_membership` table, and joined to
+buildings by address. Nothing public ever used it, so it was removed from the
+pipeline: the database feeding the public map holds no membership data at all.
+If an internal tool needs it later, it gets its own store, joined by `addr_key`.
+The old ingest is in git history (`src/tc_core/ingest/membership.py`).
 
 ---
 

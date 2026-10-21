@@ -5,7 +5,7 @@
 
 DROP TABLE IF EXISTS building_names;  -- references buildings: drop first
 DROP TABLE IF EXISTS building_listings;  -- references buildings: drop first
-DROP TABLE IF EXISTS vtu_membership;
+DROP TABLE IF EXISTS vtu_membership;  -- retired 2026-10-20: membership no longer enters the pipeline
 DROP TABLE IF EXISTS buildings;
 DROP TABLE IF EXISTS landlords;
 DROP TABLE IF EXISTS blocks;  -- pre-2026-10-20 name of raw_blocks
@@ -270,23 +270,6 @@ CREATE TABLE buildings (
 );
 CREATE INDEX idx_buildings_landlord ON buildings(landlord_id);
 CREATE INDEX idx_buildings_local_area ON buildings(local_area);
-
--- Allow-listed columns only — see ingest/membership.py's ALLOWED_MEMBERSHIP_COLUMNS
--- (a later step). No name/email/phone/ethnicity/religion/donation data ever lands
--- here, even though the source NationBuilder export carries all of that.
--- Whole table is treated as non-public by default at export time (later step).
-CREATE TABLE vtu_membership (
-    membership_row_id INTEGER PRIMARY KEY,
-    nationbuilder_id TEXT,
-    addr_key TEXT,
-    building_id INTEGER REFERENCES buildings(building_id),
-    tag_list TEXT,
-    updated_at TEXT,
-    source_row_ids TEXT,
-    ingested_at TEXT NOT NULL
-);
-CREATE INDEX idx_vtu_membership_addr_key ON vtu_membership(addr_key);
-CREATE INDEX idx_vtu_membership_building ON vtu_membership(building_id);
 
 -- Every name a source gives a building, with its source (see
 -- ingest/building_names.py). The map shows one, picked at export.

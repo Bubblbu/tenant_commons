@@ -2,7 +2,7 @@
 
 Not a `raw_<source>.py` module: unlike raw_buildings/raw_addresses,
 ownership_claims isn't merged into a separate derived table afterward — it's
-already the final, curated layer (same category as membership.py's source).
+already the final, curated layer.
 
 Each row is upserted via claims.record_claim() by its required `claim_key`
 column — re-running against an edited version of the same research

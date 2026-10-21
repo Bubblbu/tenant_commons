@@ -114,7 +114,6 @@ that street? does B?). Measured on 2026-10-06 across every source's "A-B" addres
 | `prepare/buildings.py`: FOI inventory, non-market list, rental licences, rental-standards issues | property addresses (`properties.csv`) | — |
 | `ingest/overlays.py`: co-ops, SRO/SRA, rezoning | buildings | secondary addresses |
 | `ingest/building_names.py`, `ingest/listing_buildings.py` | buildings (and, for placing a listing, the City's address points) | secondary addresses |
-| `ingest/membership.py` | buildings | secondary addresses: a member at "488 W 41st Ave" belongs to the building at 458 W 41st Ave on the same parcel |
 
 **Secondary addresses (aliases)** come from `load_secondary_address_index()`. A
 building's `secondary_addresses` are all the other addresses on its parcel. When a
