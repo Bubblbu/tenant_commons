@@ -87,3 +87,17 @@ describe('flatten, classification', () => {
     expect([r.owner_type, r.market, r.portfolio_units, r.portfolio_value]).toEqual([null, null, null, null]);
   });
 });
+
+describe('flatten, housing facts', () => {
+  const nonMarket = { family_units: 0, seniors_units: 40, other_units: 2, operators: ['New Chelsea Society'], seniors: true };
+  it('adds non-market and seniors to the housing types the filter reads', () => {
+    const r = flatten({ ...york, sro: null, housing: { licence_types: [], purpose_built: false, zoning: null, non_market: nonMarket } }, {});
+    expect(r.housing_type).toBe('non-market, seniors');
+  });
+
+  it('carries licence type, purpose-built list and zoning as plain CSV columns', () => {
+    const r = flatten({ ...york, housing: { licence_types: ['Apartment house'], purpose_built: true, zoning: 'RM-4', non_market: null } }, {});
+    expect([r.licence_type, r.purpose_built, r.zoning]).toEqual(['Apartment house', true, 'RM-4']);
+    expect(FLAT_COLUMNS).toEqual(expect.arrayContaining(['licence_type', 'purpose_built', 'zoning']));
+  });
+});

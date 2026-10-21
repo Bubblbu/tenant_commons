@@ -9,6 +9,7 @@
 .tc-popup .popup-tier { display: inline-block; font-size: 10.5px; padding: 1px 6px; border-radius: 8px; background: #e6f2e8; color: #1d6b33; margin-left: 4px; }
 .tc-popup .popup-tier.weak { background: #f1efe6; color: #7a6a2a; }
 /* Building classification (spec 2026-10-20): inferred parts read softer. */
+.tc-popup .popup-housing { font-size: 12px; margin: 0 0 6px; }
 .tc-popup .popup-classification { font-size: 12px; color: #27354a; margin: 0 0 6px; }
 .tc-popup .popup-class.inferred { color: #6b7080; text-decoration: underline dotted; text-underline-offset: 2px; }
 .tc-popup .popup-kind { display: inline-block; font-size: 10.5px; padding: 0 6px; border-radius: 8px; background: #eef0f4; color: #4a5160; margin-left: 4px; font-weight: normal; }

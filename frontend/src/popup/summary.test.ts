@@ -44,3 +44,26 @@ describe('renderSummary', () => {
     expect(t).toContain('Only building we know of for this owner');
   });
 });
+
+describe('renderSummary, housing facts', () => {
+  const withHousing = (housing: typeof YORK.housing) => ({ ...YORK, sro: null, housing });
+
+  it('lists the plain facts with their sources', () => {
+    const t = text(renderSummary(withHousing({ licence_types: ['Apartment house'], purpose_built: true, zoning: 'RM-4', non_market: null }), CTX));
+    expect(t).toContain('Apartment house (2024 City licence) · on the City\'s purpose-built rental list · zoned RM-4 · built 1979 · 43 units');
+  });
+
+  it('flags non-market and seniors housing, with operator and units by clientele', () => {
+    const html = renderSummary(withHousing({ licence_types: [], purpose_built: false, zoning: null,
+      non_market: { family_units: 12, seniors_units: 40, other_units: 0, operators: ['New Chelsea Society'], seniors: true } }), CTX);
+    const badges = [...new DOMParser().parseFromString(html, 'text/html').querySelectorAll('.popup-badge')].map((b) => b.textContent);
+    expect(badges).toEqual(['Non-market', 'Seniors']);
+    expect(text(html)).toContain('Non-market housing operated by New Chelsea Society · 40 seniors units · 12 family-size units (2+ bedrooms)');
+  });
+
+  it('says nothing extra when no facts are known', () => {
+    const t = text(renderSummary(withHousing({ licence_types: [], purpose_built: false, zoning: null, non_market: null }), CTX));
+    expect(t).not.toContain('City licence');
+    expect(t).not.toContain('Non-market');
+  });
+});

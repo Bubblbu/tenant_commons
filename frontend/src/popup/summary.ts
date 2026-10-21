@@ -20,6 +20,8 @@ function badges(b: Building): string {
     if (b.sro.occupancy) out.push(LABELS.occupancy[b.sro.occupancy]);
   }
   if (b.coop) out.push('Co-op');
+  if (b.housing.non_market) out.push('Non-market');
+  if (b.housing.non_market?.seniors) out.push('Seniors');
   return out.length ? `<div class="popup-badges">${out.map((t) => `<span class="popup-badge">${escapeHtml(t)}</span>`).join('')}</div>` : '';
 }
 
@@ -57,12 +59,38 @@ function rezoningAlert(b: Building): string {
   return `<div class="popup-alert"><strong>${escapeHtml(LABELS.rezoning[z.status])}</strong>${when} — the site may be redeveloped${link}</div>`;
 }
 
+/** The City's plain facts about the building: licence type, purpose-built list, zoning, age, size. */
+function housingFacts(b: Building): string {
+  const h = b.housing;
+  const parts = [
+    ...h.licence_types.map((t) => `${t} (2024 City licence)`),
+    h.purpose_built ? "on the City's purpose-built rental list" : '',
+    h.zoning ? `zoned ${h.zoning}` : '',
+    b.year_built ? `built ${b.year_built}` : '',
+    b.units ? plural(b.units, 'unit', 'units') : '',
+  ].filter(Boolean);
+  return parts.length ? `<div class="popup-muted popup-housing">${escapeHtml(parts.join(' · '))}</div>` : '';
+}
+
+/** Who runs non-market housing and who its units are for (the City's clientele counts). */
+function nonMarketLine(b: Building): string {
+  const nm = b.housing.non_market;
+  if (!nm) return '';
+  const parts = [
+    nm.operators.length ? `Non-market housing operated by ${nm.operators.join(' and ')}` : 'Non-market housing',
+    nm.seniors_units ? plural(nm.seniors_units, 'seniors unit', 'seniors units') : '',
+    nm.family_units ? `${plural(nm.family_units, 'family-size unit', 'family-size units')} (2+ bedrooms)` : '',
+    nm.other_units ? plural(nm.other_units, 'unit for singles', 'units for singles') : '',
+  ].filter(Boolean);
+  return `<div class="popup-housing">${escapeHtml(parts.join(' · '))}</div>`;
+}
+
 export function renderSummary(b: Building, ctx: PopupContext): string {
   const licensee = first(b, 'licensee');
   const licensed = licensee && licensee.same_as === null
     ? row('Licensed to', `${escapeHtml(licensee.name)}${icon(licensee, ctx)}`) : '';
   const issues = b.issues
     ? `<div class="popup-issues">${linked(plural(b.issues.count, 'outstanding City issue', 'outstanding City issues'), b.issues.url)}</div>` : '';
-  return badges(b) + classificationHeadline(b) + rezoningAlert(b) + row('Owned by', ownedBy(b, ctx)) + row('Managed by', managedBy(b, ctx)) +
+  return badges(b) + classificationHeadline(b) + housingFacts(b) + nonMarketLine(b) + rezoningAlert(b) + row('Owned by', ownedBy(b, ctx)) + row('Managed by', managedBy(b, ctx)) +
     licensed + portfolio(b, ctx) + issues;
 }
