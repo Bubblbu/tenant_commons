@@ -20,7 +20,8 @@ function badges(b: Building): string {
     if (b.sro.occupancy) out.push(LABELS.occupancy[b.sro.occupancy]);
   }
   if (b.coop) out.push('Co-op');
-  if (b.housing.non_market) out.push('Non-market');
+  // The City counts co-ops as non-market; a co-op's badge says Co-op only.
+  if (b.housing.non_market && !b.coop) out.push('Non-market');
   if (b.housing.non_market?.seniors) out.push('Seniors');
   return out.length ? `<div class="popup-badges">${out.map((t) => `<span class="popup-badge">${escapeHtml(t)}</span>`).join('')}</div>` : '';
 }
@@ -72,17 +73,18 @@ function housingFacts(b: Building): string {
   return parts.length ? `<div class="popup-muted popup-housing">${escapeHtml(parts.join(' · '))}</div>` : '';
 }
 
-/** Who runs non-market housing and who its units are for (the City's clientele counts). */
+/** Who runs non-market housing and who its units are for (the City's clientele counts). A co-op
+ * runs itself, so it shows only the unit mix. */
 function nonMarketLine(b: Building): string {
   const nm = b.housing.non_market;
   if (!nm) return '';
   const parts = [
-    nm.operators.length ? `Non-market housing operated by ${nm.operators.join(' and ')}` : 'Non-market housing',
+    b.coop ? '' : nm.operators.length ? `Non-market housing operated by ${nm.operators.join(' and ')}` : 'Non-market housing',
     nm.seniors_units ? plural(nm.seniors_units, 'seniors unit', 'seniors units') : '',
     nm.family_units ? `${plural(nm.family_units, 'family-size unit', 'family-size units')} (2+ bedrooms)` : '',
     nm.other_units ? plural(nm.other_units, 'unit for singles', 'units for singles') : '',
   ].filter(Boolean);
-  return `<div class="popup-housing">${escapeHtml(parts.join(' · '))}</div>`;
+  return parts.length ? `<div class="popup-housing">${escapeHtml(parts.join(' · '))}</div>` : '';
 }
 
 export function renderSummary(b: Building, ctx: PopupContext): string {

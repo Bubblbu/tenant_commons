@@ -26,7 +26,9 @@ export function flatten(b: Building, networks: Record<string, Network>): Buildin
   const owner = first(b, 'owner');
   const net = b.network_id ? networks[b.network_id] ?? null : null;
   const nonMarket = b.housing.non_market;
-  const housing = [b.coop ? 'co-op' : '', b.sro ? 'sro' : '', nonMarket ? 'non-market' : '', nonMarket?.seniors ? 'seniors' : '']
+  // The City counts co-ops as non-market; on the map a co-op is a Co-op, not also Non-market.
+  const housing = [b.coop ? 'co-op' : '', b.sro ? 'sro' : '', nonMarket && !b.coop ? 'non-market' : '',
+    nonMarket?.seniors ? 'seniors' : '']
     .filter(Boolean).join(', ');
   const { owner: ownerType, market } = b.classification;
   return {

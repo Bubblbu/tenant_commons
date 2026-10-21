@@ -101,3 +101,12 @@ describe('flatten, housing facts', () => {
     expect(FLAT_COLUMNS).toEqual(expect.arrayContaining(['licence_type', 'purpose_built', 'zoning']));
   });
 });
+
+describe('flatten, co-ops on the non-market list', () => {
+  it('match Co-op, not Non-market', () => {
+    const nonMarket = { family_units: 23, seniors_units: 58, other_units: 0, operators: ['X Co-op'], seniors: true };
+    const r = flatten({ ...york, sro: null, coop: { status: null, ownership_model: 'non_profit', url: null },
+      housing: { licence_types: [], purpose_built: false, zoning: null, non_market: nonMarket } }, {});
+    expect(r.housing_type).toBe('co-op, seniors');
+  });
+});

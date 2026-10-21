@@ -67,3 +67,23 @@ describe('renderSummary, housing facts', () => {
     expect(t).not.toContain('Non-market');
   });
 });
+
+describe('renderSummary, co-ops on the non-market list', () => {
+  const coop = { status: null, ownership_model: 'non_profit' as const, url: null };
+  const nm = (seniors: boolean) => ({ family_units: 23, seniors_units: seniors ? 58 : 0, other_units: 0,
+    operators: ['North Arm Housing Co-op'], seniors });
+  const badges = (html: string) =>
+    [...new DOMParser().parseFromString(html, 'text/html').querySelectorAll('.popup-badge')].map((b) => b.textContent);
+
+  it('shows Co-op, not Non-market, and only the unit mix', () => {
+    const html = renderSummary({ ...YORK, sro: null, coop, housing: { licence_types: [], purpose_built: false, zoning: null, non_market: nm(false) } }, CTX);
+    expect(badges(html)).toEqual(['Co-op']);
+    expect(text(html)).toContain('23 family-size units (2+ bedrooms)');
+    expect(text(html)).not.toContain('operated by');
+  });
+
+  it('still flags a seniors co-op', () => {
+    const html = renderSummary({ ...YORK, sro: null, coop, housing: { licence_types: [], purpose_built: false, zoning: null, non_market: nm(true) } }, CTX);
+    expect(badges(html)).toEqual(['Co-op', 'Seniors']);
+  });
+});
