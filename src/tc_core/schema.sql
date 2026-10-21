@@ -61,7 +61,8 @@ CREATE TABLE raw_buildings (
     zoning_district TEXT,
     zoning_classification TEXT,
     name TEXT,                 -- non-market housing list's project name
-    foi_name TEXT,             -- FOI rental list's building name
+    foi_name TEXT,
+    foi_release TEXT,          -- "2024-698" (the City's purpose-built rental list) or "2023-186"             -- FOI rental list's building name
     management TEXT,
     n_issues INTEGER,
     issues_details TEXT,
