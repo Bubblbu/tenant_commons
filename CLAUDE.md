@@ -154,6 +154,7 @@ Constraints that still hold regardless of use case:
 | Map rendering | **Hand-written Leaflet** (same visual library as now, no Folium), with marker clustering/canvas rendering for scale. Not vector tiles (MapLibre GL) yet — current building counts don't need that, but the data export is shaped so upgrading later, if data volume grows enough to need it, is realistic (Q14). |
 | Frontend tooling | **Vite + TypeScript, no framework** (Q15). Author's React experience (via Headstart, ~2016, pre-hooks) is real but rusty; relearning React well enough to use confidently is a bigger time cost right now than managing map/filter/table state sync by hand in TypeScript. Can migrate *to* a framework later once the JSON data contract is stable — the hard part (data) won't need to change. |
 | Data flow | Python pipeline's job becomes: produce clean JSON/GeoJSON only. All rendering, filtering, and interactivity logic moves to the TypeScript frontend. |
+| Deep links | **`#pid=&lat=&lon=&address=` opens the map on one building** (2026-10-23) — the interface between the tenantcommons.ca website's address picker (a separate repo, using the City geocoder) and the map. Address or PID match opens the popup; otherwise a missing-building popup, never a guess by distance. A public interface like the contract: see [`docs/DEEP_LINKS.md`](docs/DEEP_LINKS.md). |
 
 ---
 

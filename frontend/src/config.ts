@@ -48,6 +48,16 @@ export const BASEMAPS: Record<string, Basemap> = {
   },
 };
 
+/**
+ * PID (9 digits, no dashes) of the building the missing-building popup
+ * suggests instead, to show what the map can tell. null leaves the
+ * suggestion out. Placeholder until one is chosen.
+ */
+export const EXAMPLE_BUILDING_PID: string | null = null;
+
+/** Where the missing-building popup asks tenants to write. */
+export const CONTACT_EMAIL = 'info@tenantcommons.ca';
+
 /** config.toml's former [options].tiles. */
 export const DEFAULT_BASEMAP = 'esri-gray';
 /** Only used if filter_config.json has no bounds; build.py's fallback. */

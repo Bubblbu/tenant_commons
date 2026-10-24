@@ -18,6 +18,7 @@ import { initDisplayOptions } from './display-options';
 import { BASEMAPS, DEFAULT_BASEMAP, DEFAULT_CENTER, DEFAULT_ZOOM, MAX_ZOOM } from './config';
 import { renderCoverage } from './coverage';
 import { loadBuildingArtifacts, loadMapArtifacts } from './data';
+import { initDeepLinks } from './deep-link';
 import { buildOptions, initLandlordPicker, type LandlordFilter } from './landlord-picker';
 import { areaBounds, selectionBounds } from './initial-view';
 import {
@@ -158,6 +159,8 @@ async function main(): Promise<void> {
   });
 
   initDisplayOptions();
+  // After wiring, so a linked building's popup opens on a styled, filtered map.
+  initDeepLinks({ map, records: loaded.buildings, markersById: buildings.markersById });
 
   const landlordViews = ['networks', 'owners'].map((v) => ({
     button: document.getElementById(`landlord-view-${v}`),
