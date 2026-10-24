@@ -44,3 +44,33 @@ describe('renderSummary', () => {
     expect(t).toContain('Only building we know of for this owner');
   });
 });
+
+describe('renderSummary, key badges only', () => {
+  const nm = { family_units: 12, seniors_units: 40, other_units: 0, operators: ['New Chelsea Society'], seniors: true };
+  const badges = (html: string) =>
+    [...new DOMParser().parseFromString(html, 'text/html').querySelectorAll('.popup-badge')].map((b) => b.textContent);
+  const owner = { value: 'non_profit' as const, legal_forms: [], parts: [], reason: null, basis: ['registry' as const], inferred: false };
+
+  it('shows program and owner type badges, and no classification or facts lines', () => {
+    const b = { ...YORK, sro: null, housing: { licence_types: ['Apartment house' as const], purpose_built: true, zoning: 'RM-4', non_market: nm },
+      classification: { owner, market: { value: 'non_market' as const, basis: ['non_market_list' as const], inferred: false }, operator: null, scale: 'small_portfolio' as const } };
+    const html = renderSummary(b, CTX);
+    expect(badges(html)).toEqual(['Non-market', 'Seniors', 'Non-profit']);
+    const t = text(html);
+    for (const gone of ['small portfolio', 'zoned RM-4', 'City licence', 'operated by', 'seniors units']) expect(t).not.toContain(gone);
+  });
+
+  it('marks an inferred owner type badge', () => {
+    const b = { ...YORK, sro: null, classification: { owner: { ...owner, value: 'private' as const, basis: ['licence' as const], inferred: true },
+      market: null, operator: null, scale: null } };
+    const el = new DOMParser().parseFromString(renderSummary(b, CTX), 'text/html').querySelector('.popup-badge.owner')!;
+    expect(el.textContent).toBe('Private');
+    expect(el.classList.contains('inferred')).toBe(true);
+  });
+
+  it('a co-op on the non-market list shows Co-op, not Non-market', () => {
+    const b = { ...YORK, sro: null, coop: { status: null, ownership_model: 'non_profit' as const, url: null },
+      housing: { licence_types: [], purpose_built: false, zoning: null, non_market: { ...nm, seniors: false } } };
+    expect(badges(renderSummary(b, CTX))).toEqual(['Co-op']);
+  });
+});

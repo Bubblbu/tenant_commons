@@ -176,3 +176,15 @@ describe('network members by kind', () => {
     expect(dom(renderOwnership(york, CTX)).querySelector('.node.bldg .popup-kind')!.textContent).toBe('company');
   });
 });
+
+describe('renderOwnership, classification', () => {
+  it('opens with the classification line', () => {
+    const b = { ...YORK, classification: { owner: { value: 'private' as const, legal_forms: ['numbered_company' as const], parts: [], reason: null,
+      basis: ['registry' as const], inferred: false }, market: null, operator: null, scale: 'large_portfolio' as const } };
+    const d = dom(renderOwnership(b, CTX));
+    d.querySelectorAll('.prov').forEach((n) => n.remove());  // provenance icons' "i"
+    const t = d.textContent!.replace(/\s+/g, ' ');
+    expect(t.indexOf('Private · numbered company · large portfolio')).toBeGreaterThanOrEqual(0);
+    expect(t.indexOf('Private')).toBeLessThan(t.indexOf('Network'));
+  });
+});

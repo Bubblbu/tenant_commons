@@ -15,6 +15,7 @@ export const FLAT_COLUMNS = [
   'network_evidence_registry', 'network_evidence_city', 'network_evidence_research',
   'pids', 'registry_no_filing', 'value_land', 'value_bldg', 'bldg_land_ratio', 'land_share_pctl',
   'owner_type', 'owner_legal_forms', 'market', 'portfolio_units', 'portfolio_value',
+  'licence_type', 'purpose_built', 'zoning',
   'housing_type', 'rezoning_status', 'n_issues', 'issues_details',
   'areas', 'lat', 'lon',
 ];
@@ -24,7 +25,11 @@ const first = (b: Building, role: Party['role']): Party | null => b.parties.find
 export function flatten(b: Building, networks: Record<string, Network>): BuildingRecord {
   const owner = first(b, 'owner');
   const net = b.network_id ? networks[b.network_id] ?? null : null;
-  const housing = [b.coop ? 'co-op' : '', b.sro ? 'sro' : ''].filter(Boolean).join(', ');
+  const nonMarket = b.housing.non_market;
+  // The City counts co-ops as non-market; on the map a co-op is a Co-op, not also Non-market.
+  const housing = [b.coop ? 'co-op' : '', b.sro ? 'sro' : '', nonMarket && !b.coop ? 'non-market' : '',
+    nonMarket?.seniors ? 'seniors' : '']
+    .filter(Boolean).join(', ');
   const { owner: ownerType, market } = b.classification;
   return {
     b_id: b.id,
@@ -65,6 +70,9 @@ export function flatten(b: Building, networks: Record<string, Network>): Buildin
     // The landlord's network on the map (spec 2026-10-20): a lower bound.
     portfolio_units: net?.totals.units ?? null,
     portfolio_value: net?.totals.assessed_value ?? null,
+    licence_type: b.housing.licence_types.length ? b.housing.licence_types.join('; ') : null,
+    purpose_built: b.housing.purpose_built,
+    zoning: b.housing.zoning,
     housing_type: housing,
     rezoning_status: b.rezoning?.status ?? null,
     n_issues: b.issues?.count ?? null,

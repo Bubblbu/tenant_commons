@@ -12,7 +12,7 @@ from typing import Annotated, Literal
 
 from pydantic import AfterValidator, BaseModel, ConfigDict, Field, Strict
 
-SCHEMA_VERSION = 5
+SCHEMA_VERSION = 6
 
 _SENTINELS = {"(unknown)", "unknown"}
 
@@ -140,6 +140,28 @@ class Classification(_Model):
     operator: OperatorAxis | None
     scale: Scale | None
 
+LicenceType = Literal["Apartment house", "Rooming house", "Apartment house (99-year lease)"]
+
+
+class NonMarketHousing(_Model):
+    """The City's non-market housing list: units by clientele, and operator."""
+
+    family_units: Int  # the City's "families": units with two or more bedrooms
+    seniors_units: Int  # units for people typically over 55
+    other_units: Int  # units for single non-seniors
+    operators: list[Text]
+    seniors: bool  # at least four fifths of the units are for seniors
+
+
+class Housing(_Model):
+    """Plain facts the City publishes about the building (spec 2026-10-20, housing type)."""
+
+    licence_types: list[LicenceType]  # its 2024 rental licence, by building type
+    purpose_built: bool  # on the City's purpose-built rental list (FOI 2024-698)
+    zoning: Text | None
+    non_market: NonMarketHousing | None
+
+
 class Building(_Model):
     id: Int
     origin: Literal["building", "overlay_sro", "overlay_coop"]
@@ -167,6 +189,7 @@ class Building(_Model):
     sro: Sro | None
     rezoning: Rezoning | None
     classification: Classification
+    housing: Housing
 
 
 class Evidence(_Model):
@@ -210,12 +233,12 @@ class Network(_Model):
 
 
 class BuildingRecordsFile(_Model):
-    schema_version: Literal[5]
+    schema_version: Literal[6]
     records: dict[str, Building]
 
 
 class NetworksFile(_Model):
-    schema_version: Literal[5]
+    schema_version: Literal[6]
     networks: dict[str, Network]
 
 

@@ -25,6 +25,7 @@ const york: Building = {
   network_id: 'net:cressey', registry_search: { status: 'filed', date: null },
   coop: null, sro: { rooms: 10, occupancy: 'open', owner_sector: 'private', operator_sector: null }, rezoning: null,
   classification: { owner: null, market: null, operator: null, scale: null },
+  housing: { licence_types: [], purpose_built: false, zoning: null, non_market: null },
 };
 
 describe('flatten', () => {
@@ -84,5 +85,28 @@ describe('flatten, classification', () => {
   it('leaves unknown axes and portfolios null', () => {
     const r = flatten({ ...york, network_id: null }, {});
     expect([r.owner_type, r.market, r.portfolio_units, r.portfolio_value]).toEqual([null, null, null, null]);
+  });
+});
+
+describe('flatten, housing facts', () => {
+  const nonMarket = { family_units: 0, seniors_units: 40, other_units: 2, operators: ['New Chelsea Society'], seniors: true };
+  it('adds non-market and seniors to the housing types the filter reads', () => {
+    const r = flatten({ ...york, sro: null, housing: { licence_types: [], purpose_built: false, zoning: null, non_market: nonMarket } }, {});
+    expect(r.housing_type).toBe('non-market, seniors');
+  });
+
+  it('carries licence type, purpose-built list and zoning as plain CSV columns', () => {
+    const r = flatten({ ...york, housing: { licence_types: ['Apartment house'], purpose_built: true, zoning: 'RM-4', non_market: null } }, {});
+    expect([r.licence_type, r.purpose_built, r.zoning]).toEqual(['Apartment house', true, 'RM-4']);
+    expect(FLAT_COLUMNS).toEqual(expect.arrayContaining(['licence_type', 'purpose_built', 'zoning']));
+  });
+});
+
+describe('flatten, co-ops on the non-market list', () => {
+  it('match Co-op, not Non-market', () => {
+    const nonMarket = { family_units: 23, seniors_units: 58, other_units: 0, operators: ['X Co-op'], seniors: true };
+    const r = flatten({ ...york, sro: null, coop: { status: null, ownership_model: 'non_profit', url: null },
+      housing: { licence_types: [], purpose_built: false, zoning: null, non_market: nonMarket } }, {});
+    expect(r.housing_type).toBe('co-op, seniors');
   });
 });

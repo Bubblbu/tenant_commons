@@ -2,7 +2,7 @@
 import type { Building, Party } from '../contract.gen';
 import { escapeHtml } from '../html';
 import { evidenceParts, provenanceIcon } from '../provenance';
-import { classificationHeadline } from './classification';
+import { ownerTypeBadge } from './classification';
 import { LABELS } from './labels';
 import { linked, plural, sourceText } from './format';
 import type { PopupContext } from './index';
@@ -20,7 +20,11 @@ function badges(b: Building): string {
     if (b.sro.occupancy) out.push(LABELS.occupancy[b.sro.occupancy]);
   }
   if (b.coop) out.push('Co-op');
-  return out.length ? `<div class="popup-badges">${out.map((t) => `<span class="popup-badge">${escapeHtml(t)}</span>`).join('')}</div>` : '';
+  // The City counts co-ops as non-market; a co-op's badge says Co-op only.
+  if (b.housing.non_market && !b.coop) out.push('Non-market');
+  if (b.housing.non_market?.seniors) out.push('Seniors');
+  const html = out.map((t) => `<span class="popup-badge">${escapeHtml(t)}</span>`).join('') + ownerTypeBadge(b);
+  return html ? `<div class="popup-badges">${html}</div>` : '';
 }
 
 function ownedBy(b: Building, ctx: PopupContext): string {
@@ -63,6 +67,6 @@ export function renderSummary(b: Building, ctx: PopupContext): string {
     ? row('Licensed to', `${escapeHtml(licensee.name)}${icon(licensee, ctx)}`) : '';
   const issues = b.issues
     ? `<div class="popup-issues">${linked(plural(b.issues.count, 'outstanding City issue', 'outstanding City issues'), b.issues.url)}</div>` : '';
-  return badges(b) + classificationHeadline(b) + rezoningAlert(b) + row('Owned by', ownedBy(b, ctx)) + row('Managed by', managedBy(b, ctx)) +
+  return badges(b) + rezoningAlert(b) + row('Owned by', ownedBy(b, ctx)) + row('Managed by', managedBy(b, ctx)) +
     licensed + portfolio(b, ctx) + issues;
 }

@@ -57,6 +57,7 @@ format, cadence, quirks). It stops there.
 | [`block-numbers.csv`](#block-numberscsv) | Open Data portal | 2026-09-18 | On demand (`fetch_cov_open_data.py`) | `tc_core` |
 | [`local-area-boundary.csv`](#local-area-boundarycsv) | Open Data portal | 2026-09-18 | On demand (`fetch_cov_open_data.py`) | none (`tc_core` uses the GeoJSON export) |
 | [`city-owned-properties.csv`](#city-owned-propertiescsv) | Open Data portal | 2026-09-24 | On demand (`fetch_cov_open_data.py`) | `tc_core` |
+| [`business-licences-2013-to-2024.csv`](#business-licences-2013-to-2024csv) | Open Data portal (2024 slice) | 2026-10-20 | Static (historic dataset) | `tc_core` |
 | [`sra_housing_combined.csv`](#sra_housing_combinedcsv) | FOI? — unverified ⚠️ | 2026-07-30 (file date) | TODO | `tc_core` |
 | [`rezoning_applications.csv`](#rezoning_applicationscsv) | FOI? — unverified ⚠️ | 2026-07-30 (file date) | TODO | `tc_core` |
 | [`coops_vancouver.csv`](#coops_vancouvercsv) | Third-party online | 2026-08-04 | Periodic (re-run script) | `tc_core` |
@@ -277,6 +278,32 @@ for the full rebuild order.
 - **Consumed by:** `metrics/sector.py::city_owned_buildings` (building
   classification).
 - **Refresh cadence:** on demand with the other Open Data files.
+
+---
+
+### `business-licences-2013-to-2024.csv`
+
+- **What it is:** the City's historic business licences. Until 2024 long-term
+  rentals were licensed by building type (Apartment House, Apartment House
+  Strata, Multiple Dwelling, Duplex, Single Detached House, Secondary Suite,
+  Rooming House, Pre-1956 Dwelling, 99-year lease); from 2025 they are one
+  "Long-term Rental" type. We keep only the 2024 rows of the types the City
+  publishes **with addresses**: Apartment House (a building with 3+ dwelling
+  units, possibly strata), Rooming House, and 99-year lease. The other types
+  are published without addresses. Strata rentals had addresses only in
+  2013–2019 (not fetched).
+- **Origin and access method:** fetched by `scripts/fetch_cov_open_data.py`
+  (`--only business-licences-2013-to-2024`) with a server-side filter
+  (`where`/`select`, `fetch/cov_open_data.py::RENTAL_LICENCE_TYPES_2024`);
+  licensee names are not fetched.
+- **License/attribution:** Open Government Licence – Vancouver.
+- **Format/known quirks:** semicolon CSV. Almost every 2024 row has status
+  "Inactive" because the year is archived; Cancelled / Gone Out of Business
+  are the ones to drop. Match buildings by primary *and* secondary addresses:
+  about 10% of licences sit at a building's secondary address.
+- **Output location:** `raw_licences_2024` (`ingest/raw_housing_sources.py`).
+- **Consumed by:** `metrics/housing.py` (a building's licence type).
+- **Refresh cadence:** none needed; the dataset is closed.
 
 ---
 

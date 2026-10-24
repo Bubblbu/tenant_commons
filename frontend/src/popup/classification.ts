@@ -1,4 +1,4 @@
-/** The classification headline on the Summary tab and party kind chips (spec 2026-10-20). */
+/** Classification on the popup: the owner type badge (Summary), the classification line (Ownership tab) and party kind chips (spec 2026-10-20). */
 import type { Building, Party } from '../contract.gen';
 import { escapeHtml } from '../html';
 import { provenanceIcon } from '../provenance';
@@ -23,6 +23,15 @@ function mixedText(parts: string[], reason: string | null): string {
     return `City land, ${holders.join(' and ') || 'public'} leasehold`;
   }
   return `Mixed: ${parts.map(label).join(' and ')}`;
+}
+
+/** The owner type as a Summary badge; an inferred one reads softer, with its basis. */
+export function ownerTypeBadge(b: Building): string {
+  const owner = b.classification.owner;
+  if (!owner) return '';
+  const text = owner.value === 'mixed' ? mixedText(owner.parts, owner.reason) : LABELS.ownerType[owner.value];
+  const why = ownerWhy(owner.basis);
+  return `<span class="popup-badge owner${owner.inferred ? ' inferred' : ''}">${escapeHtml(text)}</span>${why ? provenanceIcon(why) : ''}`;
 }
 
 export function classificationHeadline(b: Building): string {

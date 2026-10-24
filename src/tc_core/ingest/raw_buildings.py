@@ -76,6 +76,7 @@ RAW_BUILDINGS_COLUMNS = [
     "zoning_classification",
     "name",
     "foi_name",
+    "foi_release",
     "management",
     "n_issues",
     "issues_details",

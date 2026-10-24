@@ -31,6 +31,7 @@ def test_plan_covers_every_consumer_format(tmp_path):
         "city-owned-properties.csv",
         "block-outlines.csv",
         "block-numbers.csv",
+        "business-licences-2013-to-2024.csv",
     }
 
 
@@ -84,3 +85,20 @@ def test_fetch_all_logs_each_file(tmp_path):
     )
     assert [d.out_path.name for d in done] == ["block-numbers.csv"]
     assert any("block-numbers.csv" in line for line in lines)
+
+
+def test_2024_rental_licences_are_filtered_on_the_server(tmp_path):
+    """Only the addressed rental licence types from 2024, the last year the City
+    split long-term rentals by building type (spec 2026-10-20 housing type)."""
+    (dl,) = plan_downloads(tmp_path, only=["business-licences-2013-to-2024"])
+    seen = {}
+
+    def get(url, **kwargs):
+        seen.update(kwargs["params"])
+        return FakeResponse()
+
+    download(dl, get=get)
+    assert 'folderyear="24"' in seen["where"]
+    assert '"Apartment House *Historic*"' in seen["where"] and '"Rooming House *Historic*"' in seen["where"]
+    assert seen["select"] == "licencenumber,status,businesstype,house,street,geo_point_2d"
+    assert "businessname" not in seen["select"]

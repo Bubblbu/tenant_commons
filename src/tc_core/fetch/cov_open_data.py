@@ -25,6 +25,17 @@ class Dataset:
     id: str
     formats: tuple[str, ...]
     refine: str | None = None  # may contain "{year}"
+    # Server-side filters (ODSQL), for datasets where only a slice is needed.
+    where: str | None = None
+    select: str | None = None
+
+
+# 2024 is the last year the City licensed long-term rentals by building type,
+# and only these types carry addresses (spec 2026-10-20, housing type).
+# Licensee names are not fetched.
+RENTAL_LICENCE_TYPES_2024 = (
+    "Apartment House *Historic*", "Rooming House *Historic*", "Apartment House-99 Year Lease *Historic*",
+)
 
 
 DATASETS = (
@@ -37,6 +48,12 @@ DATASETS = (
     Dataset("city-owned-properties", ("csv",)),
     Dataset("block-outlines", ("csv",)),
     Dataset("block-numbers", ("csv",)),
+    Dataset(
+        "business-licences-2013-to-2024", ("csv",),
+        where='folderyear="24" and businesstype in ('
+        + ",".join(f'"{t}"' for t in RENTAL_LICENCE_TYPES_2024) + ")",
+        select="licencenumber,status,businesstype,house,street,geo_point_2d",
+    ),
 )
 
 
@@ -47,6 +64,8 @@ class Download:
     refine: str | None
     url: str
     out_path: Path
+    where: str | None = None
+    select: str | None = None
 
 
 def plan_downloads(
@@ -70,6 +89,7 @@ def plan_downloads(
                     ds.id, fmt, refine,
                     f"{BASE_URL}/{ds.id}/exports/{fmt}",
                     out_dir / f"{ds.id}.{fmt}",
+                    ds.where, ds.select,
                 )
             )
     return plan
@@ -80,7 +100,7 @@ def download(dl: Download, get: Callable = requests.get, chunk_size: int = 1 << 
     success, so a dropped connection never clobbers an existing good file."""
     dl.out_path.parent.mkdir(parents=True, exist_ok=True)
     tmp = dl.out_path.with_name(dl.out_path.name + ".part")
-    params = {"refine": dl.refine} if dl.refine else None
+    params = {k: v for k, v in (("refine", dl.refine), ("where", dl.where), ("select", dl.select)) if v} or None
     total = 0
     try:
         r = get(dl.url, stream=True, params=params, timeout=120)

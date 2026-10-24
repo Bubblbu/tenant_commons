@@ -5,7 +5,7 @@ import { FLAT_COLUMNS } from './flat';
 
 describe('checkSchemaVersion', () => {
   it('accepts the expected version', () => {
-    expect(() => checkSchemaVersion('marker_metadata.json', { schema_version: 5, markers: [] })).not.toThrow();
+    expect(() => checkSchemaVersion('marker_metadata.json', { schema_version: 6, markers: [] })).not.toThrow();
   });
 
   it('rejects a different version, naming the file', () => {
@@ -27,13 +27,14 @@ describe('buildingViews', () => {
       units_basis: 'inventory', year_built: 1950, listed_in: [], value: null, issues: null, parties: [],
       network_id: 'n1', registry_search: { status: 'not_searched', date: null }, coop: null, sro: null, rezoning: null,
       classification: { owner: null, market: null, operator: null, scale: null },
+  housing: { licence_types: [], purpose_built: false, zoning: null, non_market: null },
     };
     const n1: Network = { id: 'n1', name: 'N', name_source: 'default', tier: 'name_match',
       evidence: { registry: 0, city_records: 0, vtu_research: 0 }, entities: [],
       totals: { buildings: 1, units: 5, assessed_value: null, open_issues: 0, properties_on_title: null } };
     const views = buildingViews(
-      { schema_version: 5, records: { '7': b } },
-      { schema_version: 5, networks: { n1 } },
+      { schema_version: 6, records: { '7': b } },
+      { schema_version: 6, networks: { n1 } },
     );
     expect(views.buildings['7']).toBe(b);
     expect(views.networks.n1).toBe(n1);

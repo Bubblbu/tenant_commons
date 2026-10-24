@@ -408,6 +408,9 @@ def run(paths: DataPaths) -> None:
         "bsns_year",
         "name",
         "foi_name",
+        # Which FOI list the building came from: "2024-698" is the City's
+        # purpose-built rental list (it wins where both list an address).
+        "foi_release",
         "management",
         "n_issues",
         "issues_details",

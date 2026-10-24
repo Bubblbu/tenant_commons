@@ -9,7 +9,7 @@ export const LEGEND_LEFT_OFFSET = SIDEBAR_WIDTH + 20;
 export const MOBILE_BREAKPOINT_PX = 768;
 
 /** The artifact contract version this frontend understands (spec §4). */
-export const EXPECTED_SCHEMA_VERSION = 5;
+export const EXPECTED_SCHEMA_VERSION = 6;
 
 /** Artifact files live at <base>/data/ (served or copied by artifacts-plugin.ts). */
 export function artifactUrl(name: string): string {
@@ -47,6 +47,16 @@ export const BASEMAPS: Record<string, Basemap> = {
     maxNativeZoom: 16,
   },
 };
+
+/**
+ * PID (9 digits, no dashes) of the building the missing-building popup
+ * suggests instead, to show what the map can tell. null leaves the
+ * suggestion out. Placeholder until one is chosen.
+ */
+export const EXAMPLE_BUILDING_PID: string | null = null;
+
+/** Where the missing-building popup asks tenants to write. */
+export const CONTACT_EMAIL = 'info@tenantcommons.ca';
 
 /** config.toml's former [options].tiles. */
 export const DEFAULT_BASEMAP = 'esri-gray';

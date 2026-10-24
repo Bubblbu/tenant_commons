@@ -10,7 +10,8 @@ const base = (b: Partial<Building> & Pick<Building, 'id' | 'address'>): Building
   areas: [], units: null, units_basis: null, year_built: null, listed_in: [],
   value: null, issues: null, parties: [], network_id: null, registry_search: { status: 'not_searched', date: null },
   coop: null, sro: null, rezoning: null,
-  classification: { owner: null, market: null, operator: null, scale: null }, ...b,
+  classification: { owner: null, market: null, operator: null, scale: null },
+  housing: { licence_types: [], purpose_built: false, zoning: null, non_market: null }, ...b,
 });
 
 export const NETWORKS: Record<string, Network> = {

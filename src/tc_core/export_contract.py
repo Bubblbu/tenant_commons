@@ -11,6 +11,8 @@ from statistics import median
 from .contract import (
     Building,
     Coop,
+    Housing,
+    NonMarketHousing,
     Evidence,
     Issues,
     Network,
@@ -22,6 +24,7 @@ from .contract import (
     Value,
 )
 from .export_parties import _date, _http, _text, build_parties
+from .metrics.housing import HousingFacts
 from .metrics.sector import BuildingFacts, EntityClassifier, ScaleThresholds, classify_building
 from .sro_text import sector
 
@@ -152,9 +155,24 @@ def _facts(row: Mapping[str, object], coop: Coop | None, sro: Sro | None, listed
     )
 
 
+def _housing(facts: HousingFacts | None) -> Housing:
+    facts = facts or HousingFacts()
+    nm = facts.non_market
+    return Housing(
+        licence_types=facts.licence_types,
+        purpose_built=facts.purpose_built,
+        zoning=_text(facts.zoning),
+        non_market=NonMarketHousing(
+            family_units=nm.family_units, seniors_units=nm.seniors_units, other_units=nm.other_units,
+            operators=nm.operators, seniors=nm.seniors,
+        ) if nm else None,
+    )
+
+
 def build_building(
     row: Mapping[str, object], *, shares: LandShares, clusters: Mapping[str, str],
     classify: EntityClassifier | None = None, thresholds: ScaleThresholds = ScaleThresholds(),
+    housing: HousingFacts | None = None,
 ) -> Building:
     classify = classify or EntityClassifier()
     parties = build_parties(row, clusters, classify)
@@ -183,6 +201,7 @@ def build_building(
         sro=sro,
         rezoning=_rezoning(row),
         classification=classify_building(parties, classify, _facts(row, coop, sro, listed_in), thresholds),
+        housing=_housing(housing),
     )
 
 
