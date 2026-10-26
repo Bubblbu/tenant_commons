@@ -51,9 +51,9 @@ export const BASEMAPS: Record<string, Basemap> = {
 /**
  * PID (9 digits, no dashes) of the building the missing-building popup
  * suggests instead, to show what the map can tell. null leaves the
- * suggestion out. Placeholder until one is chosen.
+ * suggestion out. 1925 Nelson St (Park Beach Manor), chosen 2026-10-25.
  */
-export const EXAMPLE_BUILDING_PID: string | null = null;
+export const EXAMPLE_BUILDING_PID: string | null = '015738302';
 
 /** Where the missing-building popup asks tenants to write. */
 export const CONTACT_EMAIL = 'info@tenantcommons.ca';

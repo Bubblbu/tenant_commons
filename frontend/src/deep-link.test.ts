@@ -80,6 +80,19 @@ describe('renderMissingPopup', () => {
     expect(html).not.toContain('example building');
   });
 
+  it('explains that the map covers mainly rental apartment buildings', () => {
+    const html = renderMissingPopup(link({ address: '1865 E 10TH AV' }), null);
+    expect(html).toContain('mainly rental apartment buildings');
+    expect(html).toContain('smaller landlords');
+  });
+
+  it('puts the email address on a line of its own', () => {
+    const d = document.createElement('div');
+    d.innerHTML = renderMissingPopup(link({ address: '1865 E 10TH AV' }), null);
+    const contact = d.querySelector('.tc-missing-contact')!;
+    expect(contact.textContent!.trim()).toBe('info@tenantcommons.ca');
+  });
+
   it('gives the email address, with the building in the subject', () => {
     const html = renderMissingPopup(link({ address: '1865 E 10TH AV' }), null);
     expect(html).toContain('href="mailto:info@tenantcommons.ca?subject=Missing%20building%3A%201865%20E%2010th%20Ave"');

@@ -58,4 +58,5 @@
 .leaflet-popup.tc-popup-below { margin-bottom: 0; margin-top: 20px; }
 .tc-popup-below .leaflet-popup-tip-container { top: -19px; margin-top: 0; }
 .tc-popup-below .leaflet-popup-tip { margin: 11px auto 0; }
-.tc-missing p { margin: 6px 0 0; }
+.tc-missing p { margin: 10px 0 0; line-height: 1.45; }
+.tc-missing .tc-missing-contact { margin-top: 4px; font-weight: 600; }

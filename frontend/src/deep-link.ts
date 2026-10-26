@@ -102,9 +102,12 @@ export function renderMissingPopup(link: DeepLink, examplePid: string | null = E
   const example = examplePid
     ? `<p>See what the map can show: <a href="#pid=${encodeURIComponent(examplePid)}">an example building</a>.</p>` : '';
   return `<div class="tc-popup tc-missing">${address}` +
-    '<p>We don\'t have this building on the map yet.</p>' +
-    '<p>We\'re working on a way for you to tell us about it. Until then, email us at ' +
-    `<a href="mailto:${CONTACT_EMAIL}?subject=${subject}">${CONTACT_EMAIL}</a>.</p>` +
+    '<p><strong>We don\'t have this building on the map yet.</strong></p>' +
+    '<p>The map currently covers mainly rental apartment buildings from the City\'s records. ' +
+    'Smaller rentals, like houses, suites, duplexes and rented condos, and their smaller landlords ' +
+    'are often missing.</p>' +
+    '<p>We\'re working on a way for you to tell us about a building. Until then, email us:</p>' +
+    `<p class="tc-missing-contact"><a href="mailto:${CONTACT_EMAIL}?subject=${subject}">${CONTACT_EMAIL}</a></p>` +
     `${example}</div>`;
 }
 
