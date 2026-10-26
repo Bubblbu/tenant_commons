@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from 'vitest';
 import type { Building } from './contract.gen';
-import { addressKey, buildLookup, findBuilding, parseDeepLink, renderMissingPopup, type DeepLink } from './deep-link';
+import { addressKey, buildLookup, deepLinkView, findBuilding, parseDeepLink, renderMissingPopup, type DeepLink } from './deep-link';
 
 // Matching reads only address and pids.
 const rec = (address: string, pids: string[] = []): Building => ({ address, pids }) as unknown as Building;
@@ -37,6 +37,17 @@ describe('parseDeepLink', () => {
     expect(parseDeepLink('#lat=0&lon=0&address=x')).toMatchObject({ lat: null, lon: null });
     expect(parseDeepLink('#lat=49.26&address=x')).toMatchObject({ lat: null, lon: null });
     expect(parseDeepLink('#lat=49.26&lon=abc&address=x')).toMatchObject({ lat: null, lon: null });
+  });
+});
+
+describe('deepLinkView', () => {
+  it('opens a link with coordinates there at street level, before the building records load', () => {
+    expect(deepLinkView('#lat=49.2457&lon=-123.1777&address=3456%20W%2027TH%20AV')).toEqual({ center: [49.2457, -123.1777], zoom: 17 });
+  });
+
+  it('leaves the view alone without coordinates or a link', () => {
+    expect(deepLinkView('#pid=029334772')).toBeNull();
+    expect(deepLinkView('')).toBeNull();
   });
 });
 

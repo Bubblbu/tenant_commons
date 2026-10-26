@@ -18,7 +18,7 @@ import { initDisplayOptions } from './display-options';
 import { BASEMAPS, DEFAULT_BASEMAP, DEFAULT_CENTER, DEFAULT_ZOOM, MAX_ZOOM } from './config';
 import { renderCoverage } from './coverage';
 import { loadBuildingArtifacts, loadMapArtifacts } from './data';
-import { initDeepLinks } from './deep-link';
+import { deepLinkView, initDeepLinks } from './deep-link';
 import { buildOptions, initLandlordPicker, type LandlordFilter } from './landlord-picker';
 import { areaBounds, selectionBounds } from './initial-view';
 import {
@@ -95,7 +95,10 @@ async function main(): Promise<void> {
   // can settle on the wrong center/zoom; there's no prior view worth
   // animating from anyway.
   const b = artifacts.filterConfig.bounds;
-  if (selected) {
+  const linked = deepLinkView(window.location.hash);
+  if (linked) {
+    map.setView(linked.center, linked.zoom, { animate: false });
+  } else if (selected) {
     map.fitBounds(selected, { padding: [20, 20], animate: false });
   } else if (b) {
     map.fitBounds([[b.lat_min, b.lon_min], [b.lat_max, b.lon_max]], { animate: false });

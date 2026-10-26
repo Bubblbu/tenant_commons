@@ -24,6 +24,8 @@ Implemented in `frontend/src/deep-link.ts`.
 2. **PID match:** otherwise, the building on parcel `pid` opens its popup. Only when exactly one building sits on that parcel; some parcels hold several.
 3. **Otherwise:** a missing-building popup at `lat`/`lon` (or the current view's centre without them) says the building isn't on the map yet, gives the contact email (`CONTACT_EMAIL`, subject naming the building), and links to an example building (`EXAMPLE_BUILDING_PID` in `frontend/src/config.ts`) when one is set.
 
+With `lat`/`lon` the map opens there at street level straight away; matching waits for the building records, which load after the basemap. Without them it opens on the whole city until the match is made.
+
 There's no matching by distance: a wrong match would show a tenant someone else's landlord. The map also follows a link that changes the hash while it's open.
 
 ## The City geocoder

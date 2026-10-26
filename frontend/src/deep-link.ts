@@ -50,6 +50,16 @@ export function parseDeepLink(hash: string): DeepLink | null {
   return link.pid || link.address || link.lat !== null ? link : null;
 }
 
+/**
+ * Where the map opens for a link with coordinates: there, at street level.
+ * Matching a building waits for the building records; opening on the city
+ * first would load tiles only to jump away from them. null keeps the default.
+ */
+export function deepLinkView(hash: string): { center: [number, number]; zoom: number } | null {
+  const link = parseDeepLink(hash);
+  return link && link.lat !== null && link.lon !== null ? { center: [link.lat, link.lon], zoom: LOCATE_ZOOM } : null;
+}
+
 const WORDS: Record<string, string> = {
   avenue: 'ave', av: 'ave', street: 'st', road: 'rd', drive: 'dr', boulevard: 'blvd', place: 'pl',
   court: 'ct', crt: 'ct', crescent: 'cres', cr: 'cres', highway: 'hwy',
